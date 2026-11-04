@@ -137,7 +137,7 @@ export default function FootprintDOM() {
   };
 
   return (
-    <div className="flex h-full w-84 shrink-0 flex-col border-l border-grid bg-panel font-mono text-xs select-none shadow-2xl">
+    <div className="flex h-full w-full flex-col bg-panel font-mono text-xs select-none shadow-2xl">
       {/* Top Header / View Toggle */}
       <div className="flex items-center justify-between border-b border-grid px-3 py-2 bg-bg/60">
         <div className="flex items-center gap-1">

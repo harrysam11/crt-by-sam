@@ -26,7 +26,7 @@ export default function Watchlist() {
   });
 
   return (
-    <aside className="hidden w-56 shrink-0 flex-col border-r border-grid bg-panel md:flex">
+    <aside className="flex w-full h-full flex-col bg-panel">
       <div className="flex items-center justify-between border-b border-grid px-3 py-2">
         <span className="font-semibold text-white">Markets</span>
         <button className="rounded border border-grid px-2 py-0.5 text-muted hover:text-white" onClick={() => setSearching((v) => !v)}>

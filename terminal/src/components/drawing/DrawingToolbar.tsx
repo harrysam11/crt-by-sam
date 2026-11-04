@@ -51,7 +51,7 @@ export default function DrawingToolbar({
     }`;
 
   return (
-    <div className="absolute left-2 top-8 z-30 flex flex-col gap-1 rounded-xl border border-grid bg-panel/95 p-1 backdrop-blur-md shadow-2xl select-none font-mono text-xs">
+    <div className="relative z-30 flex w-11 shrink-0 flex-col items-center gap-1 border-r border-grid bg-panel/95 py-2 backdrop-blur-md select-none font-mono text-xs">
       {/* Drawer 1: Cursors */}
       <div className="relative">
         <button
@@ -65,7 +65,7 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'CURSOR' && (
-          <div className="absolute left-10 top-0 z-40 flex flex-col gap-1 rounded-lg border border-grid bg-panel p-1.5 shadow-2xl min-w-[130px]">
+          <div className="absolute left-11 top-0 z-40 flex flex-col gap-1 rounded-lg border border-grid bg-panel p-1.5 shadow-2xl min-w-[130px]">
             <button
               onClick={() => select('CURSOR_CROSSHAIR')}
               className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'CURSOR_CROSSHAIR' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
@@ -107,7 +107,7 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'LINES' && (
-          <div className="absolute left-10 top-0 z-40 flex flex-col gap-1 rounded-lg border border-grid bg-panel p-1.5 shadow-2xl min-w-[150px]">
+          <div className="absolute left-11 top-0 z-40 flex flex-col gap-1 rounded-lg border border-grid bg-panel p-1.5 shadow-2xl min-w-[150px]">
             <button
               onClick={() => select('TRENDLINE')}
               className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'TRENDLINE' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
@@ -161,7 +161,7 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'FIB' && (
-          <div className="absolute left-10 top-0 z-40 flex flex-col gap-1 rounded-lg border border-grid bg-panel p-1.5 shadow-2xl min-w-[160px]">
+          <div className="absolute left-11 top-0 z-40 flex flex-col gap-1 rounded-lg border border-grid bg-panel p-1.5 shadow-2xl min-w-[160px]">
             <button
               onClick={() => select('FIBONACCI')}
               className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'FIBONACCI' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
@@ -191,7 +191,7 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'SHAPES' && (
-          <div className="absolute left-10 top-0 z-40 flex flex-col gap-1 rounded-lg border border-grid bg-panel p-1.5 shadow-2xl min-w-[140px]">
+          <div className="absolute left-11 top-0 z-40 flex flex-col gap-1 rounded-lg border border-grid bg-panel p-1.5 shadow-2xl min-w-[140px]">
             <button
               onClick={() => select('RECTANGLE')}
               className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'RECTANGLE' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
@@ -227,7 +227,7 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'TEXT' && (
-          <div className="absolute left-10 top-0 z-40 flex flex-col gap-1 rounded-lg border border-grid bg-panel p-1.5 shadow-2xl min-w-[140px]">
+          <div className="absolute left-11 top-0 z-40 flex flex-col gap-1 rounded-lg border border-grid bg-panel p-1.5 shadow-2xl min-w-[140px]">
             <button
               onClick={() => select('TEXT')}
               className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'TEXT' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
@@ -263,7 +263,7 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'POSITION' && (
-          <div className="absolute left-10 top-0 z-40 flex flex-col gap-1 rounded-lg border border-grid bg-panel p-1.5 shadow-2xl min-w-[170px]">
+          <div className="absolute left-11 top-0 z-40 flex flex-col gap-1 rounded-lg border border-grid bg-panel p-1.5 shadow-2xl min-w-[170px]">
             <button
               onClick={() => select('POSITION_LONG')}
               className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'POSITION_LONG' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}

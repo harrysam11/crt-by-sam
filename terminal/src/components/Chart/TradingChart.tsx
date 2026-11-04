@@ -831,34 +831,9 @@ export default function TradingChart({
         </button>
       </div>
 
-      {/* Main Chart Canvas & Overlays Container */}
-      <div
-        className="relative min-h-0 flex-1"
-        onClick={(e) => {
-          if (!isSelectingCutPoint || !chartApi || !box.current) return;
-          const rect = box.current.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const time = chartApi.timeScale().coordinateToTime(x);
-          if (time) {
-            const idx = candles.findIndex((c) => c.time >= (time as number));
-            if (idx !== -1) {
-              audioHaptics.tick();
-              setReplayIndex(idx);
-              setIsSelectingCutPoint(false);
-            }
-          }
-        }}
-      >
-        <div ref={ohlc} className="num pointer-events-none absolute left-14 top-1 z-30 text-[11px] text-muted" />
-
-        {/* Watermark */}
-        {chartSettings.showWatermark && (
-          <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center opacity-[0.035] text-4xl sm:text-6xl font-black tracking-widest text-white select-none">
-            {chartSettings.watermarkText}
-          </div>
-        )}
-
-        {/* TradingView-Style Left Vertical Drawing Toolbar */}
+      {/* Chart Center Area: Docked Left Rail + Canvas */}
+      <div className="relative flex flex-1 min-h-0 w-full overflow-hidden">
+        {/* Docked Left Drawing Rail */}
         <DrawingToolbar
           activeTool={activeTool}
           onSelectTool={setActiveTool}
@@ -878,99 +853,170 @@ export default function TradingChart({
           onToggleHideAll={() => setIsHiddenAll((v) => !v)}
         />
 
-        {/* Bar Replay Historical Time Machine Scrubber Bar */}
-        <BarReplayController
-          isActive={isReplayActive}
-          onExit={exitReplay}
-          totalCandles={candles.length}
-          currentReplayIndex={replayIndex}
-          isPlaying={isReplayPlaying}
-          onTogglePlay={() => setIsReplayPlaying((v) => !v)}
-          onStepForward={handleStepForward}
-          onSelectCutPoint={() => setIsSelectingCutPoint((v) => !v)}
-          isSelectingCutPoint={isSelectingCutPoint}
-          speedMs={replaySpeedMs}
-          onSpeedChange={setReplaySpeedMs}
-          currentTimeString={candles[replayIndex] ? new Date(candles[replayIndex].time * 1000).toLocaleString() : undefined}
-        />
+        {/* Main Chart Canvas & Overlays Container */}
+        <div
+          className="relative min-h-0 flex-1 h-full overflow-hidden"
+          onClick={(e) => {
+            if (!isSelectingCutPoint || !chartApi || !box.current) return;
+            const rect = box.current.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const time = chartApi.timeScale().coordinateToTime(x);
+            if (time) {
+              const idx = candles.findIndex((c) => c.time >= (time as number));
+              if (idx !== -1) {
+                audioHaptics.tick();
+                setReplayIndex(idx);
+                setIsSelectingCutPoint(false);
+              }
+            }
+          }}
+        >
+          <div ref={ohlc} className="num pointer-events-none absolute left-4 top-1 z-30 text-[11px] text-muted" />
 
-        {/* Candle-Close Countdown Floating Timer */}
-        {chartSettings.showCountdownTimer && <CandleCountdown timeframe={timeframe} />}
+          {/* Watermark */}
+          {chartSettings.showWatermark && (
+            <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center opacity-[0.035] text-4xl sm:text-6xl font-black tracking-widest text-white select-none">
+              {chartSettings.watermarkText}
+            </div>
+          )}
 
-        {/* Lightweight Charts mounting container */}
-        <div ref={box} className="absolute inset-0 z-10" />
+          {/* Bar Replay Historical Time Machine Scrubber Bar */}
+          <BarReplayController
+            isActive={isReplayActive}
+            onExit={exitReplay}
+            totalCandles={candles.length}
+            currentReplayIndex={replayIndex}
+            isPlaying={isReplayPlaying}
+            onTogglePlay={() => setIsReplayPlaying((v) => !v)}
+            onStepForward={handleStepForward}
+            onSelectCutPoint={() => setIsSelectingCutPoint((v) => !v)}
+            isSelectingCutPoint={isSelectingCutPoint}
+            speedMs={replaySpeedMs}
+            onSpeedChange={setReplaySpeedMs}
+            currentTimeString={candles[replayIndex] ? new Date(candles[replayIndex].time * 1000).toLocaleString() : undefined}
+          />
 
-        {/* Real-time Footprint / Cluster Chart Overlay */}
-        {chartStyle === 'FOOTPRINT' && (
-          <FootprintChartOverlay
+          {/* Candle-Close Countdown Floating Timer */}
+          {chartSettings.showCountdownTimer && <CandleCountdown timeframe={timeframe} />}
+
+          {/* Lightweight Charts mounting container */}
+          <div ref={box} className="absolute inset-0 z-10" />
+
+          {/* Real-time Footprint / Cluster Chart Overlay */}
+          {chartStyle === 'FOOTPRINT' && (
+            <FootprintChartOverlay
+              chartApi={chartApi}
+              seriesApi={seriesApi}
+              candles={effectiveCandles}
+              containerWidth={boxDimensions.w}
+              containerHeight={boxDimensions.h}
+            />
+          )}
+
+          {/* Multi-Timeframe Ghost Charts Canvas Layer */}
+          <GhostOverlay chartApi={chartApi} seriesApi={seriesApi} />
+
+          {/* TradingView-Style SVG Drawing Tools Canvas Layer */}
+          <DrawingOverlay
+            symbol={symbol}
+            activeTool={activeTool}
+            seriesApi={seriesApi}
+            chartApi={chartApi}
+            candles={effectiveCandles}
+            magnetConfig={magnetConfig}
+            isLockedAll={isLockedAll}
+            isHiddenAll={isHiddenAll}
+            onDrawingsCountChange={setDrawingsCount}
+            clearTrigger={clearDrawingTrigger}
+          />
+
+          {/* Interactive In-Chart Measurement Ruler */}
+          <ChartRulerOverlay
+            isActive={isRulerActive}
+            onClose={() => setIsRulerActive(false)}
             chartApi={chartApi}
             seriesApi={seriesApi}
-            candles={effectiveCandles}
-            containerWidth={boxDimensions.w}
-            containerHeight={boxDimensions.h}
           />
-        )}
 
-        {/* Multi-Timeframe Ghost Charts Canvas Layer */}
-        <GhostOverlay chartApi={chartApi} seriesApi={seriesApi} />
+          {/* Sticky Candle Quick-Notes Overlay */}
+          <StickyNotesOverlay
+            symbol={symbol}
+            chartApi={chartApi}
+            isOpen={isNotesOpen}
+            onClose={() => setIsNotesOpen(false)}
+          />
 
-        {/* TradingView-Style SVG Drawing Tools Canvas Layer */}
-        <DrawingOverlay
-          symbol={symbol}
-          activeTool={activeTool}
-          seriesApi={seriesApi}
-          chartApi={chartApi}
-          candles={effectiveCandles}
-          magnetConfig={magnetConfig}
-          isLockedAll={isLockedAll}
-          isHiddenAll={isHiddenAll}
-          onDrawingsCountChange={setDrawingsCount}
-          clearTrigger={clearDrawingTrigger}
-        />
+          {/* Drag-and-Drop Canvas Order Lines */}
+          <CanvasOrderOverlay
+            seriesApi={seriesApi}
+            onExecuteOrders={handleExecuteCanvasOrders}
+          />
 
-        {/* Interactive In-Chart Measurement Ruler */}
-        <ChartRulerOverlay
-          isActive={isRulerActive}
-          onClose={() => setIsRulerActive(false)}
-          chartApi={chartApi}
-          seriesApi={seriesApi}
-        />
+          {/* Risk Sizing HUD Widget */}
+          {showRiskHUD && (
+            <RiskHUD
+              onClose={() => setShowRiskHUD(false)}
+              onApplySize={(qty, slPrice, tpPrice) => {
+                if (window.__setExecutionValues) {
+                  window.__setExecutionValues({ qty: String(qty), sl: slPrice ? String(slPrice) : '', tp: tpPrice ? String(tpPrice) : '' });
+                }
+                setShowRiskHUD(false);
+              }}
+            />
+          )}
 
-        {/* Sticky Candle Quick-Notes Overlay */}
-        <StickyNotesOverlay
-          symbol={symbol}
-          chartApi={chartApi}
-          isOpen={isNotesOpen}
-          onClose={() => setIsNotesOpen(false)}
-        />
+          {/* Loading overlay */}
+          {!candles.length && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-bg/80 p-6 text-center">
+              {error
+                ? <p className="max-w-sm text-down">{error}</p>
+                : <p className="text-muted">Loading {labelOf(symbol)}...</p>}
+            </div>
+          )}
+        </div>
+      </div>
 
-        {/* Drag-and-Drop Canvas Order Lines */}
-        <CanvasOrderOverlay
-          seriesApi={seriesApi}
-          onExecuteOrders={handleExecuteCanvasOrders}
-        />
+      {/* TradingView Bottom Range & Scale Bar */}
+      <div className="h-7 shrink-0 border-t border-grid bg-panel/90 px-3 flex items-center justify-between text-[11px] text-slate-400 select-none font-mono">
+        {/* Left: Time Range Presets */}
+        <div className="flex items-center gap-1">
+          {['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', 'ALL'].map((r) => (
+            <button
+              key={r}
+              onClick={() => {
+                audioHaptics.tick();
+                api.current?.chart.timeScale().fitContent();
+              }}
+              className="px-1.5 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition text-[10px]"
+            >
+              {r}
+            </button>
+          ))}
+        </div>
 
-        {/* Risk Sizing HUD Widget */}
-        {showRiskHUD && (
-          <RiskHUD
-            onClose={() => setShowRiskHUD(false)}
-            onApplySize={(qty, slPrice, tpPrice) => {
-              if (window.__setExecutionValues) {
-                window.__setExecutionValues({ qty: String(qty), sl: slPrice ? String(slPrice) : '', tp: tpPrice ? String(tpPrice) : '' });
-              }
-              setShowRiskHUD(false);
+        {/* Right: Scale & Timezone */}
+        <div className="flex items-center gap-2 text-[10px]">
+          <span className="font-mono text-slate-400">UTC</span>
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              api.current?.chart.timeScale().resetTimeScale();
             }}
-          />
-        )}
-
-        {/* Loading overlay */}
-        {!candles.length && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-bg/80 p-6 text-center">
-            {error
-              ? <p className="max-w-sm text-down">{error}</p>
-              : <p className="text-muted">Loading {labelOf(symbol)}...</p>}
-          </div>
-        )}
+            className="px-1.5 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 font-bold"
+            title="Auto scale"
+          >
+            auto
+          </button>
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+            }}
+            className="px-1.5 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 font-bold"
+            title="Logarithmic scale"
+          >
+            log
+          </button>
+        </div>
       </div>
 
       {/* Indicators, Metrics & Strategies Modal */}

@@ -30,6 +30,7 @@ import { useKeyboardHotkeys } from './hooks/useKeyboardHotkeys';
 import { useTerminalStore } from './store/useTerminalStore';
 import { useDerivativesStore } from './store/useDerivativesStore';
 import { getInstrument } from './services/instruments';
+import { audioHaptics } from './utils/notify';
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
@@ -41,6 +42,7 @@ export default function App() {
 
   const [rightW, setRightW] = useState(300);
   const [bottomH, setBottomH] = useState(240);
+  const [activeRightDrawer, setActiveRightDrawer] = useState<'WATCHLIST' | 'DOM' | 'TRADE' | 'ANALYTICS' | null>('WATCHLIST');
 
   // Modal visibility states
   const [isOptionChainOpen, setIsOptionChainOpen] = useState(false);
@@ -189,29 +191,131 @@ export default function App() {
         isPopoutActive={isPopoutOpen}
       />
 
-      <div className="flex min-h-0 flex-1">
-        <Watchlist />
-
-        <main className="flex min-w-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 relative overflow-hidden">
+        {/* Main Center Area: Chart + Bottom Positions */}
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 relative">
             <MultiChartGrid />
           </div>
           <Splitter dir="h" onDrag={(d) => setBottomH((h) => clamp(h - d, 120, 500))} />
-          <div style={{ height: bottomH }} className="shrink-0">
+          <div style={{ height: bottomH }} className="shrink-0 overflow-hidden">
             <PositionsTable />
           </div>
         </main>
 
-        {/* Institutional Depth of Market & Footprint Sidebar */}
-        {isDomVisible && <FootprintDOM />}
+        {/* Collapsible Right Slideout Drawer */}
+        {activeRightDrawer && (
+          <>
+            <Splitter dir="v" onDrag={(d) => setRightW((w) => clamp(w - d, 260, 520))} />
+            <div style={{ width: rightW }} className="shrink-0 flex flex-col h-full overflow-hidden bg-panel border-l border-grid z-10 shadow-2xl">
+              {activeRightDrawer === 'WATCHLIST' && <Watchlist />}
+              {activeRightDrawer === 'DOM' && <FootprintDOM />}
+              {activeRightDrawer === 'TRADE' && (
+                <div className="flex flex-col h-full overflow-y-auto">
+                  {provider === 'binance' ? <OrderBook /> : <QuotePanel />}
+                  <ExecutionPanel />
+                </div>
+              )}
+              {activeRightDrawer === 'ANALYTICS' && <AnalyticsPanel />}
+            </div>
+          </>
+        )}
 
-        {/* Institutional Seasonals, Technicals & Live News Sidebar */}
-        {isAnalyticsVisible && <AnalyticsPanel />}
+        {/* TradingView-Style Far Right Vertical Icon Dock Rail */}
+        <aside className="w-[44px] shrink-0 border-l border-grid bg-panel/95 flex flex-col items-center py-2.5 gap-2 z-20 select-none font-mono">
+          {/* Watchlist Toggle */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setActiveRightDrawer((prev) => (prev === 'WATCHLIST' ? null : 'WATCHLIST'));
+            }}
+            className={`p-2 rounded-lg transition ${
+              activeRightDrawer === 'WATCHLIST' ? 'bg-accent text-black font-bold ring-1 ring-accent' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Watchlist & Markets"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </svg>
+          </button>
 
-        <Splitter dir="v" onDrag={(d) => setRightW((w) => clamp(w - d, 260, 520))} />
-        <aside style={{ width: rightW }} className="hidden shrink-0 flex-col lg:flex">
-          {provider === 'binance' ? <OrderBook /> : <QuotePanel />}
-          <ExecutionPanel />
+          {/* DOM & Footprint Toggle */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setActiveRightDrawer((prev) => (prev === 'DOM' ? null : 'DOM'));
+            }}
+            className={`p-2 rounded-lg transition ${
+              activeRightDrawer === 'DOM' ? 'bg-accent text-black font-bold ring-1 ring-accent' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Depth of Market (DOM) Ladder & Order Flow"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </button>
+
+          {/* Trade Execution & Order Book Toggle */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setActiveRightDrawer((prev) => (prev === 'TRADE' ? null : 'TRADE'));
+            }}
+            className={`p-2 rounded-lg transition ${
+              activeRightDrawer === 'TRADE' ? 'bg-accent text-black font-bold ring-1 ring-accent' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Order Entry & Live Order Book"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </button>
+
+          {/* Analytics Toggle */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setActiveRightDrawer((prev) => (prev === 'ANALYTICS' ? null : 'ANALYTICS'));
+            }}
+            className={`p-2 rounded-lg transition ${
+              activeRightDrawer === 'ANALYTICS' ? 'bg-accent text-black font-bold ring-1 ring-accent' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Seasonals, Liquidity & News"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+          </button>
+
+          <span className="my-1 h-px w-6 bg-grid" />
+
+          {/* Option Chain Button */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setIsOptionChainOpen(true);
+            }}
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            title="Option Chain Matrix"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+            </svg>
+          </button>
+
+          {/* Economic Calendar */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setIsCalendarOpen(true);
+            }}
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            title="Macro Calendar"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </button>
         </aside>
       </div>
     </div>
