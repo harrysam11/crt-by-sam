@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  createChart, ColorType, CrosshairMode, LineStyle,
+  createChart, ColorType, CrosshairMode, LineStyle, PriceScaleMode,
   type CandlestickData, type IChartApi, type IPriceLine, type ISeriesApi, type Time, type UTCTimestamp,
 } from 'lightweight-charts';
 import { useTerminalStore } from '../../store/useTerminalStore';
@@ -28,13 +28,14 @@ import DrawingOverlay from '../drawing/DrawingOverlay';
 import IndicatorsModal from './IndicatorsModal';
 import BarReplayController from './BarReplayController';
 import ChartSettingsModal, { DEFAULT_CHART_SETTINGS, type ChartSettingsState } from './ChartSettingsModal';
+import ChartLegendHUD, { type ActiveIndicatorInfo } from './ChartLegendHUD';
 import ShareChartModal from '../share/ShareChartModal';
 import RiskHUD from '../RiskHUD';
 
 const SMA_N = 20, EMA_N = 50, EMA_K = 2 / (EMA_N + 1);
 
 const bar = (c: Candle) => ({ time: c.time as UTCTimestamp, open: c.open, high: c.high, low: c.low, close: c.close });
-const vol = (c: Candle) => ({ time: c.time as UTCTimestamp, value: c.volume, color: c.close >= c.open ? 'rgba(38,166,154,.4)' : 'rgba(239,83,80,.4)' });
+const vol = (c: Candle) => ({ time: c.time as UTCTimestamp, value: c.volume, color: c.close >= c.open ? 'rgba(8,153,129,.35)' : 'rgba(242,54,69,.35)' });
 const pts = (cs: Candle[], v: (number | null)[]) =>
   cs.flatMap((c, i) => (v[i] == null ? [] : [{ time: c.time as UTCTimestamp, value: v[i] as number }]));
 
@@ -159,6 +160,88 @@ export default function TradingChart({
     } catch {}
   };
 
+  // Live inside-chart TradingView Legend HUD state
+  const [currentOhlc, setCurrentOhlc] = useState<{ open: number; high: number; low: number; close: number; volume?: number } | null>(null);
+  const [indicatorValues, setIndicatorValues] = useState<{
+    sma?: number | null;
+    ema?: number | null;
+    vwap?: number | null;
+    rsi?: number | null;
+    oi?: number | null;
+  }>({});
+  const [isLogScale, setIsLogScale] = useState(false);
+
+  // Active indicator list for in-chart legend controls
+  const activeIndicatorsList = useMemo<ActiveIndicatorInfo[]>(() => {
+    const list: ActiveIndicatorInfo[] = [];
+    if (showSma) {
+      list.push({
+        id: 'sma',
+        name: 'SMA 20',
+        color: '#f0b90b',
+        value: indicatorValues.sma,
+        visible: showSma,
+        onToggleVisible: () => setShowSma((v) => !v),
+        onRemove: () => setShowSma(false),
+      });
+    }
+    if (showEma) {
+      list.push({
+        id: 'ema',
+        name: 'EMA 50',
+        color: '#4c8dff',
+        value: indicatorValues.ema,
+        visible: showEma,
+        onToggleVisible: () => setShowEma((v) => !v),
+        onRemove: () => setShowEma(false),
+      });
+    }
+    if (showVwap) {
+      list.push({
+        id: 'vwap',
+        name: 'VWAP',
+        color: '#ec4899',
+        value: indicatorValues.vwap,
+        visible: showVwap,
+        onToggleVisible: () => setShowVwap((v) => !v),
+        onRemove: () => setShowVwap(false),
+      });
+    }
+    if (showBbands) {
+      list.push({
+        id: 'bbands',
+        name: 'BB 20 2',
+        color: 'rgba(56, 189, 248, 0.85)',
+        visible: showBbands,
+        onToggleVisible: () => setShowBbands((v) => !v),
+        onRemove: () => setShowBbands(false),
+      });
+    }
+    if (showRsi) {
+      list.push({
+        id: 'rsi',
+        name: 'RSI 14',
+        color: '#c084fc',
+        value: indicatorValues.rsi ? indicatorValues.rsi.toFixed(1) : undefined,
+        visible: showRsi,
+        onToggleVisible: () => setShowRsi((v) => !v),
+        onRemove: () => setShowRsi(false),
+      });
+    }
+    if (showOI) {
+      list.push({
+        id: 'oi',
+        name: 'Open Interest',
+        color: '#38bdf8',
+        value: indicatorValues.oi ? fmtQty(indicatorValues.oi) : undefined,
+        visible: showOI,
+        onToggleVisible: () => setShowOI((v) => !v),
+        onRemove: () => setShowOI(false),
+      });
+    }
+    return list;
+  }, [showSma, showEma, showVwap, showBbands, showRsi, showOI, indicatorValues]);
+
   // Effective candles respecting Bar Replay slice
   const effectiveCandles = useMemo(() => {
     if (!isReplayActive) return candles;
@@ -275,8 +358,8 @@ export default function TradingChart({
   useEffect(() => {
     const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
     const isZen = zenMode.active && zenMode.softPastelCandles;
-    const upColor = isZen ? '#4a7c59' : '#26a69a';
-    const downColor = isZen ? '#8b5d5d' : '#ef5350';
+    const upColor = isZen ? '#4a7c59' : '#089981';
+    const downColor = isZen ? '#8b5d5d' : '#f23645';
 
     const chart = createChart(box.current!, {
       autoSize: true,
@@ -285,21 +368,74 @@ export default function TradingChart({
         textColor: '#8b93a7',
         fontSize: 11,
       },
-      grid: { vertLines: { color: '#1e222d' }, horzLines: { color: '#1e222d' } },
-      crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: '#1e222d' },
+      grid: {
+        vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
+        horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: {
+          color: 'rgba(255, 255, 255, 0.25)',
+          width: 1,
+          style: LineStyle.Dashed,
+          labelBackgroundColor: '#1e222d',
+        },
+        horzLine: {
+          color: 'rgba(255, 255, 255, 0.25)',
+          width: 1,
+          style: LineStyle.Dashed,
+          labelBackgroundColor: '#1e222d',
+        },
+      },
+      rightPriceScale: {
+        borderColor: '#1e222d',
+        scaleMargins: { top: 0.08, bottom: 0.12 },
+        autoScale: true,
+        alignLabels: true,
+        borderVisible: true,
+      },
+      timeScale: {
+        borderColor: '#1e222d',
+        timeVisible: true,
+        secondsVisible: false,
+        tickMarkFormatter: tickLabel,
+        barSpacing: 12,
+        minBarSpacing: 3,
+        rightOffset: 12,
+        borderVisible: true,
+      },
+      handleScale: {
+        axisPressedMouseMove: {
+          time: true,
+          price: true,
+        },
+        mouseWheel: true,
+        pinch: true,
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: true,
+      },
+      kineticScroll: {
+        touch: true,
+        mouse: false,
+      },
       localization: { timeFormatter: localTime },
-      timeScale: { borderColor: '#1e222d', timeVisible: true, secondsVisible: true, tickMarkFormatter: tickLabel },
     });
 
     const cs = chart.addCandlestickSeries({
       upColor,
       downColor,
-      borderVisible: false,
+      borderVisible: true,
+      borderUpColor: upColor,
+      borderDownColor: downColor,
+      wickVisible: true,
       wickUpColor: upColor,
       wickDownColor: downColor,
     });
-    cs.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.28 } });
+    cs.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.12 } });
 
     const vs = chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '' });
     vs.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
@@ -362,7 +498,21 @@ export default function TradingChart({
       hovering.current = !!d;
       if (d) {
         const v = p.seriesData.get(vs) as { value?: number } | undefined;
+        const sVal = p.seriesData.get(smaS) as { value?: number } | undefined;
+        const eVal = p.seriesData.get(emaS) as { value?: number } | undefined;
+        const vwVal = p.seriesData.get(vwapS) as { value?: number } | undefined;
+        const rVal = p.seriesData.get(rsiS) as { value?: number } | undefined;
+        const oVal = p.seriesData.get(ois) as { value?: number } | undefined;
+
         writeOhlc({ open: d.open, high: d.high, low: d.low, close: d.close, volume: v?.value });
+        setCurrentOhlc({ open: d.open, high: d.high, low: d.low, close: d.close, volume: v?.value });
+        setIndicatorValues({
+          sma: sVal?.value ?? null,
+          ema: eVal?.value ?? null,
+          vwap: vwVal?.value ?? null,
+          rsi: rVal?.value ?? null,
+          oi: oVal?.value ?? null,
+        });
       }
     });
 
@@ -385,7 +535,10 @@ export default function TradingChart({
           st.lastEma = EMA_K * c.close + (1 - EMA_K) * st.emaPrev;
           emaS.update({ time, value: st.lastEma });
         }
-        if (!hovering.current) writeOhlc(c);
+        if (!hovering.current) {
+          writeOhlc(c);
+          setCurrentOhlc({ open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume });
+        }
       } catch { /* update raced a history reload */ }
     };
     liveCandleBus.add(onLive);
@@ -417,8 +570,8 @@ export default function TradingChart({
   useEffect(() => {
     if (!api.current) return;
     const isZen = zenMode.active && zenMode.softPastelCandles;
-    const upColor = isZen ? '#4a7c59' : '#26a69a';
-    const downColor = isZen ? '#8b5d5d' : '#ef5350';
+    const upColor = isZen ? '#4a7c59' : '#089981';
+    const downColor = isZen ? '#8b5d5d' : '#f23645';
     api.current.candles.applyOptions({
       upColor,
       downColor,
@@ -513,7 +666,16 @@ export default function TradingChart({
 
     live.current = { closes, lastTime: displayCandles[n - 1].time, emaPrev: e[n - 2] ?? null, lastEma: e[n - 1] ?? null };
     a.chart.timeScale().fitContent();
-    writeOhlc(displayCandles[n - 1]);
+    const lastBar = displayCandles[n - 1];
+    writeOhlc(lastBar);
+    setCurrentOhlc({ open: lastBar.open, high: lastBar.high, low: lastBar.low, close: lastBar.close, volume: lastBar.volume });
+    setIndicatorValues({
+      sma: s[n - 1] ?? null,
+      ema: e[n - 1] ?? null,
+      vwap: cumVol > 0 ? cumTpVol / cumVol : lastBar.close,
+      rsi: r[n - 1] ?? null,
+      oi: oiBars.length ? oiBars[oiBars.length - 1].totalOI : null,
+    });
   }, [effectiveCandles, symbol, chartStyle]);
 
   // Price lines for positions, orders, alerts, and Session OHL Laser Lines
@@ -527,13 +689,13 @@ export default function TradingChart({
 
     // Active position line
     const p = s.positions[s.symbol];
-    if (p) add(p.entryPrice, p.side === 'LONG' ? '#26a69a' : '#ef5350', `${p.side} ${fmtQty(p.size)}`, true);
+    if (p) add(p.entryPrice, p.side === 'LONG' ? '#089981' : '#f23645', `${p.side} ${fmtQty(p.size)}`, true);
 
     // Orders
     for (const o of s.orders) {
       if (o.status !== 'PENDING' || o.symbol !== s.symbol) continue;
       if (o.type === 'LIMIT') add(o.price, '#4c8dff', `${o.side} limit`);
-      else add(o.triggerPrice ?? 0, o.type === 'STOP_LOSS' ? '#ef5350' : '#26a69a', o.type === 'STOP_LOSS' ? 'SL' : 'TP');
+      else add(o.triggerPrice ?? 0, o.type === 'STOP_LOSS' ? '#f23645' : '#089981', o.type === 'STOP_LOSS' ? 'SL' : 'TP');
     }
 
     // Alerts
@@ -549,8 +711,8 @@ export default function TradingChart({
         const sHigh = Math.max(...refCandles.map((c) => c.high));
         const sLow = Math.min(...refCandles.map((c) => c.low));
         add(sOpen, '#38bdf8', 'Session Open');
-        add(sHigh, '#22c55e', 'Session High');
-        add(sLow, '#f43f5e', 'Session Low');
+        add(sHigh, '#089981', 'Session High');
+        add(sLow, '#f23645', 'Session Low');
       }
     }
 
@@ -574,24 +736,25 @@ export default function TradingChart({
     if (!a) return;
     if (chartStyle === 'FOOTPRINT') {
       a.candles.applyOptions({
-        upColor: 'rgba(38, 166, 154, 0.12)',
-        downColor: 'rgba(239, 83, 80, 0.12)',
-        borderUpColor: 'rgba(38, 166, 154, 0.25)',
-        borderDownColor: 'rgba(239, 83, 80, 0.25)',
-        wickUpColor: 'rgba(38, 166, 154, 0.25)',
-        wickDownColor: 'rgba(239, 83, 80, 0.25)',
+        upColor: 'transparent',
+        downColor: 'transparent',
+        borderVisible: false,
+        wickUpColor: 'rgba(255, 255, 255, 0.25)',
+        wickDownColor: 'rgba(255, 255, 255, 0.25)',
       });
     } else {
       a.candles.applyOptions({
-        upColor: '#26a69a',
-        downColor: '#ef5350',
-        borderUpColor: '#26a69a',
-        borderDownColor: '#ef5350',
-        wickUpColor: '#26a69a',
-        wickDownColor: '#ef5350',
+        upColor: chartSettings.candleUpColor || '#089981',
+        downColor: chartSettings.candleDownColor || '#f23645',
+        borderVisible: true,
+        borderUpColor: chartSettings.candleUpColor || '#089981',
+        borderDownColor: chartSettings.candleDownColor || '#f23645',
+        wickVisible: true,
+        wickUpColor: chartSettings.candleUpColor || '#089981',
+        wickDownColor: chartSettings.candleDownColor || '#f23645',
       });
     }
-  }, [chartStyle]);
+  }, [chartStyle, chartSettings]);
 
   // Handler for placing order from Canvas Drag-and-Drop Order lines
   const handleExecuteCanvasOrders = (entry: CanvasOrderLine, sl?: CanvasOrderLine, tp?: CanvasOrderLine) => {
@@ -606,6 +769,35 @@ export default function TradingChart({
       stopLoss: sl?.price,
       takeProfit: tp?.price,
     });
+  };
+
+  const handleSelectTimeRange = (range: string) => {
+    audioHaptics.tick();
+    const a = api.current;
+    if (!a || !effectiveCandles.length) return;
+    const now = Math.floor(Date.now() / 1000);
+    let seconds = 86400; // 1D
+    if (range === '1D') seconds = 86400;
+    else if (range === '5D') seconds = 5 * 86400;
+    else if (range === '1M') seconds = 30 * 86400;
+    else if (range === '3M') seconds = 90 * 86400;
+    else if (range === '6M') seconds = 180 * 86400;
+    else if (range === 'YTD') {
+      const startOfYear = Math.floor(new Date(new Date().getFullYear(), 0, 1).getTime() / 1000);
+      seconds = now - startOfYear;
+    } else if (range === '1Y') seconds = 365 * 86400;
+    else if (range === 'ALL') {
+      a.chart.timeScale().fitContent();
+      return;
+    }
+
+    const fromTime = (now - seconds) as UTCTimestamp;
+    const toTime = (now + 3600) as UTCTimestamp;
+    try {
+      a.chart.timeScale().setVisibleRange({ from: fromTime, to: toTime });
+    } catch {
+      a.chart.timeScale().fitContent();
+    }
   };
 
   const btn = (on: boolean) => `rounded px-2 py-1 text-xs transition ${on ? 'bg-grid text-white font-semibold' : 'text-muted hover:text-white'}`;
@@ -871,7 +1063,15 @@ export default function TradingChart({
             }
           }}
         >
-          <div ref={ohlc} className="num pointer-events-none absolute left-4 top-1 z-30 text-[11px] text-muted" />
+          {/* Institutional TradingView-Grade In-Chart Legend HUD */}
+          <ChartLegendHUD
+            symbol={symbol}
+            timeframe={timeframe}
+            currentOhlc={currentOhlc}
+            indicators={activeIndicatorsList}
+          />
+
+          <div ref={ohlc} className="hidden" />
 
           {/* Watermark */}
           {chartSettings.showWatermark && (
@@ -900,7 +1100,14 @@ export default function TradingChart({
           {chartSettings.showCountdownTimer && <CandleCountdown timeframe={timeframe} />}
 
           {/* Lightweight Charts mounting container */}
-          <div ref={box} className="absolute inset-0 z-10" />
+          <div
+            ref={box}
+            className="absolute inset-0 z-10"
+            onDoubleClick={() => {
+              audioHaptics.tick();
+              api.current?.candles.priceScale().applyOptions({ autoScale: true });
+            }}
+          />
 
           {/* Real-time Footprint / Cluster Chart Overlay */}
           {chartStyle === 'FOOTPRINT' && (
@@ -980,14 +1187,11 @@ export default function TradingChart({
       <div className="h-7 shrink-0 border-t border-grid bg-panel/90 px-3 flex items-center justify-between text-[11px] text-slate-400 select-none font-mono">
         {/* Left: Time Range Presets */}
         <div className="flex items-center gap-1">
-          {['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', 'ALL'].map((r) => (
+          {(['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', 'ALL'] as const).map((r) => (
             <button
               key={r}
-              onClick={() => {
-                audioHaptics.tick();
-                api.current?.chart.timeScale().fitContent();
-              }}
-              className="px-1.5 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition text-[10px]"
+              onClick={() => handleSelectTimeRange(r)}
+              className="px-1.5 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition text-[10px] font-semibold"
             >
               {r}
             </button>
@@ -1000,18 +1204,25 @@ export default function TradingChart({
           <button
             onClick={() => {
               audioHaptics.tick();
-              api.current?.chart.timeScale().resetTimeScale();
+              api.current?.candles.priceScale().applyOptions({ autoScale: true });
             }}
-            className="px-1.5 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 font-bold"
-            title="Auto scale"
+            className="px-1.5 py-0.5 rounded text-accent hover:bg-accent/15 font-bold transition"
+            title="Auto scale (or double-click price scale)"
           >
             auto
           </button>
           <button
             onClick={() => {
               audioHaptics.tick();
+              const next = !isLogScale;
+              setIsLogScale(next);
+              api.current?.candles.priceScale().applyOptions({
+                mode: next ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
+              });
             }}
-            className="px-1.5 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 font-bold"
+            className={`px-1.5 py-0.5 rounded font-bold transition ${
+              isLogScale ? 'bg-accent text-black' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
             title="Logarithmic scale"
           >
             log

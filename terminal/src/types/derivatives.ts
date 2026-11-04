@@ -18,6 +18,8 @@ export interface DOMLevel {
   totalVolume: number;
 }
 
+export type FootprintMode = 'BID_ASK' | 'DELTA' | 'VOLUME';
+
 export interface FootprintPriceLevel {
   price: number;
   bidVolume: number;
@@ -25,6 +27,8 @@ export interface FootprintPriceLevel {
   delta: number;
   askImbalance?: boolean;
   bidImbalance?: boolean;
+  isPOC?: boolean;
+  isValueArea?: boolean;
 }
 
 export interface FootprintCandle {
@@ -36,6 +40,8 @@ export interface FootprintCandle {
   totalVolume: number;
   candleDelta: number;
   pointOfControl: number; // POC price level
+  vah: number; // Value Area High (70% vol)
+  val: number; // Value Area Low (70% vol)
   priceLevels: FootprintPriceLevel[];
 }
 
