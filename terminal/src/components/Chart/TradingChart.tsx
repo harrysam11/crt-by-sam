@@ -12,9 +12,9 @@ import { ema, sma, rsi, bollingerBands, heikinAshi } from '../../services/indica
 import { generateOIHistory } from '../../services/nseOptionChain';
 import { decimalsFor, fmtPrice, fmtQty, labelOf } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
-import type { Candle } from '../../types/terminal';
+import type { Candle, Timeframe } from '../../types/terminal';
 import type { CanvasOrderLine } from '../../types/derivatives';
-import type { ToolType } from '../drawing/types';
+import type { ToolType, MagnetConfig } from '../drawing/types';
 import ChartSkinsLayer from '../ChartSkinsLayer';
 import ChartSkinsModal from '../ChartSkinsModal';
 import GhostOverlay from '../ghost/GhostOverlay';
@@ -25,6 +25,9 @@ import ChartRulerOverlay from './ChartRulerOverlay';
 import StickyNotesOverlay from './StickyNotesOverlay';
 import DrawingToolbar from '../drawing/DrawingToolbar';
 import DrawingOverlay from '../drawing/DrawingOverlay';
+import IndicatorsModal from './IndicatorsModal';
+import BarReplayController from './BarReplayController';
+import ChartSettingsModal, { DEFAULT_CHART_SETTINGS, type ChartSettingsState } from './ChartSettingsModal';
 import ShareChartModal from '../share/ShareChartModal';
 import RiskHUD from '../RiskHUD';
 
@@ -59,10 +62,22 @@ interface Api {
 }
 interface LiveInd { closes: number[]; lastTime: number; emaPrev: number | null; lastEma: number | null }
 
-export default function TradingChart() {
-  const symbol = useTerminalStore((s) => s.symbol);
+export interface TradingChartProps {
+  paneId?: string;
+  symbolOverride?: string;
+  timeframeOverride?: Timeframe;
+}
+
+export default function TradingChart({
+  paneId = 'pane-1',
+  symbolOverride,
+  timeframeOverride,
+}: TradingChartProps = {}) {
+  const storeSymbol = useTerminalStore((s) => s.symbol);
+  const symbol = symbolOverride ?? storeSymbol;
   const currentPrice = useTerminalStore((s) => s.currentPrice);
-  const timeframe = useTerminalStore((s) => s.timeframe);
+  const storeTimeframe = useTerminalStore((s) => s.timeframe);
+  const timeframe = timeframeOverride ?? storeTimeframe;
   const setTimeframe = useTerminalStore((s) => s.setTimeframe);
   const candles = useTerminalStore((s) => s.candles);
   const error = useTerminalStore((s) => s.error);
@@ -98,10 +113,103 @@ export default function TradingChart() {
   const [isRulerActive, setIsRulerActive] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
 
-  // Drawing Tools State
+  // Drawing Tools & Magnet State
   const [activeTool, setActiveTool] = useState<ToolType>('CURSOR_CROSSHAIR');
   const [drawingsCount, setDrawingsCount] = useState(0);
   const [clearDrawingTrigger, setClearDrawingTrigger] = useState(0);
+  const [magnetConfig, setMagnetConfig] = useState<MagnetConfig>({ enabled: false, mode: 'WEAK' });
+  const [isLockedAll, setIsLockedAll] = useState(false);
+  const [isHiddenAll, setIsHiddenAll] = useState(false);
+
+  // Indicators Modal State
+  const [isIndicatorsModalOpen, setIsIndicatorsModalOpen] = useState(false);
+
+  // Bar Replay Historical Time Machine State
+  const [isReplayActive, setIsReplayActive] = useState(false);
+  const [replayIndex, setReplayIndex] = useState(0);
+  const [isReplayPlaying, setIsReplayPlaying] = useState(false);
+  const [replaySpeedMs, setReplaySpeedMs] = useState(500);
+  const [isSelectingCutPoint, setIsSelectingCutPoint] = useState(false);
+
+  // Chart Settings State
+  const [isChartSettingsOpen, setIsChartSettingsOpen] = useState(false);
+  const [chartSettings, setChartSettings] = useState<ChartSettingsState>(() => {
+    try {
+      const stored = localStorage.getItem('crt_chart_settings');
+      return stored ? { ...DEFAULT_CHART_SETTINGS, ...JSON.parse(stored) } : DEFAULT_CHART_SETTINGS;
+    } catch {
+      return DEFAULT_CHART_SETTINGS;
+    }
+  });
+
+  const updateChartSettings = (patch: Partial<ChartSettingsState>) => {
+    setChartSettings((prev) => {
+      const next = { ...prev, ...patch };
+      try {
+        localStorage.setItem('crt_chart_settings', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const resetChartSettings = () => {
+    setChartSettings(DEFAULT_CHART_SETTINGS);
+    try {
+      localStorage.setItem('crt_chart_settings', JSON.stringify(DEFAULT_CHART_SETTINGS));
+    } catch {}
+  };
+
+  // Effective candles respecting Bar Replay slice
+  const effectiveCandles = useMemo(() => {
+    if (!isReplayActive) return candles;
+    return candles.slice(0, Math.min(candles.length, replayIndex + 1));
+  }, [candles, isReplayActive, replayIndex]);
+
+  // Replay playback interval timer
+  useEffect(() => {
+    if (!isReplayActive || !isReplayPlaying) return;
+    const interval = setInterval(() => {
+      setReplayIndex((prev) => {
+        if (prev >= candles.length - 1) {
+          setIsReplayPlaying(false);
+          return prev;
+        }
+        audioHaptics.tick();
+        return prev + 1;
+      });
+    }, replaySpeedMs);
+    return () => clearInterval(interval);
+  }, [isReplayActive, isReplayPlaying, replaySpeedMs, candles.length]);
+
+  const startReplay = () => {
+    audioHaptics.tick();
+    setIsReplayActive(true);
+    setReplayIndex(Math.max(0, candles.length - 40));
+    setIsReplayPlaying(false);
+  };
+
+  const exitReplay = () => {
+    audioHaptics.tick();
+    setIsReplayActive(false);
+    setIsReplayPlaying(false);
+    setIsSelectingCutPoint(false);
+  };
+
+  const handleStepForward = () => {
+    audioHaptics.tick();
+    setReplayIndex((prev) => Math.min(candles.length - 1, prev + 1));
+  };
+
+  const handleToggleIndicator = (key: string) => {
+    audioHaptics.tick();
+    if (key === 'sma') setShowSma((v) => !v);
+    else if (key === 'ema') setShowEma((v) => !v);
+    else if (key === 'vwap') setShowVwap((v) => !v);
+    else if (key === 'bbands') setShowBbands((v) => !v);
+    else if (key === 'rsi') setShowRsi((v) => !v);
+    else if (key === 'oi') setShowOI((v) => !v);
+    else if (key === 'sessionOhl') setShowSessionOHL((v) => !v);
+  };
 
   const box = useRef<HTMLDivElement>(null);
   const ohlc = useRef<HTMLDivElement>(null);
@@ -319,13 +427,41 @@ export default function TradingChart() {
     });
   }, [zenMode.active, zenMode.softPastelCandles]);
 
-  // History load / symbol / timeframe switch.
+  // Dynamic Chart Settings synchronization
   useEffect(() => {
     const a = api.current;
-    if (!a || !candles.length) return;
+    if (!a) return;
+    a.candles.applyOptions({
+      upColor: chartSettings.candleUpColor,
+      downColor: chartSettings.candleDownColor,
+      borderUpColor: chartSettings.candleUpColor,
+      borderDownColor: chartSettings.candleDownColor,
+      wickUpColor: chartSettings.candleUpColor,
+      wickDownColor: chartSettings.candleDownColor,
+      lastValueVisible: chartSettings.showLastPriceLine,
+      priceLineVisible: chartSettings.showLastPriceLine,
+    });
+    a.chart.applyOptions({
+      grid: {
+        vertLines: {
+          visible: chartSettings.gridLines === 'both' || chartSettings.gridLines === 'vertical',
+          color: `rgba(255, 255, 255, ${chartSettings.gridOpacity})`,
+        },
+        horzLines: {
+          visible: chartSettings.gridLines === 'both' || chartSettings.gridLines === 'horizontal',
+          color: `rgba(255, 255, 255, ${chartSettings.gridOpacity})`,
+        },
+      },
+    });
+  }, [chartSettings]);
+
+  // History load / symbol / timeframe / Bar Replay switch.
+  useEffect(() => {
+    const a = api.current;
+    if (!a || !effectiveCandles.length) return;
 
     // Use standard or Heikin-Ashi transformed candles
-    const displayCandles = chartStyle === 'HEIKIN_ASHI' ? heikinAshi(candles) : candles;
+    const displayCandles = chartStyle === 'HEIKIN_ASHI' ? heikinAshi(effectiveCandles) : effectiveCandles;
     const closes = displayCandles.map((c) => c.close);
 
     const s = sma(closes, SMA_N);
@@ -378,7 +514,7 @@ export default function TradingChart() {
     live.current = { closes, lastTime: displayCandles[n - 1].time, emaPrev: e[n - 2] ?? null, lastEma: e[n - 1] ?? null };
     a.chart.timeScale().fitContent();
     writeOhlc(displayCandles[n - 1]);
-  }, [candles, symbol, chartStyle]);
+  }, [effectiveCandles, symbol, chartStyle]);
 
   // Price lines for positions, orders, alerts, and Session OHL Laser Lines
   useEffect(() => {
@@ -526,7 +662,20 @@ export default function TradingChart() {
 
         <span className="mx-1 h-4 w-px bg-grid" />
 
-        {/* Indicators Cluster */}
+        {/* fx Indicators Button */}
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            setIsIndicatorsModalOpen(true);
+          }}
+          className="flex items-center gap-1.5 rounded border border-grid bg-slate-900/60 px-2 py-1 text-xs font-semibold text-slate-200 hover:border-accent hover:text-white transition"
+          title="Indicators, Metrics & Strategies (fx)"
+        >
+          <span className="font-bold text-accent">fx</span>
+          <span>Indicators</span>
+        </button>
+
+        {/* Indicators Cluster Quick Toggles */}
         <button className={btn(showSma)} onClick={() => setShowSma((v) => !v)}>
           <span className="mr-1 inline-block h-2 w-2 rounded-full bg-[#f0b90b]" />SMA
         </button>
@@ -544,6 +693,27 @@ export default function TradingChart() {
         </button>
         <button className={btn(showOI)} onClick={() => setShowOI((v) => !v)} title="Toggle Open Interest (OI) Sub-pane">
           <span className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-400" />OI
+        </button>
+
+        <span className="mx-1 h-4 w-px bg-grid" />
+
+        {/* Bar Replay Historical Time Machine Trigger */}
+        <button
+          onClick={() => {
+            if (isReplayActive) exitReplay();
+            else startReplay();
+          }}
+          className={`flex items-center gap-1.5 rounded px-2 py-1 text-xs font-semibold transition ${
+            isReplayActive
+              ? 'bg-accent text-black font-bold ring-1 ring-accent'
+              : 'text-muted hover:text-white'
+          }`}
+          title="Bar Replay Historical Time Machine (Space: Play/Pause, Shift+Right: Step)"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
+          </svg>
+          <span>Replay</span>
         </button>
 
         <span className="mx-1 h-4 w-px bg-grid" />
@@ -642,13 +812,51 @@ export default function TradingChart() {
           className="rounded border border-accent/60 bg-accent/15 px-2 py-1 text-xs font-semibold text-accent hover:bg-accent hover:text-black transition"
           title="Export Watermarked Snapshot or Copy Chart Link"
         >
-          Snapshot / Share
+          Snapshot
+        </button>
+
+        {/* Chart Settings Gear Icon */}
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            setIsChartSettingsOpen(true);
+          }}
+          className="p-1 rounded text-muted hover:text-white hover:bg-slate-800 transition"
+          title="Chart Settings"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
         </button>
       </div>
 
       {/* Main Chart Canvas & Overlays Container */}
-      <div className="relative min-h-0 flex-1">
+      <div
+        className="relative min-h-0 flex-1"
+        onClick={(e) => {
+          if (!isSelectingCutPoint || !chartApi || !box.current) return;
+          const rect = box.current.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const time = chartApi.timeScale().coordinateToTime(x);
+          if (time) {
+            const idx = candles.findIndex((c) => c.time >= (time as number));
+            if (idx !== -1) {
+              audioHaptics.tick();
+              setReplayIndex(idx);
+              setIsSelectingCutPoint(false);
+            }
+          }
+        }}
+      >
         <div ref={ohlc} className="num pointer-events-none absolute left-14 top-1 z-30 text-[11px] text-muted" />
+
+        {/* Watermark */}
+        {chartSettings.showWatermark && (
+          <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center opacity-[0.035] text-4xl sm:text-6xl font-black tracking-widest text-white select-none">
+            {chartSettings.watermarkText}
+          </div>
+        )}
 
         {/* TradingView-Style Left Vertical Drawing Toolbar */}
         <DrawingToolbar
@@ -656,10 +864,38 @@ export default function TradingChart() {
           onSelectTool={setActiveTool}
           onClearAll={() => setClearDrawingTrigger(Date.now())}
           drawingsCount={drawingsCount}
+          magnetConfig={magnetConfig}
+          onToggleMagnet={() =>
+            setMagnetConfig((prev) => ({
+              ...prev,
+              enabled: !prev.enabled,
+              mode: prev.mode === 'WEAK' ? 'STRONG' : 'WEAK',
+            }))
+          }
+          isLockedAll={isLockedAll}
+          onToggleLockAll={() => setIsLockedAll((v) => !v)}
+          isHiddenAll={isHiddenAll}
+          onToggleHideAll={() => setIsHiddenAll((v) => !v)}
+        />
+
+        {/* Bar Replay Historical Time Machine Scrubber Bar */}
+        <BarReplayController
+          isActive={isReplayActive}
+          onExit={exitReplay}
+          totalCandles={candles.length}
+          currentReplayIndex={replayIndex}
+          isPlaying={isReplayPlaying}
+          onTogglePlay={() => setIsReplayPlaying((v) => !v)}
+          onStepForward={handleStepForward}
+          onSelectCutPoint={() => setIsSelectingCutPoint((v) => !v)}
+          isSelectingCutPoint={isSelectingCutPoint}
+          speedMs={replaySpeedMs}
+          onSpeedChange={setReplaySpeedMs}
+          currentTimeString={candles[replayIndex] ? new Date(candles[replayIndex].time * 1000).toLocaleString() : undefined}
         />
 
         {/* Candle-Close Countdown Floating Timer */}
-        <CandleCountdown timeframe={timeframe} />
+        {chartSettings.showCountdownTimer && <CandleCountdown timeframe={timeframe} />}
 
         {/* Lightweight Charts mounting container */}
         <div ref={box} className="absolute inset-0 z-10" />
@@ -669,7 +905,7 @@ export default function TradingChart() {
           <FootprintChartOverlay
             chartApi={chartApi}
             seriesApi={seriesApi}
-            candles={candles}
+            candles={effectiveCandles}
             containerWidth={boxDimensions.w}
             containerHeight={boxDimensions.h}
           />
@@ -684,6 +920,10 @@ export default function TradingChart() {
           activeTool={activeTool}
           seriesApi={seriesApi}
           chartApi={chartApi}
+          candles={effectiveCandles}
+          magnetConfig={magnetConfig}
+          isLockedAll={isLockedAll}
+          isHiddenAll={isHiddenAll}
           onDrawingsCountChange={setDrawingsCount}
           clearTrigger={clearDrawingTrigger}
         />
@@ -732,6 +972,31 @@ export default function TradingChart() {
           </div>
         )}
       </div>
+
+      {/* Indicators, Metrics & Strategies Modal */}
+      <IndicatorsModal
+        isOpen={isIndicatorsModalOpen}
+        onClose={() => setIsIndicatorsModalOpen(false)}
+        activeIndicators={{
+          sma: showSma,
+          ema: showEma,
+          vwap: showVwap,
+          bbands: showBbands,
+          rsi: showRsi,
+          oi: showOI,
+          sessionOhl: showSessionOHL,
+        }}
+        onToggleIndicator={handleToggleIndicator}
+      />
+
+      {/* Chart Settings Modal */}
+      <ChartSettingsModal
+        isOpen={isChartSettingsOpen}
+        onClose={() => setIsChartSettingsOpen(false)}
+        settings={chartSettings}
+        onUpdateSettings={updateChartSettings}
+        onResetDefaults={resetChartSettings}
+      />
 
       {/* Skins Customization Modal */}
       <ChartSkinsModal isOpen={showSkinsModal} onClose={() => setShowSkinsModal(false)} />

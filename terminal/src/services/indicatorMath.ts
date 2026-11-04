@@ -181,3 +181,106 @@ export function heikinAshi(candles: Candle[]): Candle[] {
 
   return ha;
 }
+
+/** Volume Weighted Average Price (VWAP). */
+export function vwap(candles: Candle[]): (number | null)[] {
+  const out: (number | null)[] = new Array(candles.length).fill(null);
+  let cumVol = 0;
+  let cumTpVol = 0;
+  for (let i = 0; i < candles.length; i++) {
+    const c = candles[i];
+    const tp = (c.high + c.low + c.close) / 3;
+    cumVol += c.volume;
+    cumTpVol += tp * c.volume;
+    out[i] = cumVol > 0 ? cumTpVol / cumVol : tp;
+  }
+  return out;
+}
+
+/** Supertrend Indicator Result */
+export interface SupertrendResult {
+  trend: (1 | -1)[]; // 1 = bullish, -1 = bearish
+  line: (number | null)[];
+}
+
+/** Supertrend Calculation (ATR Multiplier). */
+export function supertrend(candles: Candle[], period = 10, multiplier = 3): SupertrendResult {
+  const n = candles.length;
+  const trend: (1 | -1)[] = new Array(n).fill(1);
+  const line: (number | null)[] = new Array(n).fill(null);
+  if (n <= period) return { trend, line };
+
+  const atrVals = atr(candles, period);
+  let upperBand = 0;
+  let lowerBand = 0;
+  let currTrend: 1 | -1 = 1;
+
+  for (let i = period; i < n; i++) {
+    const c = candles[i];
+    const a = atrVals[i] ?? 0;
+    const hl2 = (c.high + c.low) / 2;
+    const basicUpper = hl2 + multiplier * a;
+    const basicLower = hl2 - multiplier * a;
+
+    if (i === period) {
+      upperBand = basicUpper;
+      lowerBand = basicLower;
+    } else {
+      const prevClose = candles[i - 1].close;
+      upperBand = basicUpper < upperBand || prevClose > upperBand ? basicUpper : upperBand;
+      lowerBand = basicLower > lowerBand || prevClose < lowerBand ? basicLower : lowerBand;
+    }
+
+    if (currTrend === 1 && c.close < lowerBand) {
+      currTrend = -1;
+    } else if (currTrend === -1 && c.close > upperBand) {
+      currTrend = 1;
+    }
+
+    trend[i] = currTrend;
+    line[i] = currTrend === 1 ? lowerBand : upperBand;
+  }
+
+  return { trend, line };
+}
+
+/** Stochastic Oscillator (%K and %D). */
+export interface StochasticResult {
+  k: (number | null)[];
+  d: (number | null)[];
+}
+
+export function stochastic(candles: Candle[], kPeriod = 14, dPeriod = 3): StochasticResult {
+  const n = candles.length;
+  const k: (number | null)[] = new Array(n).fill(null);
+  const d: (number | null)[] = new Array(n).fill(null);
+  if (n < kPeriod) return { k, d };
+
+  for (let i = kPeriod - 1; i < n; i++) {
+    let highest = -Infinity;
+    let lowest = Infinity;
+    for (let j = i - kPeriod + 1; j <= i; j++) {
+      if (candles[j].high > highest) highest = candles[j].high;
+      if (candles[j].low < lowest) lowest = candles[j].low;
+    }
+    const range = highest - lowest;
+    k[i] = range === 0 ? 50 : ((candles[i].close - lowest) / range) * 100;
+  }
+
+  // Smooth %K with SMA to get %D
+  const validK: number[] = [];
+  const validIdx: number[] = [];
+  k.forEach((val, idx) => {
+    if (val !== null) {
+      validK.push(val);
+      validIdx.push(idx);
+    }
+  });
+
+  const dSma = sma(validK, dPeriod);
+  dSma.forEach((val, idx) => {
+    d[validIdx[idx]] = val;
+  });
+
+  return { k, d };
+}

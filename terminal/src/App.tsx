@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Header from './components/Layout/Header';
 import Splitter from './components/Layout/Splitter';
-import TradingChart from './components/Chart/TradingChart';
+import MultiChartGrid from './components/Chart/MultiChartGrid';
 import Watchlist from './components/Watchlist/Watchlist';
 import OrderBook from './components/Trading/OrderBook';
 import QuotePanel from './components/Trading/QuotePanel';
@@ -194,7 +194,7 @@ export default function App() {
 
         <main className="flex min-w-0 flex-1 flex-col">
           <div className="min-h-0 flex-1">
-            <TradingChart />
+            <MultiChartGrid />
           </div>
           <Splitter dir="h" onDrag={(d) => setBottomH((h) => clamp(h - d, 120, 500))} />
           <div style={{ height: bottomH }} className="shrink-0">

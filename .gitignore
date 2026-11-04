@@ -23,3 +23,8 @@ Thumbs.db
 !.vscode/extensions.json
 .idea/
 *.sw?
+
+# External repos & temporary bundles
+rea/
+*.zip
+*.bundle
