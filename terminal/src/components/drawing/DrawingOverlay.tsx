@@ -25,6 +25,7 @@ interface DrawingOverlayProps {
   isHiddenAll?: boolean;
   onDrawingsCountChange?: (count: number) => void;
   clearTrigger?: number;
+  externalLineTrigger?: { price: number; type: 'LINE' | 'RAY' } | null;
 }
 
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
@@ -40,6 +41,7 @@ export default function DrawingOverlay({
   isHiddenAll = false,
   onDrawingsCountChange,
   clearTrigger,
+  externalLineTrigger,
 }: DrawingOverlayProps) {
   const [drawings, setDrawings] = useState<DrawingItem[]>(() => {
     try {
@@ -57,7 +59,35 @@ export default function DrawingOverlay({
     handle: 'target' | 'stop' | 'p1' | 'p2';
   } | null>(null);
 
+  const [, setRerenderKey] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Handle external line trigger from PriceScaleActionFlyout
+  useEffect(() => {
+    if (!externalLineTrigger || !seriesApi) return;
+    const { price, type } = externalLineTrigger;
+    const y = seriesApi.priceToCoordinate(price) ?? 100;
+    const newId = `draw_${Date.now()}`;
+    const newDrawing: DrawingItem = {
+      id: newId,
+      type: type === 'LINE' ? 'HORIZONTAL_LINE' : 'HORIZONTAL_RAY',
+      p1: { x: 50, y, price },
+      color: '#38bdf8',
+      lineWidth: 1.5,
+    };
+    audioHaptics.tick();
+    setDrawings((prev) => [...prev, newDrawing]);
+    setSelectedDrawingId(newId);
+  }, [externalLineTrigger, seriesApi]);
+
+  // Subscribe to timeScale range changes so drawings lock to price and time
+  useEffect(() => {
+    if (!chartApi) return;
+    const timeScale = chartApi.timeScale();
+    const handleRangeChange = () => setRerenderKey((k) => k + 1);
+    timeScale.subscribeVisibleLogicalRangeChange(handleRangeChange);
+    return () => timeScale.unsubscribeVisibleLogicalRangeChange(handleRangeChange);
+  }, [chartApi]);
 
   // Sync count to parent
   useEffect(() => {
@@ -66,6 +96,29 @@ export default function DrawingOverlay({
       localStorage.setItem(`crt_drawings_${symbol}`, JSON.stringify(drawings));
     } catch {}
   }, [drawings, symbol, onDrawingsCountChange]);
+
+  // Dynamic coordinate projection helpers (locks drawings to chart candles)
+  const getDrawX = useCallback(
+    (p: Point2D) => {
+      if (chartApi && p.time) {
+        const cx = chartApi.timeScale().timeToCoordinate(p.time as any);
+        if (cx !== null) return cx;
+      }
+      return p.x;
+    },
+    [chartApi]
+  );
+
+  const getDrawY = useCallback(
+    (p: Point2D) => {
+      if (seriesApi && p.price !== undefined) {
+        const cy = seriesApi.priceToCoordinate(p.price);
+        if (cy !== null) return cy;
+      }
+      return p.y;
+    },
+    [seriesApi]
+  );
 
   // Handle clear trigger
   useEffect(() => {
@@ -79,8 +132,11 @@ export default function DrawingOverlay({
   const snapPoint = useCallback(
     (rawX: number, rawY: number): Point2D => {
       const rawPrice = seriesApi?.coordinateToPrice(rawY) ?? 0;
+      const timeVal = chartApi?.timeScale().coordinateToTime(rawX);
+      const curTime = typeof timeVal === 'number' ? timeVal : undefined;
+
       if (!magnetConfig.enabled || !candles.length || !chartApi || !seriesApi) {
-        return { x: rawX, y: rawY, price: rawPrice };
+        return { x: rawX, y: rawY, price: rawPrice, time: curTime };
       }
 
       // Find closest candle by X coordinate
@@ -100,7 +156,7 @@ export default function DrawingOverlay({
         }
       }
 
-      if (!closestCandle) return { x: rawX, y: rawY, price: rawPrice };
+      if (!closestCandle) return { x: rawX, y: rawY, price: rawPrice, time: curTime };
 
       // Find closest OHLC price point
       const ohlcLevels = [
@@ -122,13 +178,14 @@ export default function DrawingOverlay({
 
       const totalDist = Math.hypot(snapX - rawX, closestLevel.coord - rawY);
       if (magnetConfig.mode === 'WEAK' && totalDist > 30) {
-        return { x: rawX, y: rawY, price: rawPrice };
+        return { x: rawX, y: rawY, price: rawPrice, time: curTime ?? closestCandle.time };
       }
 
       return {
         x: snapX,
         y: closestLevel.coord,
         price: closestLevel.price,
+        time: closestCandle.time,
       };
     },
     [magnetConfig, candles, chartApi, seriesApi]
@@ -304,30 +361,36 @@ export default function DrawingOverlay({
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
 
-    // Handle dragging an existing position handle
+    // Handle dragging an existing drawing or position handle
     if (draggingHandle && seriesApi) {
-      const newPrice = seriesApi.coordinateToPrice(rawY) ?? 0;
+      const snapped = snapPoint(rawX, rawY);
       setDrawings((prev) =>
         prev.map((d) => {
           if (d.id !== draggingHandle.drawingId) return d;
+          if (draggingHandle.handle === 'p1') {
+            return { ...d, p1: snapped };
+          }
+          if (draggingHandle.handle === 'p2') {
+            return { ...d, p2: snapped };
+          }
           if (draggingHandle.handle === 'target') {
             const entry = d.entryPrice ?? d.p1.price;
             const stop = d.stopPrice ?? d.p1.price;
-            const rr = Math.abs(newPrice - entry) / Math.max(0.0001, Math.abs(entry - stop));
+            const rr = Math.abs(snapped.price - entry) / Math.max(0.0001, Math.abs(entry - stop));
             return {
               ...d,
-              targetPrice: newPrice,
-              p2: d.p2 ? { ...d.p2, y: rawY, price: newPrice } : undefined,
+              targetPrice: snapped.price,
+              p2: d.p2 ? { ...d.p2, y: rawY, price: snapped.price, time: snapped.time } : undefined,
               riskReward: Number(rr.toFixed(2)),
             };
           }
           if (draggingHandle.handle === 'stop') {
             const entry = d.entryPrice ?? d.p1.price;
             const target = d.targetPrice ?? d.p1.price;
-            const rr = Math.abs(target - entry) / Math.max(0.0001, Math.abs(entry - newPrice));
+            const rr = Math.abs(target - entry) / Math.max(0.0001, Math.abs(entry - snapped.price));
             return {
               ...d,
-              stopPrice: newPrice,
+              stopPrice: snapped.price,
               riskReward: Number(rr.toFixed(2)),
             };
           }
@@ -416,6 +479,10 @@ export default function DrawingOverlay({
         {allDrawings.map((d) => {
           const { p1, p2, color, lineWidth, type, id } = d;
           const isSelected = selectedDrawingId === id;
+          const x1 = getDrawX(p1);
+          const y1 = getDrawY(p1);
+          const x2 = p2 ? getDrawX(p2) : x1;
+          const y2 = p2 ? getDrawY(p2) : y1;
 
           if (type === 'HORIZONTAL_LINE') {
             return (
@@ -429,17 +496,32 @@ export default function DrawingOverlay({
               >
                 <line
                   x1="0"
-                  y1={p1.y}
+                  y1={y1}
                   x2="100%"
-                  y2={p1.y}
+                  y2={y1}
                   stroke={color}
                   strokeWidth={lineWidth}
                   strokeDasharray="4 2"
                 />
-                <rect x="6" y={p1.y - 10} width="84" height="20" rx="3" fill="#1e222d" stroke={isSelected ? '#38bdf8' : 'none'} strokeWidth="1" />
-                <text x="10" y={p1.y + 4} fill="#ffffff" fontSize="10" fontFamily="monospace">
+                <rect x="6" y={y1 - 10} width="84" height="20" rx="3" fill="#1e222d" stroke={isSelected ? '#38bdf8' : 'none'} strokeWidth="1" />
+                <text x="10" y={y1 + 4} fill="#ffffff" fontSize="10" fontFamily="monospace">
                   {fmtPrice(p1.price, symbol)}
                 </text>
+                {isSelected && (
+                  <circle
+                    cx="50%"
+                    cy={y1}
+                    r="5"
+                    fill="#ffffff"
+                    stroke="#38bdf8"
+                    strokeWidth="2"
+                    className="cursor-ns-resize pointer-events-auto"
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setDraggingHandle({ drawingId: id, handle: 'p1' });
+                    }}
+                  />
+                )}
               </g>
             );
           }
@@ -454,12 +536,27 @@ export default function DrawingOverlay({
                 }}
                 className="pointer-events-auto cursor-pointer"
               >
-                <line x1={p1.x} y1={p1.y} x2="100%" y2={p1.y} stroke={color} strokeWidth={lineWidth} />
-                <circle cx={p1.x} cy={p1.y} r="3.5" fill={color} />
-                <rect x={p1.x + 8} y={p1.y - 10} width="84" height="20" rx="3" fill="#1e222d" />
-                <text x={p1.x + 12} y={p1.y + 4} fill="#ffffff" fontSize="10" fontFamily="monospace">
+                <line x1={x1} y1={y1} x2="100%" y2={y1} stroke={color} strokeWidth={lineWidth} />
+                <circle cx={x1} cy={y1} r="3.5" fill={color} />
+                <rect x={x1 + 8} y={y1 - 10} width="84" height="20" rx="3" fill="#1e222d" stroke={isSelected ? '#38bdf8' : 'none'} strokeWidth="1" />
+                <text x={x1 + 12} y={y1 + 4} fill="#ffffff" fontSize="10" fontFamily="monospace">
                   {fmtPrice(p1.price, symbol)}
                 </text>
+                {isSelected && (
+                  <circle
+                    cx={x1}
+                    cy={y1}
+                    r="5"
+                    fill="#ffffff"
+                    stroke="#38bdf8"
+                    strokeWidth="2"
+                    className="cursor-move pointer-events-auto"
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setDraggingHandle({ drawingId: id, handle: 'p1' });
+                    }}
+                  />
+                )}
               </g>
             );
           }
@@ -474,8 +571,23 @@ export default function DrawingOverlay({
                 }}
                 className="pointer-events-auto cursor-pointer"
               >
-                <line x1={p1.x} y1="0" x2={p1.x} y2="100%" stroke={color} strokeWidth={lineWidth} strokeDasharray="4 2" />
-                <circle cx={p1.x} cy={p1.y} r="3.5" fill={color} />
+                <line x1={x1} y1="0" x2={x1} y2="100%" stroke={color} strokeWidth={lineWidth} strokeDasharray="4 2" />
+                <circle cx={x1} cy={y1} r="3.5" fill={color} />
+                {isSelected && (
+                  <circle
+                    cx={x1}
+                    cy="50%"
+                    r="5"
+                    fill="#ffffff"
+                    stroke="#38bdf8"
+                    strokeWidth="2"
+                    className="cursor-ew-resize pointer-events-auto"
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setDraggingHandle({ drawingId: id, handle: 'p1' });
+                    }}
+                  />
+                )}
               </g>
             );
           }
@@ -490,11 +602,26 @@ export default function DrawingOverlay({
                 }}
                 className="pointer-events-auto cursor-pointer"
               >
-                <circle cx={p1.x} cy={p1.y} r="4" fill={color} />
-                <rect x={p1.x + 8} y={p1.y - 12} width="80" height="24" rx="4" fill="#1e222d" stroke={color} strokeWidth="1" />
-                <text x={p1.x + 12} y={p1.y + 4} fill="#ffffff" fontSize="11" fontWeight="bold" fontFamily="monospace">
+                <circle cx={x1} cy={y1} r="4" fill={color} />
+                <rect x={x1 + 8} y={y1 - 12} width="80" height="24" rx="4" fill="#1e222d" stroke={isSelected ? '#38bdf8' : color} strokeWidth="1" />
+                <text x={x1 + 12} y={y1 + 4} fill="#ffffff" fontSize="11" fontWeight="bold" fontFamily="monospace">
                   {fmtPrice(p1.price, symbol)}
                 </text>
+                {isSelected && (
+                  <circle
+                    cx={x1}
+                    cy={y1}
+                    r="5"
+                    fill="#ffffff"
+                    stroke="#38bdf8"
+                    strokeWidth="2"
+                    className="cursor-move pointer-events-auto"
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setDraggingHandle({ drawingId: id, handle: 'p1' });
+                    }}
+                  />
+                )}
               </g>
             );
           }
@@ -509,10 +636,25 @@ export default function DrawingOverlay({
                 }}
                 className="pointer-events-auto cursor-pointer"
               >
-                <rect x={p1.x - 4} y={p1.y - 16} width={(d.text?.length ?? 8) * 8 + 12} height="22" rx="4" fill="#0b0e14" stroke={isSelected ? '#38bdf8' : '#334155'} strokeWidth="1" />
-                <text x={p1.x + 2} y={p1.y - 1} fill={color} fontSize="12" fontWeight="600" fontFamily="monospace">
+                <rect x={x1 - 4} y={y1 - 16} width={(d.text?.length ?? 8) * 8 + 12} height="22" rx="4" fill="#0b0e14" stroke={isSelected ? '#38bdf8' : '#334155'} strokeWidth="1" />
+                <text x={x1 + 2} y={y1 - 1} fill={color} fontSize="12" fontWeight="600" fontFamily="monospace">
                   {d.text ?? ''}
                 </text>
+                {isSelected && (
+                  <circle
+                    cx={x1}
+                    cy={y1}
+                    r="5"
+                    fill="#ffffff"
+                    stroke="#38bdf8"
+                    strokeWidth="2"
+                    className="cursor-move pointer-events-auto"
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setDraggingHandle({ drawingId: id, handle: 'p1' });
+                    }}
+                  />
+                )}
               </g>
             );
           }
@@ -529,16 +671,46 @@ export default function DrawingOverlay({
                 }}
                 className="pointer-events-auto cursor-pointer"
               >
-                <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={color} strokeWidth={lineWidth} />
-                <circle cx={p1.x} cy={p1.y} r={isSelected ? 4 : 3} fill={isSelected ? '#ffffff' : color} stroke={color} strokeWidth="1.5" />
-                <circle cx={p2.x} cy={p2.y} r={isSelected ? 4 : 3} fill={isSelected ? '#ffffff' : color} stroke={color} strokeWidth="1.5" />
+                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={lineWidth} />
+                <circle cx={x1} cy={y1} r={isSelected ? 4 : 3} fill={isSelected ? '#ffffff' : color} stroke={color} strokeWidth="1.5" />
+                <circle cx={x2} cy={y2} r={isSelected ? 4 : 3} fill={isSelected ? '#ffffff' : color} stroke={color} strokeWidth="1.5" />
+                {isSelected && (
+                  <>
+                    <circle
+                      cx={x1}
+                      cy={y1}
+                      r="5.5"
+                      fill="#ffffff"
+                      stroke="#38bdf8"
+                      strokeWidth="2"
+                      className="cursor-move pointer-events-auto"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingHandle({ drawingId: id, handle: 'p1' });
+                      }}
+                    />
+                    <circle
+                      cx={x2}
+                      cy={y2}
+                      r="5.5"
+                      fill="#ffffff"
+                      stroke="#38bdf8"
+                      strokeWidth="2"
+                      className="cursor-move pointer-events-auto"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingHandle({ drawingId: id, handle: 'p2' });
+                      }}
+                    />
+                  </>
+                )}
               </g>
             );
           }
 
           if (type === 'RAY') {
-            const dx = p2.x - p1.x;
-            const dy = p2.y - p1.y;
+            const dx = x2 - x1;
+            const dy = y2 - y1;
             const factor = 100;
             return (
               <g
@@ -549,18 +721,48 @@ export default function DrawingOverlay({
                 }}
                 className="pointer-events-auto cursor-pointer"
               >
-                <line x1={p1.x} y1={p1.y} x2={p1.x + dx * factor} y2={p1.y + dy * factor} stroke={color} strokeWidth={lineWidth} />
-                <circle cx={p1.x} cy={p1.y} r="3" fill={color} />
-                <circle cx={p2.x} cy={p2.y} r="3" fill={color} />
+                <line x1={x1} y1={y1} x2={x1 + dx * factor} y2={y1 + dy * factor} stroke={color} strokeWidth={lineWidth} />
+                <circle cx={x1} cy={y1} r="3" fill={color} />
+                <circle cx={x2} cy={y2} r="3" fill={color} />
+                {isSelected && (
+                  <>
+                    <circle
+                      cx={x1}
+                      cy={y1}
+                      r="5.5"
+                      fill="#ffffff"
+                      stroke="#38bdf8"
+                      strokeWidth="2"
+                      className="cursor-move pointer-events-auto"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingHandle({ drawingId: id, handle: 'p1' });
+                      }}
+                    />
+                    <circle
+                      cx={x2}
+                      cy={y2}
+                      r="5.5"
+                      fill="#ffffff"
+                      stroke="#38bdf8"
+                      strokeWidth="2"
+                      className="cursor-move pointer-events-auto"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingHandle({ drawingId: id, handle: 'p2' });
+                      }}
+                    />
+                  </>
+                )}
               </g>
             );
           }
 
           if (type === 'RECTANGLE') {
-            const rx = Math.min(p1.x, p2.x);
-            const ry = Math.min(p1.y, p2.y);
-            const rw = Math.abs(p2.x - p1.x);
-            const rh = Math.abs(p2.y - p1.y);
+            const rx = Math.min(x1, x2);
+            const ry = Math.min(y1, y2);
+            const rw = Math.abs(x2 - x1);
+            const rh = Math.abs(y2 - y1);
             return (
               <g
                 key={id}
@@ -573,8 +775,32 @@ export default function DrawingOverlay({
                 <rect x={rx} y={ry} width={rw} height={rh} fill="rgba(168, 85, 247, 0.15)" stroke={color} strokeWidth={lineWidth} />
                 {isSelected && (
                   <>
-                    <circle cx={rx} cy={ry} r="3" fill="#ffffff" />
-                    <circle cx={rx + rw} cy={ry + rh} r="3" fill="#ffffff" />
+                    <circle
+                      cx={x1}
+                      cy={y1}
+                      r="5.5"
+                      fill="#ffffff"
+                      stroke="#38bdf8"
+                      strokeWidth="2"
+                      className="cursor-move pointer-events-auto"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingHandle({ drawingId: id, handle: 'p1' });
+                      }}
+                    />
+                    <circle
+                      cx={x2}
+                      cy={y2}
+                      r="5.5"
+                      fill="#ffffff"
+                      stroke="#38bdf8"
+                      strokeWidth="2"
+                      className="cursor-move pointer-events-auto"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingHandle({ drawingId: id, handle: 'p2' });
+                      }}
+                    />
                   </>
                 )}
               </g>
@@ -582,9 +808,9 @@ export default function DrawingOverlay({
           }
 
           if (type === 'CIRCLE') {
-            const cx = p1.x;
-            const cy = p1.y;
-            const r = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+            const cx = x1;
+            const cy = y1;
+            const r = Math.hypot(x2 - x1, y2 - y1);
             return (
               <g
                 key={id}
@@ -595,13 +821,43 @@ export default function DrawingOverlay({
                 className="pointer-events-auto cursor-pointer"
               >
                 <circle cx={cx} cy={cy} r={r} fill="rgba(236, 72, 153, 0.12)" stroke={color} strokeWidth={lineWidth} />
+                {isSelected && (
+                  <>
+                    <circle
+                      cx={x1}
+                      cy={y1}
+                      r="5.5"
+                      fill="#ffffff"
+                      stroke="#38bdf8"
+                      strokeWidth="2"
+                      className="cursor-move pointer-events-auto"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingHandle({ drawingId: id, handle: 'p1' });
+                      }}
+                    />
+                    <circle
+                      cx={x2}
+                      cy={y2}
+                      r="5.5"
+                      fill="#ffffff"
+                      stroke="#38bdf8"
+                      strokeWidth="2"
+                      className="cursor-move pointer-events-auto"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingHandle({ drawingId: id, handle: 'p2' });
+                      }}
+                    />
+                  </>
+                )}
               </g>
             );
           }
 
           if (type === 'FIBONACCI') {
-            const deltaY = p2.y - p1.y;
-            const deltaPrice = p2.price - p1.price;
+            const deltaY = y2 - y1;
+            const deltaPrice = (p2.price ?? 0) - p1.price;
             return (
               <g
                 key={id}
@@ -612,12 +868,12 @@ export default function DrawingOverlay({
                 className="pointer-events-auto cursor-pointer"
               >
                 {FIB_LEVELS.map((lvl) => {
-                  const yLevel = p1.y + deltaY * lvl;
+                  const yLevel = y1 + deltaY * lvl;
                   const priceLevel = p1.price + deltaPrice * lvl;
                   return (
                     <g key={lvl}>
                       <line
-                        x1={Math.min(p1.x, p2.x)}
+                        x1={Math.min(x1, x2)}
                         y1={yLevel}
                         x2="100%"
                         y2={yLevel}
@@ -632,6 +888,36 @@ export default function DrawingOverlay({
                     </g>
                   );
                 })}
+                {isSelected && (
+                  <>
+                    <circle
+                      cx={x1}
+                      cy={y1}
+                      r="5.5"
+                      fill="#ffffff"
+                      stroke="#38bdf8"
+                      strokeWidth="2"
+                      className="cursor-move pointer-events-auto"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingHandle({ drawingId: id, handle: 'p1' });
+                      }}
+                    />
+                    <circle
+                      cx={x2}
+                      cy={y2}
+                      r="5.5"
+                      fill="#ffffff"
+                      stroke="#38bdf8"
+                      strokeWidth="2"
+                      className="cursor-move pointer-events-auto"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingHandle({ drawingId: id, handle: 'p2' });
+                      }}
+                    />
+                  </>
+                )}
               </g>
             );
           }
@@ -642,12 +928,12 @@ export default function DrawingOverlay({
             const targetPrice = d.targetPrice ?? (isLong ? entryPrice * 1.02 : entryPrice * 0.98);
             const stopPrice = d.stopPrice ?? (isLong ? entryPrice * 0.99 : entryPrice * 1.01);
 
-            const entryY = p1.y;
+            const entryY = y1;
             const targetY = seriesApi?.priceToCoordinate(targetPrice) ?? (isLong ? entryY - 60 : entryY + 60);
             const stopY = seriesApi?.priceToCoordinate(stopPrice) ?? (isLong ? entryY + 30 : entryY - 30);
 
-            const rx = Math.min(p1.x, p2.x);
-            const rw = Math.max(140, Math.abs(p2.x - p1.x));
+            const rx = Math.min(x1, x2);
+            const rw = Math.max(140, Math.abs(x2 - x1));
 
             const rewardH = Math.abs(targetY - entryY);
             const riskH = Math.abs(stopY - entryY);

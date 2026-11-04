@@ -30,6 +30,7 @@ export interface ChartLegendHUDProps {
     volume?: number;
   } | null;
   indicators: ActiveIndicatorInfo[];
+  onOpenSymbolSearch?: () => void;
 }
 
 export default function ChartLegendHUD({
@@ -37,6 +38,7 @@ export default function ChartLegendHUD({
   timeframe,
   currentOhlc,
   indicators,
+  onOpenSymbolSearch,
 }: ChartLegendHUDProps) {
   const [isIndicatorsCollapsed, setIsIndicatorsCollapsed] = useState(false);
 
@@ -54,7 +56,16 @@ export default function ChartLegendHUD({
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
         </span>
-        <span className="font-bold text-slate-100 tracking-wide text-xs">{labelOf(symbol)}</span>
+        <button
+          onClick={onOpenSymbolSearch}
+          className="font-bold text-slate-100 tracking-wide text-xs hover:text-accent flex items-center gap-1 transition cursor-pointer"
+          title="Search symbols (/ or Ctrl+K)"
+        >
+          {labelOf(symbol)}
+          <svg className="h-3 w-3 text-slate-400 hover:text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </button>
         <span className="text-slate-400 font-semibold">{timeframe}</span>
         <span className="text-[10px] text-slate-400 px-1 py-0.2 rounded bg-slate-800/80 border border-grid">BINANCE</span>
 

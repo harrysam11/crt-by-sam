@@ -107,42 +107,45 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'LINES' && (
-          <div className="absolute left-11 top-0 z-40 flex flex-col gap-1 rounded-lg border border-grid bg-panel p-1.5 shadow-2xl min-w-[150px]">
+          <div className="absolute left-11 top-0 z-40 flex flex-col gap-1 rounded-lg border border-grid bg-panel p-1.5 shadow-2xl min-w-[170px]">
             <button
               onClick={() => select('TRENDLINE')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'TRENDLINE' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
+              className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-left ${activeTool === 'TRENDLINE' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
             >
-              Trend Line
+              <span>Trend Line</span>
+              <kbd className="text-[10px] text-slate-400 bg-slate-900 px-1 py-0.5 rounded border border-grid">Alt+T</kbd>
             </button>
             <button
               onClick={() => select('RAY')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'RAY' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
+              className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-left ${activeTool === 'RAY' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
             >
-              Ray
+              <span>Ray</span>
             </button>
             <button
               onClick={() => select('HORIZONTAL_LINE')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'HORIZONTAL_LINE' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
+              className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-left ${activeTool === 'HORIZONTAL_LINE' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
             >
-              Horizontal Line
+              <span>Horizontal Line</span>
+              <kbd className="text-[10px] text-slate-400 bg-slate-900 px-1 py-0.5 rounded border border-grid">Alt+H</kbd>
             </button>
             <button
               onClick={() => select('HORIZONTAL_RAY')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'HORIZONTAL_RAY' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
+              className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-left ${activeTool === 'HORIZONTAL_RAY' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
             >
-              Horizontal Ray
+              <span>Horizontal Ray</span>
             </button>
             <button
               onClick={() => select('VERTICAL_LINE')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'VERTICAL_LINE' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
+              className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-left ${activeTool === 'VERTICAL_LINE' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
             >
-              Vertical Line
+              <span>Vertical Line</span>
+              <kbd className="text-[10px] text-slate-400 bg-slate-900 px-1 py-0.5 rounded border border-grid">Alt+V</kbd>
             </button>
             <button
               onClick={() => select('PARALLEL_CHANNEL')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'PARALLEL_CHANNEL' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
+              className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-left ${activeTool === 'PARALLEL_CHANNEL' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
             >
-              Parallel Channel
+              <span>Parallel Channel</span>
             </button>
           </div>
         )}

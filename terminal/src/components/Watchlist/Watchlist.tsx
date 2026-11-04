@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTerminalStore } from '../../store/useTerminalStore';
 import { CATEGORY_LABEL } from '../../services/instruments';
 import { fmtPct, fmtPrice, pnlClass } from '../../utils/formatters';
@@ -20,10 +20,18 @@ export default function Watchlist() {
   const current = cat ?? activeCat ?? 'CRYPTO';
   const rows = instruments.filter((i) => i.category === current);
 
-  // Expose global hotkey trigger for '/' search jump
-  useState(() => {
-    (window as any).__openSymbolSearch = () => setSearching(true);
-  });
+  // Expose global hotkey triggers (Space / Shift+Space cycling)
+  useEffect(() => {
+    (window as any).__cycleWatchlistSymbol = (direction: number) => {
+      if (!rows.length) return;
+      const curIdx = rows.findIndex((i) => i.id === active);
+      const nextIdx = (curIdx + direction + rows.length) % rows.length;
+      setSymbol(rows[nextIdx].id);
+    };
+    return () => {
+      delete (window as any).__cycleWatchlistSymbol;
+    };
+  }, [rows, active, setSymbol]);
 
   return (
     <aside className="flex w-full h-full flex-col bg-panel">

@@ -52,13 +52,61 @@ export function useKeyboardHotkeys({ onOpenCheatsheet }: UseKeyboardHotkeysProps
         return;
       }
 
-      // Hotkey: / -> Quick Symbol Search jump
-      if (e.key === '/') {
+      // Hotkey: Ctrl+K or Cmd+K or "/" -> Quick Symbol Search modal
+      if (e.key === '/' || ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K'))) {
         e.preventDefault();
         audioHaptics.tick();
         const openSearch = (window as any).__openSymbolSearch;
         if (typeof openSearch === 'function') {
           openSearch();
+        }
+        return;
+      }
+
+      // Hotkey: Alt+R -> Auto-Scale / Reset Chart View
+      if (e.altKey && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault();
+        audioHaptics.tick();
+        const resetScale = (window as any).__resetChartScale;
+        if (typeof resetScale === 'function') {
+          resetScale();
+        }
+        return;
+      }
+
+      // Drawing Tool Hotkeys: Alt+T (Trendline), Alt+H (Horizontal line), Alt+V (Vertical line), Alt+F (Fib)
+      if (e.altKey && (e.key === 't' || e.key === 'T')) {
+        e.preventDefault();
+        audioHaptics.tick();
+        (window as any).__selectDrawingTool?.('TRENDLINE');
+        return;
+      }
+      if (e.altKey && (e.key === 'h' || e.key === 'H')) {
+        e.preventDefault();
+        audioHaptics.tick();
+        (window as any).__selectDrawingTool?.('HORIZONTAL_LINE');
+        return;
+      }
+      if (e.altKey && (e.key === 'v' || e.key === 'V')) {
+        e.preventDefault();
+        audioHaptics.tick();
+        (window as any).__selectDrawingTool?.('VERTICAL_LINE');
+        return;
+      }
+      if (e.altKey && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        audioHaptics.tick();
+        (window as any).__selectDrawingTool?.('FIBONACCI');
+        return;
+      }
+
+      // Hotkey: Space / Shift+Space -> Cycle through Watchlist symbols
+      if (e.key === ' ' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        audioHaptics.tick();
+        const cycle = (window as any).__cycleWatchlistSymbol;
+        if (typeof cycle === 'function') {
+          cycle(e.shiftKey ? -1 : 1);
         }
         return;
       }

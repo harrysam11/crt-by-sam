@@ -29,6 +29,9 @@ import IndicatorsModal from './IndicatorsModal';
 import BarReplayController from './BarReplayController';
 import ChartSettingsModal, { DEFAULT_CHART_SETTINGS, type ChartSettingsState } from './ChartSettingsModal';
 import ChartLegendHUD, { type ActiveIndicatorInfo } from './ChartLegendHUD';
+import VolumeProfileOverlay from './VolumeProfileOverlay';
+import PriceScaleActionFlyout from './PriceScaleActionFlyout';
+import SymbolSearchModal from '../Search/SymbolSearchModal';
 import ShareChartModal from '../share/ShareChartModal';
 import RiskHUD from '../RiskHUD';
 
@@ -170,6 +173,23 @@ export default function TradingChart({
     oi?: number | null;
   }>({});
   const [isLogScale, setIsLogScale] = useState(false);
+  const [showVolumeProfile, setShowVolumeProfile] = useState(true);
+  const [isSymbolSearchOpen, setIsSymbolSearchOpen] = useState(false);
+  const [externalLineTrigger, setExternalLineTrigger] = useState<{ price: number; type: 'LINE' | 'RAY' } | null>(null);
+
+  // Register global hotkey openers for symbol search, tool selection, and scale reset
+  useEffect(() => {
+    (window as any).__openSymbolSearch = () => setIsSymbolSearchOpen(true);
+    (window as any).__selectDrawingTool = (tool: ToolType) => setActiveTool(tool);
+    (window as any).__resetChartScale = () => {
+      api.current?.candles.priceScale().applyOptions({ autoScale: true });
+    };
+    return () => {
+      delete (window as any).__openSymbolSearch;
+      delete (window as any).__selectDrawingTool;
+      delete (window as any).__resetChartScale;
+    };
+  }, []);
 
   // Active indicator list for in-chart legend controls
   const activeIndicatorsList = useMemo<ActiveIndicatorInfo[]>(() => {
@@ -809,7 +829,19 @@ export default function TradingChart({
 
       {/* Chart Toolbar */}
       <div className="relative z-10 flex items-center gap-1 overflow-x-auto border-b border-grid bg-panel/70 px-2 py-1 backdrop-blur-sm">
-        <span className="mr-2 whitespace-nowrap font-semibold text-white">{labelOf(symbol)}</span>
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            setIsSymbolSearchOpen(true);
+          }}
+          className="mr-2 flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-bold text-white hover:bg-slate-800 hover:text-accent border border-transparent hover:border-grid transition cursor-pointer"
+          title="Search symbols (/ or Ctrl+K)"
+        >
+          <span>{labelOf(symbol)}</span>
+          <svg className="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
         {TIMEFRAMES[provider].map((t) => (
           <button
             key={t}
@@ -958,6 +990,18 @@ export default function TradingChart({
           Ghost HTF
         </button>
 
+        {/* Visible Range Volume Profile (VPVR) */}
+        <button
+          className={btn(showVolumeProfile)}
+          onClick={() => {
+            audioHaptics.tick();
+            setShowVolumeProfile((v) => !v);
+          }}
+          title="Toggle Visible Range Volume Profile (VPVR)"
+        >
+          VPVR
+        </button>
+
         {/* Drag-and-Drop Canvas Order Lines */}
         <button
           className={btn(canvasOrderLines.length > 0)}
@@ -1069,6 +1113,7 @@ export default function TradingChart({
             timeframe={timeframe}
             currentOhlc={currentOhlc}
             indicators={activeIndicatorsList}
+            onOpenSymbolSearch={() => setIsSymbolSearchOpen(true)}
           />
 
           <div ref={ohlc} className="hidden" />
@@ -1120,6 +1165,17 @@ export default function TradingChart({
             />
           )}
 
+          {/* Institutional Visible Range Volume Profile (VPVR) */}
+          <VolumeProfileOverlay
+            chartApi={chartApi}
+            seriesApi={seriesApi}
+            candles={effectiveCandles}
+            containerWidth={boxDimensions.w}
+            containerHeight={boxDimensions.h}
+            isVisible={showVolumeProfile}
+            symbol={symbol}
+          />
+
           {/* Multi-Timeframe Ghost Charts Canvas Layer */}
           <GhostOverlay chartApi={chartApi} seriesApi={seriesApi} />
 
@@ -1135,6 +1191,15 @@ export default function TradingChart({
             isHiddenAll={isHiddenAll}
             onDrawingsCountChange={setDrawingsCount}
             clearTrigger={clearDrawingTrigger}
+            externalLineTrigger={externalLineTrigger}
+          />
+
+          {/* TradingView Price Scale Hover Action Flyout */}
+          <PriceScaleActionFlyout
+            seriesApi={seriesApi}
+            containerHeight={boxDimensions.h}
+            symbol={symbol}
+            onAddHorizontalLine={(price) => setExternalLineTrigger({ price, type: 'LINE' })}
           />
 
           {/* Interactive In-Chart Measurement Ruler */}
@@ -1260,6 +1325,12 @@ export default function TradingChart({
 
       {/* Share Chart Snapshot Modal */}
       <ShareChartModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
+
+      {/* Institutional Symbol Search Modal */}
+      <SymbolSearchModal
+        isOpen={isSymbolSearchOpen}
+        onClose={() => setIsSymbolSearchOpen(false)}
+      />
     </div>
   );
 }
