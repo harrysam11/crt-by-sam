@@ -20,6 +20,7 @@ import ChartSkinsModal from '../ChartSkinsModal';
 import GhostOverlay from '../ghost/GhostOverlay';
 import CanvasOrderOverlay from '../canvas/CanvasOrderOverlay';
 import CandleCountdown from './CandleCountdown';
+import FootprintChartOverlay from './FootprintChartOverlay';
 import ChartRulerOverlay from './ChartRulerOverlay';
 import StickyNotesOverlay from './StickyNotesOverlay';
 import DrawingToolbar from '../drawing/DrawingToolbar';
@@ -81,7 +82,7 @@ export default function TradingChart() {
   const provider = getInstrument(symbol)?.provider ?? 'binance';
 
   // Indicators & Chart Styles
-  const [chartStyle, setChartStyle] = useState<'CANDLE' | 'HEIKIN_ASHI'>('CANDLE');
+  const [chartStyle, setChartStyle] = useState<'CANDLE' | 'HEIKIN_ASHI' | 'FOOTPRINT'>('CANDLE');
   const [showSma, setShowSma] = useState(true);
   const [showEma, setShowEma] = useState(true);
   const [showVwap, setShowVwap] = useState(true);
@@ -111,6 +112,23 @@ export default function TradingChart() {
   // Expose chart APIs to state for overlay layers (Ghost / Canvas drag & drop)
   const [chartApi, setChartApi] = useState<IChartApi | null>(null);
   const [seriesApi, setSeriesApi] = useState<ISeriesApi<'Candlestick'> | null>(null);
+  const [boxDimensions, setBoxDimensions] = useState<{ w: number; h: number }>({ w: 800, h: 500 });
+
+  useEffect(() => {
+    if (!box.current) return;
+    const updateSize = () => {
+      if (box.current) {
+        setBoxDimensions({
+          w: box.current.clientWidth,
+          h: box.current.clientHeight,
+        });
+      }
+    };
+    updateSize();
+    const ro = new ResizeObserver(updateSize);
+    ro.observe(box.current);
+    return () => ro.disconnect();
+  }, []);
 
   // Primitive signature of everything drawn as a price line
   const lineKey = useTerminalStore((s) => {
@@ -122,10 +140,27 @@ export default function TradingChart() {
 
   const writeOhlc = (c?: { open: number; high: number; low: number; close: number; volume?: number }) => {
     const sym = useTerminalStore.getState().symbol;
+    const tf = useTerminalStore.getState().timeframe;
     if (!ohlc.current) return;
-    ohlc.current.textContent = c
-      ? `O ${fmtPrice(c.open, sym)}  H ${fmtPrice(c.high, sym)}  L ${fmtPrice(c.low, sym)}  C ${fmtPrice(c.close, sym)}${c.volume ? `  V ${fmtQty(c.volume)}` : ''}`
-      : '';
+    if (!c) {
+      ohlc.current.innerHTML = '';
+      return;
+    }
+    const diff = c.close - c.open;
+    const diffPct = c.open ? ((diff / c.open) * 100).toFixed(2) : '0.00';
+    const isUp = diff >= 0;
+    const diffColor = isUp ? '#22c55e' : '#ef4444';
+    const diffSign = isUp ? '+' : '';
+
+    ohlc.current.innerHTML = `
+      <span class="font-bold text-white mr-2.5 tracking-wide">${labelOf(sym)} · ${tf}</span>
+      <span class="text-slate-500 font-semibold mr-0.5">O</span><span class="${isUp ? 'text-up' : 'text-down'} font-medium mr-2">${fmtPrice(c.open, sym)}</span>
+      <span class="text-slate-500 font-semibold mr-0.5">H</span><span class="${isUp ? 'text-up' : 'text-down'} font-medium mr-2">${fmtPrice(c.high, sym)}</span>
+      <span class="text-slate-500 font-semibold mr-0.5">L</span><span class="${isUp ? 'text-up' : 'text-down'} font-medium mr-2">${fmtPrice(c.low, sym)}</span>
+      <span class="text-slate-500 font-semibold mr-0.5">C</span><span class="${isUp ? 'text-up' : 'text-down'} font-medium mr-2.5">${fmtPrice(c.close, sym)}</span>
+      <span style="color:${diffColor}" class="font-bold mr-2.5">${diffSign}${fmtPrice(diff, sym)} (${diffSign}${diffPct}%)</span>
+      ${c.volume ? `<span class="text-slate-500 font-semibold mr-0.5">Vol</span><span class="text-slate-300 font-medium">${fmtQty(c.volume)}</span>` : ''}
+    `;
   };
 
   // Create once, destroy on unmount.
@@ -397,6 +432,31 @@ export default function TradingChart() {
   useEffect(() => { api.current?.rsi.applyOptions({ visible: showRsi }); }, [showRsi]);
   useEffect(() => { api.current?.oi.applyOptions({ visible: showOI }); }, [showOI]);
 
+  // Adjust candle opacity when Footprint cluster chart mode is active
+  useEffect(() => {
+    const a = api.current;
+    if (!a) return;
+    if (chartStyle === 'FOOTPRINT') {
+      a.candles.applyOptions({
+        upColor: 'rgba(38, 166, 154, 0.12)',
+        downColor: 'rgba(239, 83, 80, 0.12)',
+        borderUpColor: 'rgba(38, 166, 154, 0.25)',
+        borderDownColor: 'rgba(239, 83, 80, 0.25)',
+        wickUpColor: 'rgba(38, 166, 154, 0.25)',
+        wickDownColor: 'rgba(239, 83, 80, 0.25)',
+      });
+    } else {
+      a.candles.applyOptions({
+        upColor: '#26a69a',
+        downColor: '#ef5350',
+        borderUpColor: '#26a69a',
+        borderDownColor: '#ef5350',
+        wickUpColor: '#26a69a',
+        wickDownColor: '#ef5350',
+      });
+    }
+  }, [chartStyle]);
+
   // Handler for placing order from Canvas Drag-and-Drop Order lines
   const handleExecuteCanvasOrders = (entry: CanvasOrderLine, sl?: CanvasOrderLine, tp?: CanvasOrderLine) => {
     audioHaptics.tick();
@@ -437,17 +497,32 @@ export default function TradingChart() {
 
         <span className="mx-1 h-4 w-px bg-grid" />
 
-        {/* Chart Style Switcher (Heikin-Ashi vs Candles) */}
-        <button
-          className={btn(chartStyle === 'HEIKIN_ASHI')}
-          onClick={() => {
-            audioHaptics.tick();
-            setChartStyle(chartStyle === 'CANDLE' ? 'HEIKIN_ASHI' : 'CANDLE');
-          }}
-          title="Toggle Heikin-Ashi Smoothed Trend Candles"
-        >
-          {chartStyle === 'HEIKIN_ASHI' ? 'Heikin-Ashi' : 'Candles'}
-        </button>
+        {/* Chart Style Switcher (Candles, Heikin-Ashi, Footprint) */}
+        <div className="flex items-center rounded border border-grid bg-slate-900/60 p-0.5 text-xs">
+          {(['CANDLE', 'HEIKIN_ASHI', 'FOOTPRINT'] as const).map((style) => (
+            <button
+              key={style}
+              className={`rounded px-2 py-0.5 transition ${
+                chartStyle === style
+                  ? 'bg-accent/20 border border-accent text-accent font-semibold'
+                  : 'text-muted hover:text-white'
+              }`}
+              onClick={() => {
+                audioHaptics.tick();
+                setChartStyle(style);
+              }}
+              title={
+                style === 'CANDLE'
+                  ? 'Standard Candlestick Mode'
+                  : style === 'HEIKIN_ASHI'
+                  ? 'Heikin-Ashi Smoothed Trend Mode'
+                  : 'Institutional Bid x Ask Footprint Cluster Mode'
+              }
+            >
+              {style === 'CANDLE' ? 'Candles' : style === 'HEIKIN_ASHI' ? 'Heikin-Ashi' : 'Footprint'}
+            </button>
+          ))}
+        </div>
 
         <span className="mx-1 h-4 w-px bg-grid" />
 
@@ -588,6 +663,17 @@ export default function TradingChart() {
 
         {/* Lightweight Charts mounting container */}
         <div ref={box} className="absolute inset-0 z-10" />
+
+        {/* Real-time Footprint / Cluster Chart Overlay */}
+        {chartStyle === 'FOOTPRINT' && (
+          <FootprintChartOverlay
+            chartApi={chartApi}
+            seriesApi={seriesApi}
+            candles={candles}
+            containerWidth={boxDimensions.w}
+            containerHeight={boxDimensions.h}
+          />
+        )}
 
         {/* Multi-Timeframe Ghost Charts Canvas Layer */}
         <GhostOverlay chartApi={chartApi} seriesApi={seriesApi} />

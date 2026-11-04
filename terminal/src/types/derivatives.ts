@@ -18,15 +18,25 @@ export interface DOMLevel {
   totalVolume: number;
 }
 
+export interface FootprintPriceLevel {
+  price: number;
+  bidVolume: number;
+  askVolume: number;
+  delta: number;
+  askImbalance?: boolean;
+  bidImbalance?: boolean;
+}
+
 export interface FootprintCandle {
   time: number;
-  priceLevels: {
-    price: number;
-    bidVolume: number;
-    askVolume: number;
-    delta: number;
-  }[];
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  totalVolume: number;
+  candleDelta: number;
   pointOfControl: number; // POC price level
+  priceLevels: FootprintPriceLevel[];
 }
 
 export interface GhostCandleConfig {
