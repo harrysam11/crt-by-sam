@@ -1,0 +1,94 @@
+export type AssetCategory = 'CRYPTO' | 'FOREX' | 'COMMODITY' | 'US_STOCK' | 'IN_STOCK' | 'INDEX';
+export type Provider = 'binance' | 'yahoo';
+export type Timeframe = '1s' | '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
+export type OrderSide = 'BUY' | 'SELL';
+export type OrderType = 'MARKET' | 'LIMIT' | 'STOP_LOSS' | 'TAKE_PROFIT';
+export type OrderStatus = 'PENDING' | 'FILLED' | 'CANCELLED';
+export type ConnectionStatus = 'connecting' | 'open' | 'reconnecting' | 'closed';
+
+export interface Candle {
+  time: number; // Unix timestamp in seconds
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface Tick {
+  symbol: string;
+  price: number;
+  qty: number;
+  side: 'buy' | 'sell';
+  timestamp: number; // ms
+}
+
+export interface Order {
+  id: string;
+  symbol: string;
+  side: OrderSide;
+  type: OrderType;
+  price: number; // limit price, or fill price once filled
+  triggerPrice?: number; // STOP_LOSS / TAKE_PROFIT trigger
+  qty: number;
+  status: OrderStatus;
+  timestamp: number;
+  reduceOnly?: boolean; // SL/TP only act on an existing opposite position
+  leverage?: number;
+}
+
+export interface Position {
+  symbol: string;
+  side: 'LONG' | 'SHORT';
+  entryPrice: number; // quote currency of the instrument
+  size: number;
+  unrealizedPnl: number; // USD
+  realizedPnl: number; // USD
+  leverage: number;
+}
+
+export interface Instrument {
+  id: string; // provider symbol, e.g. BTCUSDT, EURUSD=X, RELIANCE.NS, ^NSEI
+  label: string;
+  name: string;
+  category: AssetCategory;
+  provider: Provider;
+  currency: string; // quote currency; PnL converts to USD
+  decimals?: number;
+}
+
+export interface QuoteInfo {
+  price: number;
+  prevClose: number;
+  dayHigh: number;
+  dayLow: number;
+  currency: string;
+  open: boolean | null; // null = unknown
+  time: number; // last trade time, unix seconds
+  name?: string;
+}
+
+export interface Alert {
+  id: string;
+  symbol: string;
+  price: number;
+  dir: 'above' | 'below';
+  triggered: boolean;
+  createdAt: number;
+  type?: 'PRICE' | 'UNREALIZED_LOSS';
+}
+
+export interface DepthLevel { price: number; qty: number }
+export interface DepthSnapshot { symbol: string; bids: DepthLevel[]; asks: DepthLevel[] }
+export interface TickerStat { price: number; change: number } // change = % vs previous close
+
+export interface Trade {
+  id: string;
+  symbol: string;
+  side: 'LONG' | 'SHORT';
+  qty: number;
+  entry: number;
+  exit: number;
+  pnl: number;
+  time: number;
+}

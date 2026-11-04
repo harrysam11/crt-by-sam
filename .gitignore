@@ -1,0 +1,25 @@
+# Node & Dependencies
+node_modules/
+*/node_modules/
+dist/
+*/dist/
+dist-ssr/
+*.local
+
+# Environment & Secret files
+.env
+.env.*
+*.pem
+*.key
+
+# Logs
+*.log
+logs/
+
+# OS and Editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.sw?
