@@ -37,6 +37,7 @@ import ShareChartModal from '../share/ShareChartModal';
 import RiskHUD from '../RiskHUD';
 
 const SMA_N = 20, EMA_N = 50, EMA_K = 2 / (EMA_N + 1);
+const FAVORITE_TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
 const bar = (c: Candle) => ({ time: c.time as UTCTimestamp, open: c.open, high: c.high, low: c.low, close: c.close });
 const vol = (c: Candle) => ({ time: c.time as UTCTimestamp, value: c.volume, color: c.close >= c.open ? 'rgba(8,153,129,.35)' : 'rgba(242,54,69,.35)' });
@@ -179,6 +180,51 @@ export default function TradingChart({
   const [isSymbolSearchOpen, setIsSymbolSearchOpen] = useState(false);
   const [externalLineTrigger, setExternalLineTrigger] = useState<{ price: number; type: 'LINE' | 'RAY' } | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<ChartContextMenuPos | null>(null);
+
+  // Top Toolbar Dropdown menus
+  const [isTfMenuOpen, setIsTfMenuOpen] = useState(false);
+  const [isStyleMenuOpen, setIsStyleMenuOpen] = useState(false);
+  const [isLayersMenuOpen, setIsLayersMenuOpen] = useState(false);
+
+  const tfMenuRef = useRef<HTMLDivElement>(null);
+  const styleMenuRef = useRef<HTMLDivElement>(null);
+  const layersMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (tfMenuRef.current && !tfMenuRef.current.contains(target)) {
+        setIsTfMenuOpen(false);
+      }
+      if (styleMenuRef.current && !styleMenuRef.current.contains(target)) {
+        setIsStyleMenuOpen(false);
+      }
+      if (layersMenuRef.current && !layersMenuRef.current.contains(target)) {
+        setIsLayersMenuOpen(false);
+      }
+    };
+    if (isTfMenuOpen || isStyleMenuOpen || isLayersMenuOpen) {
+      window.addEventListener('mousedown', handleOutside);
+    }
+    return () => window.removeEventListener('mousedown', handleOutside);
+  }, [isTfMenuOpen, isStyleMenuOpen, isLayersMenuOpen]);
+
+  const favoriteTimeframes = useMemo(
+    () => TIMEFRAMES[provider].filter((t) => FAVORITE_TIMEFRAMES.includes(t)),
+    [provider]
+  );
+
+  const activeLayersCount = useMemo(() => {
+    return (
+      (showVolumeProfile ? 1 : 0) +
+      (isGhostVisible ? 1 : 0) +
+      (showSessionOHL ? 1 : 0) +
+      (canvasOrderLines.length > 0 ? 1 : 0) +
+      (showRiskHUD ? 1 : 0) +
+      (isRulerActive ? 1 : 0) +
+      (isNotesOpen ? 1 : 0)
+    );
+  }, [showVolumeProfile, isGhostVisible, showSessionOHL, canvasOrderLines.length, showRiskHUD, isRulerActive, isNotesOpen]);
 
   // Register global hotkey openers for symbol search, tool selection, and scale reset
   useEffect(() => {
@@ -823,312 +869,456 @@ export default function TradingChart({
     }
   };
 
-  const btn = (on: boolean) => `rounded px-2 py-1 text-xs transition ${on ? 'bg-grid text-white font-semibold' : 'text-muted hover:text-white'}`;
-
   return (
     <div className="relative flex h-full flex-col bg-bg overflow-hidden select-none font-mono">
       {/* ChartSkins Background Layer (Video / Wallpaper / GIF) */}
       <ChartSkinsLayer />
 
-      {/* Chart Toolbar */}
-      <div className="relative z-10 flex items-center gap-1 overflow-x-auto border-b border-grid bg-panel/70 px-2 py-1 backdrop-blur-sm">
-        <button
-          onClick={() => {
-            audioHaptics.tick();
-            setIsSymbolSearchOpen(true);
-          }}
-          className="mr-2 flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-bold text-white hover:bg-slate-800 hover:text-accent border border-transparent hover:border-grid transition cursor-pointer"
-          title="Search symbols (/ or Ctrl+K)"
-        >
-          <span>{labelOf(symbol)}</span>
-          <svg className="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-        {TIMEFRAMES[provider].map((t) => (
+      {/* Institutional TradingView-Style Chart Top Toolbar */}
+      <div className="relative z-20 flex items-center justify-between border-b border-grid bg-panel/85 px-2 py-1 backdrop-blur-md select-none text-xs">
+        {/* Left Section: Symbol, Timeframes, Candle Style, Indicators, Replay, Alert, Undo/Redo, Layers */}
+        <div className="flex items-center gap-1.5 overflow-x-auto min-w-0">
+          {/* Symbol Search Trigger */}
           <button
-            key={t}
-            className={btn(t === timeframe)}
             onClick={() => {
               audioHaptics.tick();
-              setTimeframe(t);
+              setIsSymbolSearchOpen(true);
             }}
+            className="flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-bold text-white hover:bg-slate-800 hover:text-accent border border-grid/60 bg-slate-900/60 transition cursor-pointer shrink-0"
+            title="Search symbols (/ or Ctrl+K)"
           >
-            {t}
+            <span>{labelOf(symbol)}</span>
+            <svg className="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </button>
-        ))}
 
-        <span className="mx-1 h-4 w-px bg-grid" />
+          <span className="h-4 w-px bg-grid shrink-0" />
 
-        {/* Chart Style Switcher (Candles, Heikin-Ashi, Footprint) */}
-        <div className="flex items-center rounded border border-grid bg-slate-900/60 p-0.5 text-xs">
-          {(['CANDLE', 'HEIKIN_ASHI', 'FOOTPRINT'] as const).map((style) => (
+          {/* Timeframe Favorites & Dropdown */}
+          <div className="relative flex items-center shrink-0" ref={tfMenuRef}>
+            <div className="flex items-center gap-0.5">
+              {favoriteTimeframes.map((t) => (
+                <button
+                  key={t}
+                  className={`rounded px-2 py-1 text-xs transition ${
+                    t === timeframe
+                      ? 'bg-accent/20 border border-accent/60 text-accent font-bold'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  }`}
+                  onClick={() => {
+                    audioHaptics.tick();
+                    setTimeframe(t);
+                  }}
+                >
+                  {t}
+                </button>
+              ))}
+              {!favoriteTimeframes.includes(timeframe) && (
+                <button
+                  className="rounded px-2 py-1 text-xs bg-accent/20 border border-accent/60 text-accent font-bold"
+                >
+                  {timeframe}
+                </button>
+              )}
+            </div>
+
+            {/* Timeframe Dropdown Toggle */}
             <button
-              key={style}
-              className={`rounded px-2 py-0.5 transition ${
-                chartStyle === style
-                  ? 'bg-accent/20 border border-accent text-accent font-semibold'
-                  : 'text-muted hover:text-white'
-              }`}
               onClick={() => {
                 audioHaptics.tick();
-                setChartStyle(style);
+                setIsTfMenuOpen((v) => !v);
               }}
-              title={
-                style === 'CANDLE'
-                  ? 'Standard Candlestick Mode'
-                  : style === 'HEIKIN_ASHI'
-                  ? 'Heikin-Ashi Smoothed Trend Mode'
-                  : 'Institutional Bid x Ask Footprint Cluster Mode'
-              }
+              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition ml-0.5"
+              title="All Timeframes"
             >
-              {style === 'CANDLE' ? 'Candles' : style === 'HEIKIN_ASHI' ? 'Heikin-Ashi' : 'Footprint'}
+              <svg className={`h-3 w-3 transition-transform ${isTfMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
-          ))}
-        </div>
 
-        <span className="mx-1 h-4 w-px bg-grid" />
+            {/* Timeframe Dropdown Menu */}
+            {isTfMenuOpen && (
+              <div className="absolute left-0 top-full mt-1.5 z-50 w-44 rounded-lg border border-grid bg-panel/95 p-1.5 shadow-2xl backdrop-blur-md font-mono text-xs">
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Select Timeframe
+                </div>
+                {TIMEFRAMES[provider].map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      audioHaptics.tick();
+                      setTimeframe(t);
+                      setIsTfMenuOpen(false);
+                    }}
+                    className={`flex w-full items-center justify-between px-2.5 py-1.5 rounded transition ${
+                      t === timeframe
+                        ? 'bg-accent/20 text-accent font-bold'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span>{t}</span>
+                    {t === timeframe && (
+                      <svg className="h-3.5 w-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-        {/* fx Indicators Button */}
-        <button
-          onClick={() => {
-            audioHaptics.tick();
-            setIsIndicatorsModalOpen(true);
-          }}
-          className="flex items-center gap-1.5 rounded border border-grid bg-slate-900/60 px-2 py-1 text-xs font-semibold text-slate-200 hover:border-accent hover:text-white transition"
-          title="Indicators, Metrics & Strategies (fx)"
-        >
-          <span className="font-bold text-accent">fx</span>
-          <span>Indicators</span>
-        </button>
+          <span className="h-4 w-px bg-grid shrink-0" />
 
-        {/* Indicators Cluster Quick Toggles */}
-        <button className={btn(showSma)} onClick={() => setShowSma((v) => !v)}>
-          <span className="mr-1 inline-block h-2 w-2 rounded-full bg-[#f0b90b]" />SMA
-        </button>
-        <button className={btn(showEma)} onClick={() => setShowEma((v) => !v)}>
-          <span className="mr-1 inline-block h-2 w-2 rounded-full bg-[#4c8dff]" />EMA
-        </button>
-        <button className={btn(showVwap)} onClick={() => setShowVwap((v) => !v)}>
-          <span className="mr-1 inline-block h-2 w-2 rounded-full bg-[#ec4899]" />VWAP
-        </button>
-        <button className={btn(showBbands)} onClick={() => setShowBbands((v) => !v)} title="Bollinger Bands (20, 2)">
-          <span className="mr-1 inline-block h-2 w-2 rounded-full bg-cyan-400" />BB
-        </button>
-        <button className={btn(showRsi)} onClick={() => setShowRsi((v) => !v)} title="RSI (14) Oscillator">
-          <span className="mr-1 inline-block h-2 w-2 rounded-full bg-purple-400" />RSI
-        </button>
-        <button className={btn(showOI)} onClick={() => setShowOI((v) => !v)} title="Toggle Open Interest (OI) Sub-pane">
-          <span className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-400" />OI
-        </button>
+          {/* Candle Style Dropdown */}
+          <div className="relative shrink-0" ref={styleMenuRef}>
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setIsStyleMenuOpen((v) => !v);
+              }}
+              className="flex items-center gap-1.5 rounded border border-grid/60 bg-slate-900/60 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:border-accent hover:text-white transition"
+              title="Chart Style (Candles, Heikin-Ashi, Footprint)"
+            >
+              {chartStyle === 'CANDLE' && (
+                <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <line x1="9" y1="2" x2="9" y2="6" strokeLinecap="round" />
+                  <rect x="6" y="6" width="6" height="10" rx="1" fill="currentColor" fillOpacity={0.2} />
+                  <line x1="9" y1="16" x2="9" y2="22" strokeLinecap="round" />
+                  <line x1="17" y1="4" x2="17" y2="8" strokeLinecap="round" />
+                  <rect x="14" y="8" width="6" height="8" rx="1" fill="currentColor" fillOpacity={0.2} />
+                  <line x1="17" y1="16" x2="17" y2="20" strokeLinecap="round" />
+                </svg>
+              )}
+              {chartStyle === 'HEIKIN_ASHI' && (
+                <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <line x1="8" y1="3" x2="8" y2="21" strokeLinecap="round" />
+                  <rect x="5" y="7" width="6" height="10" rx="1" fill="currentColor" fillOpacity={0.2} />
+                  <line x1="16" y1="5" x2="16" y2="19" strokeLinecap="round" />
+                  <rect x="13" y="9" width="6" height="7" rx="1" fill="currentColor" fillOpacity={0.2} />
+                </svg>
+              )}
+              {chartStyle === 'FOOTPRINT' && (
+                <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <rect x="4" y="4" width="7" height="4" rx="0.5" fill="currentColor" fillOpacity={0.4} />
+                  <rect x="13" y="4" width="7" height="4" rx="0.5" fill="currentColor" fillOpacity={0.7} />
+                  <rect x="4" y="10" width="9" height="4" rx="0.5" fill="currentColor" fillOpacity={0.8} />
+                  <rect x="15" y="10" width="5" height="4" rx="0.5" fill="currentColor" fillOpacity={0.3} />
+                  <rect x="4" y="16" width="6" height="4" rx="0.5" fill="currentColor" fillOpacity={0.3} />
+                  <rect x="12" y="16" width="8" height="4" rx="0.5" fill="currentColor" fillOpacity={0.6} />
+                </svg>
+              )}
+              <span>{chartStyle === 'CANDLE' ? 'Candles' : chartStyle === 'HEIKIN_ASHI' ? 'Heikin-Ashi' : 'Footprint'}</span>
+              <svg className={`h-3 w-3 text-slate-400 transition-transform ${isStyleMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
 
-        <span className="mx-1 h-4 w-px bg-grid" />
+            {/* Candle Style Menu */}
+            {isStyleMenuOpen && (
+              <div className="absolute left-0 top-full mt-1.5 z-50 w-56 rounded-lg border border-grid bg-panel/95 p-1.5 shadow-2xl backdrop-blur-md font-mono text-xs">
+                {[
+                  { id: 'CANDLE', label: 'Candlestick', desc: 'Standard OHLC price bars' },
+                  { id: 'HEIKIN_ASHI', label: 'Heikin-Ashi', desc: 'Smoothed trend calculation' },
+                  { id: 'FOOTPRINT', label: 'Footprint Clusters', desc: 'Institutional Bid x Ask order flow' },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      audioHaptics.tick();
+                      setChartStyle(s.id as any);
+                      setIsStyleMenuOpen(false);
+                    }}
+                    className={`flex w-full items-start justify-between px-2.5 py-2 rounded text-left transition ${
+                      chartStyle === s.id
+                        ? 'bg-accent/20 text-accent font-bold'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-semibold">{s.label}</div>
+                      <div className="text-[10px] text-slate-400 font-normal">{s.desc}</div>
+                    </div>
+                    {chartStyle === s.id && (
+                      <svg className="h-3.5 w-3.5 text-accent shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-        {/* Bar Replay Historical Time Machine Trigger */}
-        <button
-          onClick={() => {
-            if (isReplayActive) exitReplay();
-            else startReplay();
-          }}
-          className={`flex items-center gap-1.5 rounded px-2 py-1 text-xs font-semibold transition ${
-            isReplayActive
-              ? 'bg-accent text-black font-bold ring-1 ring-accent'
-              : 'text-muted hover:text-white'
-          }`}
-          title="Bar Replay Historical Time Machine (Space: Play/Pause, Shift+Right: Step)"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
-          </svg>
-          <span>Replay</span>
-        </button>
+          <span className="h-4 w-px bg-grid shrink-0" />
 
-        {/* Quick Alert Trigger Button */}
-        <button
-          onClick={() => {
-            audioHaptics.tick();
-            addAlert(symbol, currentPrice, 'PRICE');
-          }}
-          className="flex items-center gap-1.5 rounded border border-grid bg-slate-900/60 px-2 py-1 text-xs font-semibold text-slate-200 hover:border-amber-400 hover:text-amber-300 transition"
-          title="Create Alert at Current Price (Alt+A)"
-        >
-          <svg className="h-3.5 w-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-          </svg>
-          <span>Alert</span>
-        </button>
-
-        <span className="mx-1 h-4 w-px bg-grid" />
-
-        {/* Session OHL Lines Toggle */}
-        <button
-          className={btn(showSessionOHL)}
-          onClick={() => {
-            audioHaptics.tick();
-            setShowSessionOHL((v) => !v);
-          }}
-          title="Toggle Daily Open, High, Low Laser Lines"
-        >
-          OHL
-        </button>
-
-        {/* Ruler Measurement Tool Toggle */}
-        <button
-          className={btn(isRulerActive)}
-          onClick={() => {
-            audioHaptics.tick();
-            setIsRulerActive((v) => !v);
-          }}
-          title="Interactive Distance, Ticks & % Ruler Tool"
-        >
-          Ruler
-        </button>
-
-        {/* Sticky Candle Quick-Notes */}
-        <button
-          className={btn(isNotesOpen)}
-          onClick={() => {
-            audioHaptics.tick();
-            setIsNotesOpen((v) => !v);
-          }}
-          title="Pin Sticky Notes to Candle Action"
-        >
-          Notes
-        </button>
-
-        {/* Ghost Overlay Toggle */}
-        <button
-          className={btn(isGhostVisible)}
-          onClick={() => {
-            audioHaptics.tick();
-            toggleGhost();
-          }}
-          title="Toggle Multi-Timeframe Ghost Chart Overlay"
-        >
-          Ghost HTF
-        </button>
-
-        {/* Visible Range Volume Profile (VPVR) */}
-        <button
-          className={btn(showVolumeProfile)}
-          onClick={() => {
-            audioHaptics.tick();
-            setShowVolumeProfile((v) => !v);
-          }}
-          title="Toggle Visible Range Volume Profile (VPVR)"
-        >
-          VPVR
-        </button>
-
-        {/* Drag-and-Drop Canvas Order Lines */}
-        <button
-          className={btn(canvasOrderLines.length > 0)}
-          onClick={() => {
-            audioHaptics.tick();
-            if (canvasOrderLines.length > 0) clearCanvasOrderLines();
-            else initCanvasOrderLines(currentPrice, 'BUY', 0.1);
-          }}
-          title="Interactive Drag-and-Drop Order Lines on Canvas"
-        >
-          Order Lines
-        </button>
-
-        {/* Risk-Bot 1-Click Sizing HUD */}
-        <button
-          className={btn(showRiskHUD)}
-          onClick={() => {
-            audioHaptics.tick();
-            setShowRiskHUD((v) => !v);
-          }}
-          title="Open 1-Click Position Sizing HUD"
-        >
-          Risk HUD
-        </button>
-
-        {/* ChartSkins Theme Picker */}
-        <button
-          className={btn(themeConfig.wallpaperType !== 'SOLID')}
-          onClick={() => {
-            audioHaptics.tick();
-            setShowSkinsModal(true);
-          }}
-          title="Configure Chart Wallpaper & Video Loops"
-        >
-          Skins
-        </button>
-
-        {/* Share Chart Snapshot Modal Trigger */}
-        <button
-          onClick={() => {
-            audioHaptics.tick();
-            setIsShareModalOpen(true);
-          }}
-          className="rounded border border-accent/60 bg-accent/15 px-2 py-1 text-xs font-semibold text-accent hover:bg-accent hover:text-black transition"
-          title="Export Watermarked Snapshot or Copy Chart Link"
-        >
-          Snapshot
-        </button>
-
-        {/* Undo / Redo Global Controls */}
-        <div className="flex items-center gap-0.5 border-l border-grid pl-1">
+          {/* fx Indicators Button */}
           <button
             onClick={() => {
               audioHaptics.tick();
-              (window as any).__undoDrawing?.();
+              setIsIndicatorsModalOpen(true);
             }}
-            className="p-1 rounded text-muted hover:text-white hover:bg-slate-800 transition"
-            title="Undo (Ctrl+Z)"
+            className="flex items-center gap-1.5 rounded border border-grid/60 bg-slate-900/60 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:border-accent hover:text-white transition shrink-0"
+            title="Indicators, Metrics & Strategies (fx)"
           >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a5 5 0 015 5v2m-15-7l4-4m-4 4l4 4" />
-            </svg>
+            <span className="font-bold text-accent">fx</span>
+            <span>Indicators</span>
+            {activeIndicatorsList.length > 0 && (
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-accent/20 text-accent text-[10px] font-bold">
+                {activeIndicatorsList.length}
+              </span>
+            )}
           </button>
+
+          {/* Bar Replay Historical Time Machine Trigger */}
           <button
             onClick={() => {
               audioHaptics.tick();
-              (window as any).__redoDrawing?.();
+              if (isReplayActive) exitReplay();
+              else startReplay();
             }}
-            className="p-1 rounded text-muted hover:text-white hover:bg-slate-800 transition"
-            title="Redo (Ctrl+Y)"
+            className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-semibold transition shrink-0 ${
+              isReplayActive
+                ? 'bg-amber-400 text-black font-bold ring-1 ring-amber-400 shadow-sm'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Bar Replay Historical Time Machine (Space: Play/Pause, Shift+Right: Step)"
+          >
+            <svg className="h-3.5 w-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
+            </svg>
+            <span>Replay</span>
+          </button>
+
+          {/* Quick Alert Trigger Button */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              addAlert(symbol, currentPrice, 'PRICE');
+            }}
+            className="flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition shrink-0"
+            title="Create Alert at Current Price (Alt+A)"
+          >
+            <svg className="h-3.5 w-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <span>Alert</span>
+          </button>
+
+          {/* Undo / Redo Controls */}
+          <div className="flex items-center gap-0.5 border-l border-grid pl-1 shrink-0">
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                (window as any).__undoDrawing?.();
+              }}
+              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              title="Undo Drawing (Ctrl+Z)"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a5 5 0 015 5v2m-15-7l4-4m-4 4l4 4" />
+              </svg>
+            </button>
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                (window as any).__redoDrawing?.();
+              }}
+              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              title="Redo Drawing (Ctrl+Y)"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10H11a5 5 0 00-5 5v2m15-7l-4-4m4 4l-4 4" />
+              </svg>
+            </button>
+          </div>
+
+          <span className="h-4 w-px bg-grid shrink-0" />
+
+          {/* Institutional Layers & Overlays Dropdown */}
+          <div className="relative shrink-0" ref={layersMenuRef}>
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setIsLayersMenuOpen((v) => !v);
+              }}
+              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-semibold border transition ${
+                activeLayersCount > 0
+                  ? 'border-accent/60 bg-accent/15 text-accent'
+                  : 'border-grid/60 bg-slate-900/60 text-slate-300 hover:text-white hover:border-grid'
+              }`}
+              title="Chart Overlays & Layers"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              <span>Layers</span>
+              {activeLayersCount > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-accent text-black text-[10px] font-bold">
+                  {activeLayersCount}
+                </span>
+              )}
+              <svg className={`h-3 w-3 transition-transform ${isLayersMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {/* Layers Dropdown Menu */}
+            {isLayersMenuOpen && (
+              <div className="absolute left-0 top-full mt-1.5 z-50 w-72 rounded-lg border border-grid bg-panel/95 p-2 shadow-2xl backdrop-blur-md font-mono text-xs select-none">
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1">
+                  Chart Overlays & Tools
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  {[
+                    {
+                      id: 'vpvr',
+                      label: 'Volume Profile (VPVR)',
+                      desc: 'Visible Range dynamic POC, VAH, VAL',
+                      active: showVolumeProfile,
+                      onToggle: () => setShowVolumeProfile((v) => !v),
+                    },
+                    {
+                      id: 'ghost',
+                      label: 'Ghost HTF Overlay',
+                      desc: 'Higher-timeframe candlestick silhouette',
+                      active: isGhostVisible,
+                      onToggle: () => toggleGhost(),
+                    },
+                    {
+                      id: 'ohl',
+                      label: 'Session OHL Lines',
+                      desc: 'Daily Open, High, Low projection laser lines',
+                      active: showSessionOHL,
+                      onToggle: () => setShowSessionOHL((v) => !v),
+                    },
+                    {
+                      id: 'orderlines',
+                      label: 'Canvas Order Lines',
+                      desc: 'Drag limit order, TP, and SL on chart',
+                      active: canvasOrderLines.length > 0,
+                      onToggle: () => {
+                        if (canvasOrderLines.length > 0) clearCanvasOrderLines();
+                        else initCanvasOrderLines(currentPrice, 'BUY', 0.1);
+                      },
+                    },
+                    {
+                      id: 'riskHud',
+                      label: 'Position Risk HUD',
+                      desc: '1-Click % risk calculator & sizing',
+                      active: showRiskHUD,
+                      onToggle: () => setShowRiskHUD((v) => !v),
+                    },
+                    {
+                      id: 'ruler',
+                      label: 'Measurement Ruler',
+                      desc: 'Measure price distance, bars, ticks and %',
+                      active: isRulerActive,
+                      onToggle: () => setIsRulerActive((v) => !v),
+                    },
+                    {
+                      id: 'notes',
+                      label: 'Candle Sticky Notes',
+                      desc: 'Pin trade rationale and notes to bars',
+                      active: isNotesOpen,
+                      onToggle: () => setIsNotesOpen((v) => !v),
+                    },
+                  ].map((layer) => (
+                    <button
+                      key={layer.id}
+                      onClick={() => {
+                        audioHaptics.tick();
+                        layer.onToggle();
+                      }}
+                      className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-slate-800 text-left transition w-full"
+                    >
+                      <div className="flex flex-col pr-2">
+                        <span className={`font-semibold ${layer.active ? 'text-white' : 'text-slate-300'}`}>
+                          {layer.label}
+                        </span>
+                        <span className="text-[10px] text-slate-400">{layer.desc}</span>
+                      </div>
+                      <div className={`w-8 h-4.5 rounded-full p-0.5 transition shrink-0 ${layer.active ? 'bg-accent' : 'bg-slate-700'}`}>
+                        <div className={`w-3.5 h-3.5 rounded-full bg-white transition transform ${layer.active ? 'translate-x-3.5' : 'translate-x-0'}`} />
+                      </div>
+                    </button>
+                  ))}
+
+                  <div className="border-t border-grid/60 my-1 pt-1">
+                    <button
+                      onClick={() => {
+                        audioHaptics.tick();
+                        setShowSkinsModal(true);
+                        setIsLayersMenuOpen(false);
+                      }}
+                      className="flex w-full items-center justify-between px-2 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-semibold">Chart Wallpaper & Skins</span>
+                        <span className="text-[10px] text-slate-400">Solid, gradient, anime or video backgrounds</span>
+                      </div>
+                      <span className="text-accent text-[11px] font-bold">Edit</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Section: Snapshot, Settings, Fullscreen */}
+        <div className="flex items-center gap-1 shrink-0 ml-2">
+          {/* Share Chart Snapshot Modal Trigger */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setIsShareModalOpen(true);
+            }}
+            className="flex items-center gap-1 rounded border border-accent/60 bg-accent/15 px-2 py-1 text-xs font-semibold text-accent hover:bg-accent hover:text-black transition"
+            title="Export Watermarked Snapshot or Copy Chart Link"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10H11a5 5 0 00-5 5v2m15-7l-4-4m4 4l-4 4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="hidden sm:inline">Snapshot</span>
+          </button>
+
+          {/* Chart Settings Gear Icon */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setIsChartSettingsOpen(true);
+            }}
+            className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            title="Chart Settings (Alt+S)"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+
+          {/* Fullscreen Toggle */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen?.();
+              } else {
+                document.exitFullscreen?.();
+              }
+            }}
+            className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            title="Toggle Fullscreen"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
             </svg>
           </button>
         </div>
-
-        {/* Fullscreen Toggle */}
-        <button
-          onClick={() => {
-            audioHaptics.tick();
-            if (!document.fullscreenElement) {
-              document.documentElement.requestFullscreen?.();
-            } else {
-              document.exitFullscreen?.();
-            }
-          }}
-          className="p-1 rounded text-muted hover:text-white hover:bg-slate-800 transition"
-          title="Toggle Fullscreen"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-          </svg>
-        </button>
-
-        {/* Chart Settings Gear Icon */}
-        <button
-          onClick={() => {
-            audioHaptics.tick();
-            setIsChartSettingsOpen(true);
-          }}
-          className="p-1 rounded text-muted hover:text-white hover:bg-slate-800 transition"
-          title="Chart Settings"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
       </div>
 
       {/* Chart Center Area: Docked Left Rail + Canvas */}

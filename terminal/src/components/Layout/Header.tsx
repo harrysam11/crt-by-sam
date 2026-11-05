@@ -69,6 +69,20 @@ export default function Header({
 
   // Stealth Mode Balance Mask
   const [isMasked, setIsMasked] = useState(false);
+  const [isInstToolsOpen, setIsInstToolsOpen] = useState(false);
+  const instToolsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (instToolsRef.current && !instToolsRef.current.contains(e.target as Node)) {
+        setIsInstToolsOpen(false);
+      }
+    };
+    if (isInstToolsOpen) {
+      window.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, [isInstToolsOpen]);
 
   // Colour the price by tick direction
   const prev = useRef(price);
@@ -276,159 +290,133 @@ export default function Header({
             Zen {zenMode.active ? 'ON' : 'OFF'}
           </button>
 
-          {/* Economic Calendar Modal */}
-          {onOpenCalendar && (
+          {/* Institutional Suite Dropdown */}
+          <div className="relative" ref={instToolsRef}>
             <button
               onClick={() => {
                 audioHaptics.tick();
-                onOpenCalendar();
+                setIsInstToolsOpen((v) => !v);
               }}
-              className="rounded px-2 py-1 text-muted hover:text-white hover:bg-grid transition font-semibold"
-              title="Open Global Macro & Economic Events Matrix"
+              className={`flex items-center gap-1.5 rounded border px-2 py-1 font-semibold transition ${
+                isInstToolsOpen
+                  ? 'border-accent text-accent bg-accent/10 shadow-sm'
+                  : 'border-grid text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+              title="Institutional Analytics & Derivatives Suite"
             >
-              Calendar
+              <svg className="h-3.5 w-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              <span>Institutional</span>
+              <svg className={`h-3 w-3 text-slate-400 transition-transform ${isInstToolsOpen ? 'rotate-180 text-accent' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
-          )}
 
-          {/* Option Chain */}
-          {onOpenOptionChain && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenOptionChain();
-              }}
-              className="rounded px-2 py-1 text-muted hover:text-white hover:bg-grid transition"
-              title="Open Strike-wise Option Chain & Open Interest"
-            >
-              Option Chain
-            </button>
-          )}
-
-          {/* Greeks Matrix */}
-          {onOpenGreeks && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenGreeks();
-              }}
-              className="rounded px-2 py-1 text-muted hover:text-white hover:bg-grid transition"
-              title="Open Options Greeks Matrix (Delta, Gamma, Theta, Vega)"
-            >
-              Greeks
-            </button>
-          )}
-
-          {/* Funding Rate Arbitrage */}
-          {onOpenFunding && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenFunding();
-              }}
-              className="rounded px-2 py-1 text-muted hover:text-white hover:bg-grid transition"
-              title="Open Cross-Exchange Funding Rates & Basis Arbitrage"
-            >
-              Funding
-            </button>
-          )}
-
-          {/* Liquidation Waterfall */}
-          {onOpenLiquidations && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenLiquidations();
-              }}
-              className="rounded px-2 py-1 text-muted hover:text-white hover:bg-grid transition"
-              title="Live Liquidation Waterfall & Whale Tape"
-            >
-              Liqs
-            </button>
-          )}
-
-          {/* Risk Manager */}
-          {onOpenRiskManager && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenRiskManager();
-              }}
-              className="rounded px-2 py-1 text-muted hover:text-white hover:bg-grid transition"
-              title="Open Risk Manager & Margin Ratio"
-            >
-              Risk
-            </button>
-          )}
-
-          {/* Tax Ledger */}
-          {onOpenTax && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenTax();
-              }}
-              className="rounded px-2 py-1 text-muted hover:text-white hover:bg-grid transition"
-              title="FnO Regulatory Turnover & Tax Audit Ledger"
-            >
-              Tax
-            </button>
-          )}
-
-          {/* Secure API Key Vault */}
-          {onOpenVault && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenVault();
-              }}
-              className="rounded px-2 py-1 text-muted hover:text-white hover:bg-grid transition"
-              title="Encrypted Client-Side Broker Key Vault"
-            >
-              Vault
-            </button>
-          )}
-
-          {/* DOM Ladder */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              toggleDom();
-            }}
-            className={`rounded px-2 py-1 transition ${
-              isDomVisible ? 'bg-accent text-white font-bold' : 'text-muted hover:text-white'
-            }`}
-            title="Toggle Depth of Market (DOM) & Footprint"
-          >
-            DOM
-          </button>
-
-          {/* Analytics / Seasonals */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              toggleAnalytics();
-            }}
-            className={`rounded px-2 py-1 transition ${
-              isAnalyticsVisible ? 'bg-accent text-white font-bold' : 'text-muted hover:text-white'
-            }`}
-            title="Toggle Seasonals & Technical Meters"
-          >
-            Intel
-          </button>
-
-          {/* Multi-Market Screener */}
-          {onOpenScreener && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenScreener();
-              }}
-              className="rounded px-2 py-1 text-muted hover:text-white hover:bg-grid transition font-semibold"
-              title="Open Global Multi-Market Screener"
-            >
-              Screener
-            </button>
-          )}
+            {isInstToolsOpen && (
+              <div className="absolute right-0 top-full mt-1.5 z-50 w-64 rounded-lg border border-grid bg-panel/95 p-1.5 shadow-2xl backdrop-blur-md select-none font-mono text-xs">
+                {onOpenCalendar && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenCalendar(); setIsInstToolsOpen(false); }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>Economic Calendar Matrix</span>
+                  </button>
+                )}
+                {onOpenScreener && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenScreener(); setIsInstToolsOpen(false); }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <span>Multi-Market Screener</span>
+                  </button>
+                )}
+                {onOpenOptionChain && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenOptionChain(); setIsInstToolsOpen(false); }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span>Option Chain & OI</span>
+                  </button>
+                )}
+                {onOpenGreeks && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenGreeks(); setIsInstToolsOpen(false); }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span>Greeks Sensitivity Matrix</span>
+                  </button>
+                )}
+                {onOpenFunding && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenFunding(); setIsInstToolsOpen(false); }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    <span>Funding Rates Arbitrage</span>
+                  </button>
+                )}
+                {onOpenLiquidations && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenLiquidations(); setIsInstToolsOpen(false); }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                    <span>Liquidation Waterfall Tape</span>
+                  </button>
+                )}
+                {onOpenRiskManager && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenRiskManager(); setIsInstToolsOpen(false); }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>Risk Manager & Margin</span>
+                  </button>
+                )}
+                {onOpenTax && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenTax(); setIsInstToolsOpen(false); }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>Tax & Turnover Ledger</span>
+                  </button>
+                )}
+                {onOpenVault && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenVault(); setIsInstToolsOpen(false); }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <span>Broker API Key Vault</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Settings & Account Center */}
           {onOpenSettings && (
