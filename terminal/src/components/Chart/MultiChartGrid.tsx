@@ -59,11 +59,11 @@ export default function MultiChartGrid() {
             audioHaptics.tick();
             setIsLayoutMenuOpen((v) => !v);
           }}
-          className="flex items-center gap-1.5 rounded-lg border border-grid bg-panel/90 px-2 py-1 text-slate-300 backdrop-blur-md hover:border-accent hover:text-white transition shadow-lg text-[11px]"
+          className="flex items-center gap-1.5 clay-pill px-3 py-1 text-white hover:text-white transition text-[11px]"
           title="Select Chart Grid Layout"
         >
           {/* Grid Layout Icon */}
-          <svg className="h-3.5 w-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             {layout === '1x1' && (
               <rect x="3" y="3" width="18" height="18" rx="2" strokeWidth="2" />
             )}
@@ -88,13 +88,13 @@ export default function MultiChartGrid() {
               </>
             )}
           </svg>
-          <span className="font-bold">{layout}</span>
+          <span className="font-bold text-white">{layout}</span>
         </button>
 
         {/* Layout Selection Dropdown Popover */}
         {isLayoutMenuOpen && (
-          <div className="absolute right-0 top-8 z-40 flex flex-col gap-1 rounded-xl border border-grid bg-panel p-2 shadow-2xl min-w-[140px] backdrop-blur-md">
-            <span className="px-2 py-1 text-[10px] uppercase font-bold text-slate-400">
+          <div className="clay-popover absolute right-0 top-8 z-40 flex flex-col gap-1 p-2 min-w-[150px]">
+            <span className="px-2 py-1 text-[10px] uppercase font-bold text-muted">
               Chart Layout
             </span>
             {[
@@ -106,14 +106,14 @@ export default function MultiChartGrid() {
               <button
                 key={item.id}
                 onClick={() => changeLayout(item.id as ChartGridLayout)}
-                className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition text-[11px] ${
+                className={`flex items-center justify-between px-3 py-1.5 text-left transition text-[11px] ${
                   layout === item.id
-                    ? 'bg-accent/20 text-accent font-bold ring-1 ring-accent/40'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    ? 'clay-pill-active font-bold'
+                    : 'clay-pill text-muted hover:text-white'
                 }`}
               >
                 <span>{item.label}</span>
-                {layout === item.id && <span className="text-accent text-[10px]">•</span>}
+                {layout === item.id && <span className="text-[10px]">*</span>}
               </button>
             ))}
           </div>
