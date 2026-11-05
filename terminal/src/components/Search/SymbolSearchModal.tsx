@@ -24,12 +24,14 @@ interface SymbolSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialQuery?: string;
+  onSelect?: (inst: Instrument) => void;
 }
 
 export default function SymbolSearchModal({
   isOpen,
   onClose,
   initialQuery = '',
+  onSelect,
 }: SymbolSearchModalProps) {
   const currentSymbol = useTerminalStore((s) => s.symbol);
   const setSymbol = useTerminalStore((s) => s.setSymbol);
@@ -99,6 +101,9 @@ export default function SymbolSearchModal({
     audioHaptics.tick();
     registerInstruments([inst]);
     setSymbol(inst.id);
+    if (onSelect) {
+      onSelect(inst);
+    }
 
     // Save to recents
     setRecentSymbols((prev) => {

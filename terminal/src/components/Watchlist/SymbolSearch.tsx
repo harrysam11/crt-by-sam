@@ -5,7 +5,7 @@ import { useTerminalStore } from '../../store/useTerminalStore';
 import type { Instrument } from '../../types/terminal';
 
 /** Search any stock, ETF, index, FX pair or future on Yahoo Finance and add it to the watchlist. */
-export default function SymbolSearch({ onDone }: { onDone: () => void }) {
+export default function SymbolSearch({ onDone, onSelect }: { onDone: () => void; onSelect?: (i: Instrument) => void }) {
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Instrument[]>([]);
   const [msg, setMsg] = useState('');
@@ -23,7 +23,12 @@ export default function SymbolSearch({ onDone }: { onDone: () => void }) {
     return () => { clearTimeout(t); ctl.abort(); };
   }, [q]);
 
-  const pick = (i: Instrument) => { add(i); setSymbol(i.id); onDone(); };
+  const pick = (i: Instrument) => {
+    add(i);
+    setSymbol(i.id);
+    if (onSelect) onSelect(i);
+    onDone();
+  };
 
   return (
     <div className="border-b border-grid p-2">

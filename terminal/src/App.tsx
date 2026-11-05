@@ -29,6 +29,7 @@ import { useMarketFeed } from './hooks/useMarketFeed';
 import { useKeyboardHotkeys } from './hooks/useKeyboardHotkeys';
 import { useTerminalStore } from './store/useTerminalStore';
 import { useDerivativesStore } from './store/useDerivativesStore';
+import { useLayoutStore } from './store/useLayoutStore';
 import { getInstrument } from './services/instruments';
 import { audioHaptics } from './utils/notify';
 
@@ -39,6 +40,7 @@ export default function App() {
   const provider = useTerminalStore((s) => getInstrument(s.symbol)?.provider ?? 'binance');
   const isDomVisible = useDerivativesStore((s) => s.isDomVisible || s.isFootprintVisible);
   const isAnalyticsVisible = useDerivativesStore((s) => s.isAnalyticsVisible);
+  const isChartMaximized = useLayoutStore((s) => s.isChartMaximized);
 
   const [rightW, setRightW] = useState(300);
   const [bottomH, setBottomH] = useState(240);
@@ -67,7 +69,7 @@ export default function App() {
   // Dark & Light Theme Synchronizer
   useEffect(() => {
     const applyTheme = () => {
-      const mode = localStorage.getItem('crt_theme_mode') || 'DARK';
+      const mode = useLayoutStore.getState().themeMode || (localStorage.getItem('crt_theme_mode') as 'DARK' | 'LIGHT') || 'DARK';
       if (mode === 'LIGHT') {
         document.documentElement.classList.add('theme-light');
       } else {
@@ -172,24 +174,26 @@ export default function App() {
       </PopoutWindow>
 
       {/* Global Terminal Header */}
-      <Header
-        onOpenOptionChain={() => setIsOptionChainOpen(true)}
-        onOpenRiskManager={() => setIsRiskManagerOpen(true)}
-        onOpenGreeks={() => setIsGreeksOpen(true)}
-        onOpenFunding={() => setIsFundingOpen(true)}
-        onOpenLiquidations={() => setIsLiquidationsOpen(true)}
-        onOpenVault={() => setIsVaultOpen(true)}
-        onOpenTax={() => setIsTaxOpen(true)}
-        onOpenHotkeys={() => setIsHotkeyOpen(true)}
-        onOpenCalendar={() => setIsCalendarOpen(true)}
-        onOpenScreener={() => setIsScreenerOpen(true)}
-        onOpenSettings={(tab) => {
-          if (tab) setSettingsTab(tab);
-          setIsSettingsOpen(true);
-        }}
-        onTogglePopout={() => setIsPopoutOpen((v) => !v)}
-        isPopoutActive={isPopoutOpen}
-      />
+      {!isChartMaximized && (
+        <Header
+          onOpenOptionChain={() => setIsOptionChainOpen(true)}
+          onOpenRiskManager={() => setIsRiskManagerOpen(true)}
+          onOpenGreeks={() => setIsGreeksOpen(true)}
+          onOpenFunding={() => setIsFundingOpen(true)}
+          onOpenLiquidations={() => setIsLiquidationsOpen(true)}
+          onOpenVault={() => setIsVaultOpen(true)}
+          onOpenTax={() => setIsTaxOpen(true)}
+          onOpenHotkeys={() => setIsHotkeyOpen(true)}
+          onOpenCalendar={() => setIsCalendarOpen(true)}
+          onOpenScreener={() => setIsScreenerOpen(true)}
+          onOpenSettings={(tab) => {
+            if (tab) setSettingsTab(tab);
+            setIsSettingsOpen(true);
+          }}
+          onTogglePopout={() => setIsPopoutOpen((v) => !v)}
+          isPopoutActive={isPopoutOpen}
+        />
+      )}
 
       <div className="flex min-h-0 flex-1 relative overflow-hidden">
         {/* Main Center Area: Chart + Bottom Positions */}
@@ -197,14 +201,18 @@ export default function App() {
           <div className="min-h-0 flex-1 relative">
             <MultiChartGrid />
           </div>
-          <Splitter dir="h" onDrag={(d) => setBottomH((h) => clamp(h - d, 120, 500))} />
-          <div style={{ height: bottomH }} className="shrink-0 overflow-hidden">
-            <PositionsTable />
-          </div>
+          {!isChartMaximized && (
+            <>
+              <Splitter dir="h" onDrag={(d) => setBottomH((h) => clamp(h - d, 120, 500))} />
+              <div style={{ height: bottomH }} className="shrink-0 overflow-hidden">
+                <PositionsTable />
+              </div>
+            </>
+          )}
         </main>
 
         {/* Collapsible Right Slideout Drawer */}
-        {activeRightDrawer && (
+        {!isChartMaximized && activeRightDrawer && (
           <>
             <Splitter dir="v" onDrag={(d) => setRightW((w) => clamp(w - d, 260, 520))} />
             <div style={{ width: rightW }} className="shrink-0 flex flex-col h-full overflow-hidden bg-panel border-l border-grid z-10 shadow-2xl">
@@ -222,101 +230,103 @@ export default function App() {
         )}
 
         {/* TradingView-Style Far Right Vertical Icon Dock Rail */}
-        <aside className="w-[48px] shrink-0 border-l border-grid bg-panel flex flex-col items-center py-3 gap-2.5 z-20 select-none font-mono shadow-clay-card">
-          {/* Watchlist Toggle */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              setActiveRightDrawer((prev) => (prev === 'WATCHLIST' ? null : 'WATCHLIST'));
-            }}
-            className={`p-2.5 rounded-xl transition ${
-              activeRightDrawer === 'WATCHLIST' ? 'clay-btn-active' : 'clay-btn text-slate-300'
-            }`}
-            title="Watchlist & Markets"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </svg>
-          </button>
+        {!isChartMaximized && (
+          <aside className="w-[48px] shrink-0 border-l border-grid bg-panel flex flex-col items-center py-3 gap-2.5 z-20 select-none font-mono shadow-clay-card">
+            {/* Watchlist Toggle */}
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setActiveRightDrawer((prev) => (prev === 'WATCHLIST' ? null : 'WATCHLIST'));
+              }}
+              className={`p-2.5 rounded-xl transition ${
+                activeRightDrawer === 'WATCHLIST' ? 'clay-btn-active' : 'clay-btn text-slate-300'
+              }`}
+              title="Watchlist & Markets"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+            </button>
 
-          {/* DOM & Footprint Toggle */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              setActiveRightDrawer((prev) => (prev === 'DOM' ? null : 'DOM'));
-            }}
-            className={`p-2.5 rounded-xl transition ${
-              activeRightDrawer === 'DOM' ? 'clay-btn-active' : 'clay-btn text-slate-300'
-            }`}
-            title="Depth of Market (DOM) Ladder & Order Flow"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          </button>
+            {/* DOM & Footprint Toggle */}
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setActiveRightDrawer((prev) => (prev === 'DOM' ? null : 'DOM'));
+              }}
+              className={`p-2.5 rounded-xl transition ${
+                activeRightDrawer === 'DOM' ? 'clay-btn-active' : 'clay-btn text-slate-300'
+              }`}
+              title="Depth of Market (DOM) Ladder & Order Flow"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </button>
 
-          {/* Trade Execution & Order Book Toggle */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              setActiveRightDrawer((prev) => (prev === 'TRADE' ? null : 'TRADE'));
-            }}
-            className={`p-2.5 rounded-xl transition ${
-              activeRightDrawer === 'TRADE' ? 'clay-btn-active' : 'clay-btn text-slate-300'
-            }`}
-            title="Order Entry & Live Order Book"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </button>
+            {/* Trade Execution & Order Book Toggle */}
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setActiveRightDrawer((prev) => (prev === 'TRADE' ? null : 'TRADE'));
+              }}
+              className={`p-2.5 rounded-xl transition ${
+                activeRightDrawer === 'TRADE' ? 'clay-btn-active' : 'clay-btn text-slate-300'
+              }`}
+              title="Order Entry & Live Order Book"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </button>
 
-          {/* Analytics Toggle */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              setActiveRightDrawer((prev) => (prev === 'ANALYTICS' ? null : 'ANALYTICS'));
-            }}
-            className={`p-2.5 rounded-xl transition ${
-              activeRightDrawer === 'ANALYTICS' ? 'clay-btn-active' : 'clay-btn text-slate-300'
-            }`}
-            title="Seasonals, Liquidity & News"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-            </svg>
-          </button>
+            {/* Analytics Toggle */}
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setActiveRightDrawer((prev) => (prev === 'ANALYTICS' ? null : 'ANALYTICS'));
+              }}
+              className={`p-2.5 rounded-xl transition ${
+                activeRightDrawer === 'ANALYTICS' ? 'clay-btn-active' : 'clay-btn text-slate-300'
+              }`}
+              title="Seasonals, Liquidity & News"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+              </svg>
+            </button>
 
-          <span className="my-1 h-px w-6 bg-grid" />
+            <span className="my-1 h-px w-6 bg-grid" />
 
-          {/* Option Chain Button */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              setIsOptionChainOpen(true);
-            }}
-            className="p-2.5 rounded-xl clay-btn text-slate-300 transition"
-            title="Option Chain Matrix"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-            </svg>
-          </button>
+            {/* Option Chain Button */}
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setIsOptionChainOpen(true);
+              }}
+              className="p-2.5 rounded-xl clay-btn text-slate-300 transition"
+              title="Option Chain Matrix"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+              </svg>
+            </button>
 
-          {/* Economic Calendar */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              setIsCalendarOpen(true);
-            }}
-            className="p-2.5 rounded-xl clay-btn text-slate-300 transition"
-            title="Macro Calendar"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </button>
-        </aside>
+            {/* Economic Calendar */}
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setIsCalendarOpen(true);
+              }}
+              className="p-2.5 rounded-xl clay-btn text-slate-300 transition"
+              title="Macro Calendar"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </button>
+          </aside>
+        )}
 
       </div>
     </div>

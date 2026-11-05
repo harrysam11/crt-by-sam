@@ -41,6 +41,9 @@ import SymbolSearchModal from '../Search/SymbolSearchModal';
 import ChartContextMenu, { type ChartContextMenuPos } from './ChartContextMenu';
 import ShareChartModal from '../share/ShareChartModal';
 import RiskHUD from '../RiskHUD';
+import { useLayoutStore } from '../../store/useLayoutStore';
+import { chartSyncBus } from '../../services/crosshairSyncBus';
+import { datafeedHub } from '../../services/datafeed';
 
 const SMA_N = 20, EMA_N = 50, EMA_K = 2 / (EMA_N + 1);
 const FAVORITE_TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
@@ -100,6 +103,68 @@ export default function TradingChart({
   const placeOrder = useTerminalStore((s) => s.placeOrder);
   const addAlert = useTerminalStore((s) => s.addAlert);
   const pinePlots = useTerminalStore((s) => s.pinePlots);
+
+  // Layout & Multi-Chart Store
+  const activePaneId = useLayoutStore((s) => s.activePaneId);
+  const setActivePaneId = useLayoutStore((s) => s.setActivePaneId);
+  const syncCrosshair = useLayoutStore((s) => s.syncCrosshair);
+  const syncRange = useLayoutStore((s) => s.syncRange);
+  const setPaneSymbol = useLayoutStore((s) => s.setPaneSymbol);
+  const setPaneTimeframe = useLayoutStore((s) => s.setPaneTimeframe);
+  const themeMode = useLayoutStore((s) => s.themeMode);
+  const toggleThemeMode = useLayoutStore((s) => s.toggleThemeMode);
+
+  // Independent candle fetching for secondary / overridden panes
+  const isIndependentPane = Boolean(symbolOverride || timeframeOverride);
+  const [localCandles, setLocalCandles] = useState<Candle[]>([]);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isIndependentPane) return;
+    const ctl = new AbortController();
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        setLocalError(null);
+        const { candles: fetched } = await datafeedHub.getBars(symbol, timeframe, undefined, undefined, ctl.signal);
+        if (cancelled) return;
+        setLocalCandles(fetched);
+      } catch (err: unknown) {
+        if (!cancelled && !(err instanceof DOMException)) {
+          setLocalError(err instanceof Error ? err.message : 'Failed to load bars');
+        }
+      }
+    };
+
+    load();
+
+    const onRealtimeBar = (bar: Candle) => {
+      setLocalCandles((prev) => {
+        if (!prev.length) return [bar];
+        const last = prev[prev.length - 1];
+        if (last.time === bar.time) {
+          const next = [...prev];
+          next[next.length - 1] = bar;
+          return next;
+        } else if (bar.time > last.time) {
+          return [...prev, bar];
+        }
+        return prev;
+      });
+    };
+
+    const subId = datafeedHub.subscribeBars(symbol, timeframe, onRealtimeBar);
+
+    return () => {
+      cancelled = true;
+      ctl.abort();
+      datafeedHub.unsubscribeBars(subId);
+    };
+  }, [symbol, timeframe, isIndependentPane]);
+
+  const activeCandles = isIndependentPane ? localCandles : candles;
+  const activeError = isIndependentPane ? localError : error;
 
   // Psychology and Skins Store
   const zenMode = usePsychologyStore((s) => s.zenMode);
@@ -461,9 +526,9 @@ export default function TradingChart({
 
   // Effective candles respecting Bar Replay slice
   const effectiveCandles = useMemo(() => {
-    if (!isReplayActive) return candles;
-    return candles.slice(0, Math.min(candles.length, replayIndex + 1));
-  }, [candles, isReplayActive, replayIndex]);
+    if (!isReplayActive) return activeCandles;
+    return activeCandles.slice(0, Math.min(activeCandles.length, replayIndex + 1));
+  }, [activeCandles, isReplayActive, replayIndex]);
 
   // Replay playback interval timer
   useEffect(() => {
@@ -767,6 +832,12 @@ export default function TradingChart({
         const rVal = p.seriesData.get(rsiS) as { value?: number } | undefined;
         const oVal = p.seriesData.get(ois) as { value?: number } | undefined;
 
+        if (p.time && hovering.current) {
+          chartSyncBus.emitCrosshair({
+            sourcePaneId: paneId,
+            time: p.time as number,
+          });
+        }
         writeOhlc({ open: d.open, high: d.high, low: d.low, close: d.close, volume: v?.value });
         setCurrentOhlc({ open: d.open, high: d.high, low: d.low, close: d.close, volume: v?.value });
         setIndicatorValues({
@@ -778,6 +849,50 @@ export default function TradingChart({
         });
       }
     });
+
+    // Crosshair and Range Synchronization
+    const onRangeChanged = (range: any) => {
+      if (range && hovering.current) {
+        chartSyncBus.emitRange({
+          sourcePaneId: paneId,
+          from: range.from,
+          to: range.to,
+        });
+      }
+    };
+    chart.timeScale().subscribeVisibleLogicalRangeChange(onRangeChanged);
+
+    const offCrosshair = chartSyncBus.subscribeCrosshair((e) => {
+      if (e.sourcePaneId === paneId || !useLayoutStore.getState().syncCrosshair) return;
+    });
+
+    const offRange = chartSyncBus.subscribeRange((e) => {
+      if (e.sourcePaneId === paneId || !useLayoutStore.getState().syncRange) return;
+      try {
+        chart.timeScale().setVisibleLogicalRange({ from: e.from, to: e.to });
+      } catch {}
+    });
+
+    const onThemeChange = () => {
+      const isLight = document.documentElement.classList.contains('theme-light');
+      chart.applyOptions({
+        layout: {
+          background: { type: ColorType.Solid, color: isLight ? '#f4f4f6' : '#050508' },
+          textColor: isLight ? '#71717a' : '#828290',
+        },
+        grid: {
+          vertLines: { color: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)' },
+          horzLines: { color: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)' },
+        },
+        rightPriceScale: {
+          borderColor: isLight ? '#e4e4e7' : '#1e1e26',
+        },
+        timeScale: {
+          borderColor: isLight ? '#e4e4e7' : '#1e1e26',
+        },
+      });
+    };
+    window.addEventListener('crt-theme-change', onThemeChange);
 
     const onLive = (c: Candle) => {
       try {
@@ -813,6 +928,10 @@ export default function TradingChart({
     liveCandleBus.add(onLive);
 
     return () => {
+      window.removeEventListener('crt-theme-change', onThemeChange);
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChanged);
+      offCrosshair();
+      offRange();
       liveCandleBus.delete(onLive);
       chart.remove();
       api.current = null;
@@ -1280,6 +1399,7 @@ export default function TradingChart({
                   onClick={() => {
                     audioHaptics.tick();
                     setTimeframe(t);
+                    setPaneTimeframe(paneId, t);
                   }}
                 >
                   {t}
@@ -1320,6 +1440,7 @@ export default function TradingChart({
                     onClick={() => {
                       audioHaptics.tick();
                       setTimeframe(t);
+                      setPaneTimeframe(paneId, t);
                       setIsTfMenuOpen(false);
                     }}
                     className={`flex w-full items-center justify-between px-2.5 py-1.5 rounded-lg transition ${
@@ -1902,6 +2023,26 @@ export default function TradingChart({
             <span className="hidden sm:inline">Snapshot</span>
           </button>
 
+          {/* Quick Theme Switcher Button */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              toggleThemeMode();
+            }}
+            className="p-1.5 rounded-full clay-btn transition"
+            title={`Toggle Theme (Current: ${themeMode})`}
+          >
+            {themeMode === 'DARK' ? (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            )}
+          </button>
+
           {/* Chart Settings Gear Icon */}
           <button
             onClick={() => {
@@ -2129,10 +2270,10 @@ export default function TradingChart({
           )}
 
           {/* Loading overlay */}
-          {!candles.length && (
+          {!activeCandles.length && (
             <div className="absolute inset-0 z-30 flex items-center justify-center bg-bg/80 p-6 text-center">
-              {error
-                ? <p className="max-w-sm text-down">{error}</p>
+              {activeError
+                ? <p className="max-w-sm text-down">{activeError}</p>
                 : <p className="text-muted">Loading {labelOf(symbol)}...</p>}
             </div>
           )}
@@ -2268,6 +2409,7 @@ export default function TradingChart({
       <SymbolSearchModal
         isOpen={isSymbolSearchOpen}
         onClose={() => setIsSymbolSearchOpen(false)}
+        onSelect={(inst) => setPaneSymbol(paneId, inst.id)}
       />
 
       {/* TradingView-Style In-Chart Canvas Context Menu */}
