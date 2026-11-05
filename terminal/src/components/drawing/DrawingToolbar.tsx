@@ -1,12 +1,15 @@
 /**
  * TradingView-Style Expandable Vector Drawing Toolbar.
- * Provides flyout tool drawers, Magnet Snapping mode, and quick utility toggles.
+ * Provides flyout tool drawers, star icons for Favorites, Magnet Snapping mode,
+ * and quick utility toggles.
  * ZERO EMOJI POLICY strictly enforced.
  */
 
 import React, { useState } from 'react';
 import type { ToolType, MagnetConfig } from './types';
 import { audioHaptics } from '../../utils/notify';
+import { useDrawingStore } from '../../store/useDrawingStore';
+import { drawingEvents } from './framework/DrawingEvents';
 
 interface DrawingToolbarProps {
   activeTool: ToolType;
@@ -34,6 +37,10 @@ export default function DrawingToolbar({
   onToggleHideAll,
 }: DrawingToolbarProps) {
   const [openDrawer, setOpenDrawer] = useState<string | null>(null);
+  const favorites = useDrawingStore((s) => s.favorites);
+  const toggleFavorite = useDrawingStore((s) => s.toggleFavorite);
+  const isFavoritesBarVisible = useDrawingStore((s) => s.isFavoritesBarVisible);
+  const toggleFavoritesBar = useDrawingStore((s) => s.toggleFavoritesBar);
 
   const select = (t: ToolType) => {
     audioHaptics.tick();
@@ -45,10 +52,51 @@ export default function DrawingToolbar({
 
   const btnCls = (isActive: boolean) =>
     `p-2 rounded-xl flex items-center justify-center transition relative group ${
-      isActive
-        ? 'clay-btn-active'
-        : 'clay-btn text-slate-300'
+      isActive ? 'clay-btn-active' : 'clay-btn text-slate-300'
     }`;
+
+  const renderToolRow = (type: ToolType, label: string, shortcut?: string) => {
+    const isFav = favorites.includes(type);
+    const isSelected = activeTool === type;
+
+    return (
+      <div
+        key={type}
+        className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-left transition ${
+          isSelected ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'
+        }`}
+      >
+        <button
+          onClick={() => select(type)}
+          className="flex-1 text-left flex items-center justify-between gap-2"
+        >
+          <span>{label}</span>
+          {shortcut && (
+            <kbd className="text-[10px] text-slate-400 bg-slate-900 px-1 py-0.5 rounded border border-grid">
+              {shortcut}
+            </kbd>
+          )}
+        </button>
+
+        {/* Favorite Star Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            audioHaptics.tick();
+            toggleFavorite(type);
+          }}
+          className={`p-0.5 transition ${
+            isFav ? 'text-amber-400 hover:text-amber-300' : 'text-slate-600 hover:text-slate-400'
+          }`}
+          title={isFav ? 'Remove from Favorites' : 'Add to Favorites'}
+        >
+          <svg className="h-3.5 w-3.5" fill={isFav ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+          </svg>
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="relative z-30 flex w-12 shrink-0 flex-col items-center gap-1.5 border-r border-grid bg-panel py-2 select-none font-mono text-xs shadow-clay-card">
@@ -65,40 +113,30 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'CURSOR' && (
-          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[150px]">
-            <button
-              onClick={() => select('CURSOR_CROSSHAIR')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'CURSOR_CROSSHAIR' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Crosshair
-            </button>
-            <button
-              onClick={() => select('CURSOR_ARROW')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'CURSOR_ARROW' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Arrow
-            </button>
-            <button
-              onClick={() => select('CURSOR_DOT')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'CURSOR_DOT' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Dot
-            </button>
-            <button
-              onClick={() => select('CURSOR_ERASER')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'CURSOR_ERASER' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Eraser
-            </button>
+          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[160px]">
+            {renderToolRow('CURSOR_CROSSHAIR', 'Crosshair')}
+            {renderToolRow('CURSOR_ARROW', 'Arrow Cursor')}
+            {renderToolRow('CURSOR_DOT', 'Dot Cursor')}
+            {renderToolRow('CURSOR_ERASER', 'Eraser')}
           </div>
         )}
       </div>
 
-      {/* Drawer 2: Trendlines & Channels */}
+      {/* Drawer 2: Lines & Channels */}
       <div className="relative">
         <button
           onClick={() => setOpenDrawer(openDrawer === 'LINES' ? null : 'LINES')}
-          className={btnCls(isCurrentInGroup(['TRENDLINE', 'RAY', 'HORIZONTAL_LINE', 'HORIZONTAL_RAY', 'VERTICAL_LINE', 'PARALLEL_CHANNEL']))}
+          className={btnCls(
+            isCurrentInGroup([
+              'TRENDLINE',
+              'RAY',
+              'HORIZONTAL_LINE',
+              'HORIZONTAL_RAY',
+              'VERTICAL_LINE',
+              'PARALLEL_CHANNEL',
+              'ARROW',
+            ])
+          )}
           title="Lines & Channels"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -107,46 +145,14 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'LINES' && (
-          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[170px]">
-            <button
-              onClick={() => select('TRENDLINE')}
-              className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-left ${activeTool === 'TRENDLINE' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              <span>Trend Line</span>
-              <kbd className="text-[10px] text-slate-400 bg-slate-900 px-1 py-0.5 rounded border border-grid">Alt+T</kbd>
-            </button>
-            <button
-              onClick={() => select('RAY')}
-              className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-left ${activeTool === 'RAY' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              <span>Ray</span>
-            </button>
-            <button
-              onClick={() => select('HORIZONTAL_LINE')}
-              className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-left ${activeTool === 'HORIZONTAL_LINE' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              <span>Horizontal Line</span>
-              <kbd className="text-[10px] text-slate-400 bg-slate-900 px-1 py-0.5 rounded border border-grid">Alt+H</kbd>
-            </button>
-            <button
-              onClick={() => select('HORIZONTAL_RAY')}
-              className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-left ${activeTool === 'HORIZONTAL_RAY' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              <span>Horizontal Ray</span>
-            </button>
-            <button
-              onClick={() => select('VERTICAL_LINE')}
-              className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-left ${activeTool === 'VERTICAL_LINE' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              <span>Vertical Line</span>
-              <kbd className="text-[10px] text-slate-400 bg-slate-900 px-1 py-0.5 rounded border border-grid">Alt+V</kbd>
-            </button>
-            <button
-              onClick={() => select('PARALLEL_CHANNEL')}
-              className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-left ${activeTool === 'PARALLEL_CHANNEL' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              <span>Parallel Channel</span>
-            </button>
+          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[200px]">
+            {renderToolRow('TRENDLINE', 'Trend Line', 'Alt+T')}
+            {renderToolRow('RAY', 'Ray')}
+            {renderToolRow('HORIZONTAL_LINE', 'Horizontal Line', 'Alt+H')}
+            {renderToolRow('HORIZONTAL_RAY', 'Horizontal Ray')}
+            {renderToolRow('VERTICAL_LINE', 'Vertical Line', 'Alt+V')}
+            {renderToolRow('PARALLEL_CHANNEL', 'Parallel Channel')}
+            {renderToolRow('ARROW', 'Arrow Vector')}
           </div>
         )}
       </div>
@@ -156,7 +162,7 @@ export default function DrawingToolbar({
         <button
           onClick={() => setOpenDrawer(openDrawer === 'FIB' ? null : 'FIB')}
           className={btnCls(isCurrentInGroup(['FIBONACCI', 'FIB_EXTENSION']))}
-          title="Fibonacci Retracements"
+          title="Fibonacci Tools"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
@@ -164,19 +170,9 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'FIB' && (
-          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[160px]">
-            <button
-              onClick={() => select('FIBONACCI')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'FIBONACCI' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Fib Retracement
-            </button>
-            <button
-              onClick={() => select('FIB_EXTENSION')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'FIB_EXTENSION' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Trend-Based Fib Extension
-            </button>
+          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[200px]">
+            {renderToolRow('FIBONACCI', 'Fib Retracement', 'Alt+F')}
+            {renderToolRow('FIB_EXTENSION', 'Trend-Based Fib Extension')}
           </div>
         )}
       </div>
@@ -186,7 +182,7 @@ export default function DrawingToolbar({
         <button
           onClick={() => setOpenDrawer(openDrawer === 'SHAPES' ? null : 'SHAPES')}
           className={btnCls(isCurrentInGroup(['RECTANGLE', 'CIRCLE', 'BRUSH']))}
-          title="Geometric Shapes"
+          title="Geometric Shapes & Brush"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <rect x="4" y="4" width="16" height="16" rx="2" strokeWidth={2} />
@@ -194,25 +190,10 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'SHAPES' && (
-          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[140px]">
-            <button
-              onClick={() => select('RECTANGLE')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'RECTANGLE' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Rectangle Box
-            </button>
-            <button
-              onClick={() => select('CIRCLE')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'CIRCLE' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Circle / Ellipse
-            </button>
-            <button
-              onClick={() => select('BRUSH')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'BRUSH' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Brush / Pen
-            </button>
+          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[170px]">
+            {renderToolRow('RECTANGLE', 'Rectangle Box')}
+            {renderToolRow('CIRCLE', 'Circle / Ellipse')}
+            {renderToolRow('BRUSH', 'Brush / Pen')}
           </div>
         )}
       </div>
@@ -230,25 +211,10 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'TEXT' && (
-          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[140px]">
-            <button
-              onClick={() => select('TEXT')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'TEXT' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Text Note
-            </button>
-            <button
-              onClick={() => select('CALLOUT')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'CALLOUT' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Callout Balloon
-            </button>
-            <button
-              onClick={() => select('PRICE_LABEL')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'PRICE_LABEL' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Price Tag Label
-            </button>
+          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[170px]">
+            {renderToolRow('TEXT', 'Text Note')}
+            {renderToolRow('CALLOUT', 'Callout Balloon')}
+            {renderToolRow('PRICE_LABEL', 'Price Tag Label')}
           </div>
         )}
       </div>
@@ -258,7 +224,7 @@ export default function DrawingToolbar({
         <button
           onClick={() => setOpenDrawer(openDrawer === 'POSITION' ? null : 'POSITION')}
           className={btnCls(isCurrentInGroup(['POSITION_LONG', 'POSITION_SHORT', 'POSITION_TOOL', 'MEASURE_RULER']))}
-          title="Long & Short Position Forecasting Tools"
+          title="Long & Short Position / Measurement"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -266,36 +232,39 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'POSITION' && (
-          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[170px]">
-            <button
-              onClick={() => select('POSITION_LONG')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'POSITION_LONG' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Long Position (R:R Box)
-            </button>
-            <button
-              onClick={() => select('POSITION_SHORT')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'POSITION_SHORT' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Short Position (R:R Box)
-            </button>
-            <button
-              onClick={() => select('MEASURE_RULER')}
-              className={`flex items-center gap-2 px-2 py-1 rounded text-left ${activeTool === 'MEASURE_RULER' ? 'bg-accent/20 text-accent font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              Measure Ruler
-            </button>
+          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[190px]">
+            {renderToolRow('POSITION_LONG', 'Long Position (R:R)')}
+            {renderToolRow('POSITION_SHORT', 'Short Position (R:R)')}
+            {renderToolRow('MEASURE_RULER', 'Measure Ruler')}
           </div>
         )}
       </div>
 
-      <div className="h-px bg-grid my-0.5" />
+      <div className="h-px bg-grid my-0.5 w-6" />
 
-      {/* Undo Drawing Action */}
+      {/* Favorites Toolbar Toggle Button */}
       <button
         onClick={() => {
           audioHaptics.tick();
-          (window as any).__undoDrawing?.();
+          toggleFavoritesBar();
+        }}
+        className={`p-2 rounded-lg flex items-center justify-center transition ${
+          isFavoritesBarVisible && favorites.length > 0
+            ? 'text-amber-400 bg-amber-500/20'
+            : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+        }`}
+        title={isFavoritesBarVisible ? 'Hide Favorites Toolbar' : 'Show Favorites Toolbar'}
+      >
+        <svg className="h-4 w-4" fill={isFavoritesBarVisible && favorites.length > 0 ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+        </svg>
+      </button>
+
+      {/* Undo Action */}
+      <button
+        onClick={() => {
+          audioHaptics.tick();
+          drawingEvents.undo();
         }}
         className="p-2 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition"
         title="Undo (Ctrl+Z)"
@@ -305,11 +274,11 @@ export default function DrawingToolbar({
         </svg>
       </button>
 
-      {/* Redo Drawing Action */}
+      {/* Redo Action */}
       <button
         onClick={() => {
           audioHaptics.tick();
-          (window as any).__redoDrawing?.();
+          drawingEvents.redo();
         }}
         className="p-2 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition"
         title="Redo (Ctrl+Y)"
@@ -319,7 +288,7 @@ export default function DrawingToolbar({
         </svg>
       </button>
 
-      <div className="h-px bg-grid my-0.5" />
+      <div className="h-px bg-grid my-0.5 w-6" />
 
       {/* Magnet Snapping Toggle */}
       <button

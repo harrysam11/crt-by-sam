@@ -1,18 +1,20 @@
 /**
  * TradingView-Style Drawing Overlay Layer.
- * Supports Vector Trendlines, Channels, Fibonacci Retracements, Shapes, Annotations,
- * interactive Long/Short Position tools with live R:R and draggable handles,
- * and OHLC Magnet Snapping.
+ * Powered by BaseDrawingTool framework: anchor points, hit-testing, drag/resize,
+ * magnet snapping, select/lock/hide/delete, z-ordering, undo/redo stack,
+ * per-tool style panel, templates, and per-symbol persistence.
  * ZERO EMOJI POLICY strictly enforced.
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { IChartApi, ISeriesApi, SeriesType } from 'lightweight-charts';
-import type { ToolType, DrawingItem, Point2D, MagnetConfig } from './types';
+import type { ToolType, DrawingItem, Point2D, MagnetConfig, DrawingHandle } from './types';
 import type { Candle } from '../../types/terminal';
-import { fmtPrice } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
 import DrawingContextBar from './DrawingContextBar';
+import { CoordinateHelper } from './framework/CoordinateHelper';
+import { ToolFactory } from './framework/ToolFactory';
+import { drawingEvents } from './framework/DrawingEvents';
 
 interface DrawingOverlayProps {
   symbol: string;
@@ -28,8 +30,6 @@ interface DrawingOverlayProps {
   externalLineTrigger?: { price: number; type: 'LINE' | 'RAY' } | null;
 }
 
-const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
-
 export default function DrawingOverlay({
   symbol,
   activeTool,
@@ -43,6 +43,9 @@ export default function DrawingOverlay({
   clearTrigger,
   externalLineTrigger,
 }: DrawingOverlayProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Load symbol-persisted drawings
   const [drawings, setDrawings] = useState<DrawingItem[]>(() => {
     try {
       const stored = localStorage.getItem(`crt_drawings_${symbol}`);
@@ -53,13 +56,24 @@ export default function DrawingOverlay({
   });
 
   const [activeDrawing, setActiveDrawing] = useState<DrawingItem | null>(null);
+  const [creationStep, setCreationStep] = useState<number>(0);
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
+
+  // Dragging state
   const [draggingHandle, setDraggingHandle] = useState<{
     drawingId: string;
-    handle: 'target' | 'stop' | 'p1' | 'p2';
+    handleId: string;
   } | null>(null);
 
-  // Undo / Redo History Stack
+  const [draggingBody, setDraggingBody] = useState<{
+    drawingId: string;
+    startPoint: Point2D;
+    initialP1: Point2D;
+    initialP2?: Point2D;
+    initialP3?: Point2D;
+  } | null>(null);
+
+  // Undo / Redo history stack
   const [history, setHistory] = useState<DrawingItem[][]>(() => [drawings]);
   const [historyIdx, setHistoryIdx] = useState(0);
 
@@ -88,98 +102,66 @@ export default function DrawingOverlay({
     }
   }, [historyIdx, history]);
 
-  // Global hotkeys (Ctrl+Z to Undo, Ctrl+Y or Ctrl+Shift+Z to Redo)
+  // Hook into drawingEvents event bus
   useEffect(() => {
-    const handleUndoRedo = (e: KeyboardEvent) => {
+    const unsubUndo = drawingEvents.onUndo(undo);
+    const unsubRedo = drawingEvents.onRedo(redo);
+    return () => {
+      unsubUndo();
+      unsubRedo();
+    };
+  }, [undo, redo]);
+
+  // Global hotkeys (Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z, Delete/Backspace)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+
       if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
-        if (e.shiftKey) {
-          e.preventDefault();
-          redo();
-        } else {
-          e.preventDefault();
-          undo();
-        }
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
         e.preventDefault();
         redo();
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedDrawingId) {
+        e.preventDefault();
+        deleteDrawing(selectedDrawingId);
+      } else if (e.key === 'Escape') {
+        setSelectedDrawingId(null);
+        setActiveDrawing(null);
+        setCreationStep(0);
       }
     };
-    window.addEventListener('keydown', handleUndoRedo);
-    return () => window.removeEventListener('keydown', handleUndoRedo);
-  }, [undo, redo]);
 
-  // Bind global undo/redo handlers for toolbar buttons
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedDrawingId, undo, redo]);
+
+  // Persist drawings per symbol to localStorage
   useEffect(() => {
-    (window as any).__undoDrawing = undo;
-    (window as any).__redoDrawing = redo;
-    return () => {
-      delete (window as any).__undoDrawing;
-      delete (window as any).__redoDrawing;
-    };
-  }, [undo, redo]);
-
-  const [, setRerenderKey] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Handle external line trigger from PriceScaleActionFlyout
-  useEffect(() => {
-    if (!externalLineTrigger || !seriesApi) return;
-    const { price, type } = externalLineTrigger;
-    const y = seriesApi.priceToCoordinate(price) ?? 100;
-    const newId = `draw_${Date.now()}`;
-    const newDrawing: DrawingItem = {
-      id: newId,
-      type: type === 'LINE' ? 'HORIZONTAL_LINE' : 'HORIZONTAL_RAY',
-      p1: { x: 50, y, price },
-      color: '#38bdf8',
-      lineWidth: 1.5,
-    };
-    audioHaptics.tick();
-    setDrawings((prev) => [...prev, newDrawing]);
-    setSelectedDrawingId(newId);
-  }, [externalLineTrigger, seriesApi]);
-
-  // Subscribe to timeScale range changes so drawings lock to price and time
-  useEffect(() => {
-    if (!chartApi) return;
-    const timeScale = chartApi.timeScale();
-    const handleRangeChange = () => setRerenderKey((k) => k + 1);
-    timeScale.subscribeVisibleLogicalRangeChange(handleRangeChange);
-    return () => timeScale.unsubscribeVisibleLogicalRangeChange(handleRangeChange);
-  }, [chartApi]);
-
-  // Sync count to parent
-  useEffect(() => {
-    onDrawingsCountChange?.(drawings.length);
     try {
       localStorage.setItem(`crt_drawings_${symbol}`, JSON.stringify(drawings));
     } catch {}
+    onDrawingsCountChange?.(drawings.length);
   }, [drawings, symbol, onDrawingsCountChange]);
 
-  // Dynamic coordinate projection helpers (locks drawings to chart candles)
-  const getDrawX = useCallback(
-    (p: Point2D) => {
-      if (chartApi && p.time) {
-        const cx = chartApi.timeScale().timeToCoordinate(p.time as any);
-        if (cx !== null) return cx;
-      }
-      return p.x;
-    },
-    [chartApi]
-  );
-
-  const getDrawY = useCallback(
-    (p: Point2D) => {
-      if (seriesApi && p.price !== undefined) {
-        const cy = seriesApi.priceToCoordinate(p.price);
-        if (cy !== null) return cy;
-      }
-      return p.y;
-    },
-    [seriesApi]
-  );
+  // Reload drawings when symbol switches
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(`crt_drawings_${symbol}`);
+      const loaded: DrawingItem[] = stored ? JSON.parse(stored) : [];
+      setDrawings(loaded);
+      setHistory([loaded]);
+      setHistoryIdx(0);
+      setSelectedDrawingId(null);
+      setActiveDrawing(null);
+      setCreationStep(0);
+    } catch {
+      setDrawings([]);
+    }
+  }, [symbol]);
 
   // Handle clear trigger
   useEffect(() => {
@@ -187,234 +169,269 @@ export default function DrawingOverlay({
       setDrawings([]);
       pushState([]);
       setSelectedDrawingId(null);
+      setActiveDrawing(null);
     }
-  }, [clearTrigger, pushState]);
+  }, [clearTrigger]);
 
-  // Magnet snapping helper to snap to nearest OHLC
-  const snapPoint = useCallback(
+  // Coordinate helper
+  const coordHelper = useMemo(() => {
+    const width = containerRef.current?.clientWidth || 800;
+    const height = containerRef.current?.clientHeight || 500;
+    return new CoordinateHelper(chartApi, seriesApi, width, height);
+  }, [chartApi, seriesApi, containerRef.current?.clientWidth, containerRef.current?.clientHeight]);
+
+  // Magnet snapping helper
+  const snapToCandle = useCallback(
     (rawX: number, rawY: number): Point2D => {
-      const rawPrice = seriesApi?.coordinateToPrice(rawY) ?? 0;
-      const timeVal = chartApi?.timeScale().coordinateToTime(rawX);
-      const curTime = typeof timeVal === 'number' ? timeVal : undefined;
+      const rawPrice = coordHelper.yToPrice(rawY);
+      const rawTime = coordHelper.xToTime(rawX);
 
       if (!magnetConfig.enabled || !candles.length || !chartApi || !seriesApi) {
-        return { x: rawX, y: rawY, price: rawPrice, time: curTime };
+        return { x: rawX, y: rawY, price: rawPrice, time: rawTime };
       }
 
-      // Find closest candle by X coordinate
-      let closestCandle: Candle | null = null;
+      // Find closest candle by pixel X
+      let closestIdx = 0;
       let minXDist = Infinity;
-      let snapX = rawX;
 
-      for (const c of candles) {
-        const coordX = chartApi.timeScale().timeToCoordinate(c.time as any);
-        if (coordX !== null) {
-          const dist = Math.abs(coordX - rawX);
-          if (dist < minXDist) {
-            minXDist = dist;
-            closestCandle = c;
-            snapX = coordX;
-          }
+      for (let i = 0; i < candles.length; i++) {
+        const cX = coordHelper.timeToX(candles[i].time, -999);
+        const dist = Math.abs(rawX - cX);
+        if (dist < minXDist) {
+          minXDist = dist;
+          closestIdx = i;
         }
       }
 
-      if (!closestCandle) return { x: rawX, y: rawY, price: rawPrice, time: curTime };
+      const closestCandle = candles[closestIdx];
+      if (!closestCandle) {
+        return { x: rawX, y: rawY, price: rawPrice, time: rawTime };
+      }
 
-      // Find closest OHLC price point
-      const ohlcLevels = [
-        { price: closestCandle.high, coord: seriesApi.priceToCoordinate(closestCandle.high) ?? rawY },
-        { price: closestCandle.low, coord: seriesApi.priceToCoordinate(closestCandle.low) ?? rawY },
-        { price: closestCandle.open, coord: seriesApi.priceToCoordinate(closestCandle.open) ?? rawY },
-        { price: closestCandle.close, coord: seriesApi.priceToCoordinate(closestCandle.close) ?? rawY },
+      const candleX = coordHelper.timeToX(closestCandle.time, rawX);
+
+      // Snap candidates: Open, High, Low, Close
+      const candidates = [
+        { price: closestCandle.high, y: coordHelper.priceToY(closestCandle.high) },
+        { price: closestCandle.low, y: coordHelper.priceToY(closestCandle.low) },
+        { price: closestCandle.open, y: coordHelper.priceToY(closestCandle.open) },
+        { price: closestCandle.close, y: coordHelper.priceToY(closestCandle.close) },
       ];
 
-      let closestLevel = ohlcLevels[0];
+      let bestCand = candidates[0];
       let minYDist = Infinity;
-      for (const lvl of ohlcLevels) {
-        const dist = Math.abs(lvl.coord - rawY);
-        if (dist < minYDist) {
-          minYDist = dist;
-          closestLevel = lvl;
+      for (const cand of candidates) {
+        const d = Math.abs(rawY - cand.y);
+        if (d < minYDist) {
+          minYDist = d;
+          bestCand = cand;
         }
       }
 
-      const totalDist = Math.hypot(snapX - rawX, closestLevel.coord - rawY);
-      if (magnetConfig.mode === 'WEAK' && totalDist > 30) {
-        return { x: rawX, y: rawY, price: rawPrice, time: curTime ?? closestCandle.time };
+      // Strong mode snaps always; Weak mode snaps within 20px
+      if (magnetConfig.mode === 'STRONG' || minYDist <= 20) {
+        return {
+          x: candleX,
+          y: bestCand.y,
+          price: bestCand.price,
+          time: closestCandle.time,
+        };
       }
 
-      return {
-        x: snapX,
-        y: closestLevel.coord,
-        price: closestLevel.price,
-        time: closestCandle.time,
-      };
+      return { x: rawX, y: rawY, price: rawPrice, time: rawTime };
     },
-    [magnetConfig, candles, chartApi, seriesApi]
+    [magnetConfig, candles, chartApi, seriesApi, coordHelper]
   );
 
-  const isDrawingTool =
-    activeTool === 'TRENDLINE' ||
-    activeTool === 'RAY' ||
-    activeTool === 'HORIZONTAL_LINE' ||
-    activeTool === 'HORIZONTAL_RAY' ||
-    activeTool === 'VERTICAL_LINE' ||
-    activeTool === 'PARALLEL_CHANNEL' ||
-    activeTool === 'FIBONACCI' ||
-    activeTool === 'RECTANGLE' ||
-    activeTool === 'CIRCLE' ||
-    activeTool === 'TEXT' ||
-    activeTool === 'CALLOUT' ||
-    activeTool === 'PRICE_LABEL' ||
-    activeTool === 'POSITION_LONG' ||
-    activeTool === 'POSITION_SHORT' ||
-    activeTool === 'POSITION_TOOL' ||
-    activeTool === 'MEASURE_RULER';
-
-  // Keyboard shortcuts (Del/Backspace = delete selected, Esc = deselect)
+  // External line trigger from Price Scale hover actions
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedDrawingId) {
-          audioHaptics.tick();
-          setDrawings((prev) => prev.filter((d) => d.id !== selectedDrawingId));
-          setSelectedDrawingId(null);
-        }
-      } else if (e.key === 'Escape') {
-        setSelectedDrawingId(null);
-        setActiveDrawing(null);
-      }
+    if (!externalLineTrigger || !seriesApi) return;
+    const { price, type } = externalLineTrigger;
+    const y = coordHelper.priceToY(price, 100);
+    const newDrawing: DrawingItem = {
+      id: `ext_${Date.now()}`,
+      type: type === 'LINE' ? 'HORIZONTAL_LINE' : 'HORIZONTAL_RAY',
+      p1: { x: 50, y, price },
+      color: '#38bdf8',
+      lineWidth: 1.5,
+      lineStyle: 'dashed',
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedDrawingId]);
+    audioHaptics.tick();
+    const next = [...drawings, newDrawing];
+    setDrawings(next);
+    pushState(next);
+    setSelectedDrawingId(newDrawing.id);
+  }, [externalLineTrigger, seriesApi]);
+
+  // Pointer interactions
+  const isDrawingTool =
+    activeTool !== 'CURSOR_CROSSHAIR' &&
+    activeTool !== 'CURSOR_ARROW' &&
+    activeTool !== 'CURSOR_DOT' &&
+    activeTool !== 'CURSOR_ERASER';
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!seriesApi || !containerRef.current) return;
+    if (e.button !== 0 || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
+    const point = snapToCandle(rawX, rawY);
 
+    // Eraser mode deletes on click
     if (activeTool === 'CURSOR_ERASER') {
-      audioHaptics.tick();
-      setDrawings((prev) =>
-        prev.filter((d) => {
-          const dist1 = Math.hypot(d.p1.x - rawX, d.p1.y - rawY);
-          const dist2 = d.p2 ? Math.hypot(d.p2.x - rawX, d.p2.y - rawY) : Infinity;
-          return dist1 > 20 && dist2 > 20;
-        })
-      );
-      return;
-    }
-
-    if (!isDrawingTool) return;
-
-    audioHaptics.tick();
-    const p1 = snapPoint(rawX, rawY);
-
-    if (activeTool === 'HORIZONTAL_LINE') {
-      const newDrawing: DrawingItem = {
-        id: `draw-${Date.now()}`,
-        type: 'HORIZONTAL_LINE',
-        p1,
-        color: '#f0b90b',
-        lineWidth: 1.5,
-      };
-      setDrawings((prev) => [...prev, newDrawing]);
-      setSelectedDrawingId(newDrawing.id);
-      return;
-    }
-
-    if (activeTool === 'HORIZONTAL_RAY') {
-      const newDrawing: DrawingItem = {
-        id: `draw-${Date.now()}`,
-        type: 'HORIZONTAL_RAY',
-        p1,
-        color: '#38bdf8',
-        lineWidth: 1.5,
-      };
-      setDrawings((prev) => [...prev, newDrawing]);
-      setSelectedDrawingId(newDrawing.id);
-      return;
-    }
-
-    if (activeTool === 'VERTICAL_LINE') {
-      const newDrawing: DrawingItem = {
-        id: `draw-${Date.now()}`,
-        type: 'VERTICAL_LINE',
-        p1,
-        color: '#c084fc',
-        lineWidth: 1.5,
-      };
-      setDrawings((prev) => [...prev, newDrawing]);
-      setSelectedDrawingId(newDrawing.id);
-      return;
-    }
-
-    if (activeTool === 'PRICE_LABEL') {
-      const newDrawing: DrawingItem = {
-        id: `draw-${Date.now()}`,
-        type: 'PRICE_LABEL',
-        p1,
-        color: '#22c55e',
-        lineWidth: 1.5,
-      };
-      setDrawings((prev) => [...prev, newDrawing]);
-      setSelectedDrawingId(newDrawing.id);
-      return;
-    }
-
-    if (activeTool === 'TEXT') {
-      const textVal = window.prompt('Enter annotation text:', 'Key Level');
-      if (textVal) {
-        const newDrawing: DrawingItem = {
-          id: `draw-${Date.now()}`,
-          type: 'TEXT',
-          p1,
-          text: textVal,
-          color: '#ffffff',
-          lineWidth: 1,
-        };
-        setDrawings((prev) => [...prev, newDrawing]);
-        setSelectedDrawingId(newDrawing.id);
+      for (let i = drawings.length - 1; i >= 0; i--) {
+        const tool = ToolFactory.create(drawings[i]);
+        if (tool.hitTest(rawX, rawY, coordHelper)) {
+          deleteDrawing(drawings[i].id);
+          return;
+        }
       }
       return;
     }
 
-    // Two-point drawing setup
-    const isLong = activeTool === 'POSITION_LONG';
-    const isShort = activeTool === 'POSITION_SHORT';
-    const isPos = isLong || isShort || activeTool === 'POSITION_TOOL';
+    // Check handle hit testing on currently selected drawing
+    if (selectedDrawingId) {
+      const selected = drawings.find((d) => d.id === selectedDrawingId);
+      if (selected && !selected.locked && !isLockedAll) {
+        const tool = ToolFactory.create(selected);
+        const handles = tool.getHandles(coordHelper);
+        const hitHandle = handles.find(
+          (h) => Math.hypot(rawX - h.x, rawY - h.y) <= 8
+        );
+        if (hitHandle) {
+          audioHaptics.tick();
+          setDraggingHandle({ drawingId: selected.id, handleId: hitHandle.id });
+          return;
+        }
 
-    const color =
-      isLong
-        ? '#22c55e'
-        : isShort
-        ? '#ef4444'
-        : activeTool === 'FIBONACCI'
-        ? '#38bdf8'
-        : activeTool === 'RECTANGLE'
-        ? '#a855f7'
-        : activeTool === 'CIRCLE'
-        ? '#ec4899'
-        : '#4c8dff';
+        // If clicked inside body of selected drawing, start translating it
+        if (tool.hitTest(rawX, rawY, coordHelper)) {
+          audioHaptics.tick();
+          setDraggingBody({
+            drawingId: selected.id,
+            startPoint: point,
+            initialP1: { ...selected.p1 },
+            initialP2: selected.p2 ? { ...selected.p2 } : undefined,
+            initialP3: selected.p3 ? { ...selected.p3 } : undefined,
+          });
+          return;
+        }
+      }
+    }
 
-    const newDrawing: DrawingItem = {
-      id: `draw-${Date.now()}`,
-      type: activeTool,
-      p1,
-      p2: { ...p1 },
-      color,
-      lineWidth: 1.5,
-      entryPrice: p1.price,
-      targetPrice: isLong ? p1.price * 1.02 : isShort ? p1.price * 0.98 : undefined,
-      stopPrice: isLong ? p1.price * 0.99 : isShort ? p1.price * 1.01 : undefined,
-      riskReward: isPos ? 2.0 : undefined,
-    };
+    // Check hit testing on any existing drawing to select it
+    if (!isDrawingTool) {
+      for (let i = drawings.length - 1; i >= 0; i--) {
+        const tool = ToolFactory.create(drawings[i]);
+        if (tool.hitTest(rawX, rawY, coordHelper)) {
+          audioHaptics.tick();
+          setSelectedDrawingId(drawings[i].id);
+          return;
+        }
+      }
+      setSelectedDrawingId(null);
+      return;
+    }
 
-    setActiveDrawing(newDrawing);
+    // Multi-step tool creation
+    if (isDrawingTool) {
+      if (creationStep === 0) {
+        audioHaptics.tick();
+
+        // 1-point instant tools
+        if (activeTool === 'HORIZONTAL_LINE' || activeTool === 'VERTICAL_LINE' || activeTool === 'PRICE_LABEL') {
+          const newDrawing: DrawingItem = {
+            id: `draw_${Date.now()}`,
+            type: activeTool,
+            p1: point,
+            color: '#38bdf8',
+            lineWidth: 2,
+            lineStyle: 'solid',
+          };
+          const next = [...drawings, newDrawing];
+          setDrawings(next);
+          pushState(next);
+          setSelectedDrawingId(newDrawing.id);
+          return;
+        }
+
+        if (activeTool === 'TEXT' || activeTool === 'CALLOUT') {
+          const newDrawing: DrawingItem = {
+            id: `draw_${Date.now()}`,
+            type: activeTool,
+            p1: point,
+            text: 'Text Note',
+            color: '#ffffff',
+            fillColor: '#181820',
+            lineWidth: 1,
+            fontSize: 12,
+          };
+          const next = [...drawings, newDrawing];
+          setDrawings(next);
+          pushState(next);
+          setSelectedDrawingId(newDrawing.id);
+          return;
+        }
+
+        if (activeTool === 'BRUSH') {
+          const newDrawing: DrawingItem = {
+            id: `draw_${Date.now()}`,
+            type: 'BRUSH',
+            p1: point,
+            points: [point],
+            color: '#38bdf8',
+            lineWidth: 2,
+          };
+          setActiveDrawing(newDrawing);
+          setCreationStep(1);
+          return;
+        }
+
+        // 2-point and 3-point tools
+        const newDrawing: DrawingItem = {
+          id: `draw_${Date.now()}`,
+          type: activeTool,
+          p1: point,
+          p2: point,
+          color: activeTool === 'POSITION_LONG' ? '#22c55e' : activeTool === 'POSITION_SHORT' ? '#ef4444' : '#38bdf8',
+          lineWidth: 2,
+          lineStyle: 'solid',
+        };
+        setActiveDrawing(newDrawing);
+        setCreationStep(1);
+      } else if (creationStep === 1) {
+        if (!activeDrawing) return;
+
+        // 3-point tools (Parallel Channel, Fib Extension) require a 3rd click
+        if (activeTool === 'PARALLEL_CHANNEL' || activeTool === 'FIB_EXTENSION') {
+          audioHaptics.tick();
+          setActiveDrawing({ ...activeDrawing, p2: point, p3: point });
+          setCreationStep(2);
+          return;
+        }
+
+        // Finalize 2-point tool
+        audioHaptics.tick();
+        const finalized = { ...activeDrawing, p2: point };
+        const next = [...drawings, finalized];
+        setDrawings(next);
+        pushState(next);
+        setSelectedDrawingId(finalized.id);
+        setActiveDrawing(null);
+        setCreationStep(0);
+      } else if (creationStep === 2) {
+        // Finalize 3-point tool
+        if (!activeDrawing) return;
+        audioHaptics.tick();
+        const finalized = { ...activeDrawing, p3: point };
+        const next = [...drawings, finalized];
+        setDrawings(next);
+        pushState(next);
+        setSelectedDrawingId(finalized.id);
+        setActiveDrawing(null);
+        setCreationStep(0);
+      }
+    }
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -422,96 +439,89 @@ export default function DrawingOverlay({
     const rect = containerRef.current.getBoundingClientRect();
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
+    const point = snapToCandle(rawX, rawY);
 
-    // Handle dragging an existing drawing or position handle
-    if (draggingHandle && seriesApi) {
-      const snapped = snapPoint(rawX, rawY);
+    // Dragging an anchor handle
+    if (draggingHandle) {
       setDrawings((prev) =>
         prev.map((d) => {
           if (d.id !== draggingHandle.drawingId) return d;
-          if (draggingHandle.handle === 'p1') {
-            return { ...d, p1: snapped };
-          }
-          if (draggingHandle.handle === 'p2') {
-            return { ...d, p2: snapped };
-          }
-          if (draggingHandle.handle === 'target') {
-            const entry = d.entryPrice ?? d.p1.price;
-            const stop = d.stopPrice ?? d.p1.price;
-            const rr = Math.abs(snapped.price - entry) / Math.max(0.0001, Math.abs(entry - stop));
-            return {
-              ...d,
-              targetPrice: snapped.price,
-              p2: d.p2 ? { ...d.p2, y: rawY, price: snapped.price, time: snapped.time } : undefined,
-              riskReward: Number(rr.toFixed(2)),
-            };
-          }
-          if (draggingHandle.handle === 'stop') {
-            const entry = d.entryPrice ?? d.p1.price;
-            const target = d.targetPrice ?? d.p1.price;
-            const rr = Math.abs(target - entry) / Math.max(0.0001, Math.abs(entry - snapped.price));
-            return {
-              ...d,
-              stopPrice: snapped.price,
-              riskReward: Number(rr.toFixed(2)),
-            };
-          }
-          return d;
+          const tool = ToolFactory.create(d);
+          tool.onDragHandle(draggingHandle.handleId, point);
+          return tool.toJSON();
         })
       );
       return;
     }
 
-    if (!activeDrawing || !seriesApi) return;
-    const p2 = snapPoint(rawX, rawY);
+    // Translating an entire drawing body
+    if (draggingBody) {
+      const deltaPrice = point.price - draggingBody.startPoint.price;
+      const deltaTime = point.time && draggingBody.startPoint.time ? point.time - draggingBody.startPoint.time : 0;
 
-    // Update live active drawing
-    setActiveDrawing((prev) => {
-      if (!prev) return null;
-      let targetPrice = prev.targetPrice;
-      let stopPrice = prev.stopPrice;
-      let rr = prev.riskReward;
+      setDrawings((prev) =>
+        prev.map((d) => {
+          if (d.id !== draggingBody.drawingId) return d;
+          const tool = ToolFactory.create(d);
+          tool.p1 = {
+            ...draggingBody.initialP1,
+            price: draggingBody.initialP1.price + deltaPrice,
+            time: draggingBody.initialP1.time !== undefined ? draggingBody.initialP1.time + deltaTime : undefined,
+          };
+          if (draggingBody.initialP2) {
+            tool.p2 = {
+              ...draggingBody.initialP2,
+              price: draggingBody.initialP2.price + deltaPrice,
+              time: draggingBody.initialP2.time !== undefined ? draggingBody.initialP2.time + deltaTime : undefined,
+            };
+          }
+          if (draggingBody.initialP3) {
+            tool.p3 = {
+              ...draggingBody.initialP3,
+              price: draggingBody.initialP3.price + deltaPrice,
+              time: draggingBody.initialP3.time !== undefined ? draggingBody.initialP3.time + deltaTime : undefined,
+            };
+          }
+          return tool.toJSON();
+        })
+      );
+      return;
+    }
 
-      if (prev.type === 'POSITION_LONG') {
-        targetPrice = p2.price;
-        const entry = prev.p1.price;
-        const stopDist = Math.abs(targetPrice - entry) * 0.5;
-        stopPrice = entry - stopDist;
-        rr = 2.0;
-      } else if (prev.type === 'POSITION_SHORT') {
-        targetPrice = p2.price;
-        const entry = prev.p1.price;
-        const stopDist = Math.abs(targetPrice - entry) * 0.5;
-        stopPrice = entry + stopDist;
-        rr = 2.0;
+    // Updating active drawing in progress
+    if (activeDrawing) {
+      if (activeDrawing.type === 'BRUSH') {
+        const pts = activeDrawing.points ? [...activeDrawing.points, point] : [point];
+        setActiveDrawing({ ...activeDrawing, points: pts });
+      } else if (creationStep === 1) {
+        setActiveDrawing({ ...activeDrawing, p2: point });
+      } else if (creationStep === 2) {
+        setActiveDrawing({ ...activeDrawing, p3: point });
       }
-
-      return {
-        ...prev,
-        p2,
-        targetPrice,
-        stopPrice,
-        riskReward: rr,
-      };
-    });
+    }
   };
 
   const handlePointerUp = () => {
     if (draggingHandle) {
       setDraggingHandle(null);
-      return;
+      pushState(drawings);
     }
-
-    if (activeDrawing && activeDrawing.p2) {
+    if (draggingBody) {
+      setDraggingBody(null);
+      pushState(drawings);
+    }
+    if (activeDrawing && activeDrawing.type === 'BRUSH') {
       audioHaptics.tick();
       const next = [...drawings, activeDrawing];
       setDrawings(next);
       pushState(next);
       setSelectedDrawingId(activeDrawing.id);
       setActiveDrawing(null);
+      setCreationStep(0);
     }
   };
 
+  // Drawing modifiers
   const updateDrawing = (id: string, patch: Partial<DrawingItem>) => {
     setDrawings((prev) => {
       const next = prev.map((d) => (d.id === id ? { ...d, ...patch } : d));
@@ -526,6 +536,28 @@ export default function DrawingOverlay({
     setDrawings(next);
     pushState(next);
     if (selectedDrawingId === id) setSelectedDrawingId(null);
+  };
+
+  const bringToFront = (id: string) => {
+    setDrawings((prev) => {
+      const idx = prev.findIndex((d) => d.id === id);
+      if (idx === -1 || idx === prev.length - 1) return prev;
+      const target = prev[idx];
+      const next = [...prev.slice(0, idx), ...prev.slice(idx + 1), target];
+      pushState(next);
+      return next;
+    });
+  };
+
+  const sendToBack = (id: string) => {
+    setDrawings((prev) => {
+      const idx = prev.findIndex((d) => d.id === id);
+      if (idx <= 0) return prev;
+      const target = prev[idx];
+      const next = [target, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
+      pushState(next);
+      return next;
+    });
   };
 
   const selectedDrawing = drawings.find((d) => d.id === selectedDrawingId) ?? null;
@@ -546,567 +578,53 @@ export default function DrawingOverlay({
       }`}
     >
       <svg className="h-full w-full pointer-events-none">
-        {allDrawings.map((d) => {
-          const { p1, p2, color, lineWidth, type, id } = d;
-          const isSelected = selectedDrawingId === id;
-          const x1 = getDrawX(p1);
-          const y1 = getDrawY(p1);
-          const x2 = p2 ? getDrawX(p2) : x1;
-          const y2 = p2 ? getDrawY(p2) : y1;
+        {/* Render all drawings via BaseDrawingTool instances */}
+        {allDrawings.map((item) => {
+          const isSelected = selectedDrawingId === item.id;
+          const isHovered = false;
+          const tool = ToolFactory.create(item);
 
-          if (type === 'HORIZONTAL_LINE') {
-            return (
-              <g
-                key={id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedDrawingId(id);
-                }}
-                className="pointer-events-auto cursor-pointer"
-              >
-                <line
-                  x1="0"
-                  y1={y1}
-                  x2="100%"
-                  y2={y1}
-                  stroke={color}
-                  strokeWidth={lineWidth}
-                  strokeDasharray="4 2"
-                />
-                <rect x="6" y={y1 - 10} width="84" height="20" rx="3" fill="#1e222d" stroke={isSelected ? '#38bdf8' : 'none'} strokeWidth="1" />
-                <text x="10" y={y1 + 4} fill="#ffffff" fontSize="10" fontFamily="monospace">
-                  {fmtPrice(p1.price, symbol)}
-                </text>
-                {isSelected && (
+          return (
+            <g key={item.id} className="pointer-events-auto">
+              {tool.renderSVG(isSelected, isHovered, coordHelper, symbol)}
+
+              {/* Render anchor handles for selected drawing */}
+              {isSelected &&
+                !item.locked &&
+                !isLockedAll &&
+                tool.getHandles(coordHelper).map((h) => (
                   <circle
-                    cx="50%"
-                    cy={y1}
-                    r="5"
+                    key={h.id}
+                    cx={h.x}
+                    cy={h.y}
+                    r={5}
                     fill="#ffffff"
                     stroke="#38bdf8"
-                    strokeWidth="2"
-                    className="cursor-ns-resize pointer-events-auto"
+                    strokeWidth={2}
+                    className="cursor-pointer pointer-events-auto hover:scale-125 transition-transform"
                     onPointerDown={(e) => {
                       e.stopPropagation();
-                      setDraggingHandle({ drawingId: id, handle: 'p1' });
+                      audioHaptics.tick();
+                      setDraggingHandle({ drawingId: item.id, handleId: h.id });
                     }}
                   />
-                )}
-              </g>
-            );
-          }
-
-          if (type === 'HORIZONTAL_RAY') {
-            return (
-              <g
-                key={id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedDrawingId(id);
-                }}
-                className="pointer-events-auto cursor-pointer"
-              >
-                <line x1={x1} y1={y1} x2="100%" y2={y1} stroke={color} strokeWidth={lineWidth} />
-                <circle cx={x1} cy={y1} r="3.5" fill={color} />
-                <rect x={x1 + 8} y={y1 - 10} width="84" height="20" rx="3" fill="#1e222d" stroke={isSelected ? '#38bdf8' : 'none'} strokeWidth="1" />
-                <text x={x1 + 12} y={y1 + 4} fill="#ffffff" fontSize="10" fontFamily="monospace">
-                  {fmtPrice(p1.price, symbol)}
-                </text>
-                {isSelected && (
-                  <circle
-                    cx={x1}
-                    cy={y1}
-                    r="5"
-                    fill="#ffffff"
-                    stroke="#38bdf8"
-                    strokeWidth="2"
-                    className="cursor-move pointer-events-auto"
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      setDraggingHandle({ drawingId: id, handle: 'p1' });
-                    }}
-                  />
-                )}
-              </g>
-            );
-          }
-
-          if (type === 'VERTICAL_LINE') {
-            return (
-              <g
-                key={id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedDrawingId(id);
-                }}
-                className="pointer-events-auto cursor-pointer"
-              >
-                <line x1={x1} y1="0" x2={x1} y2="100%" stroke={color} strokeWidth={lineWidth} strokeDasharray="4 2" />
-                <circle cx={x1} cy={y1} r="3.5" fill={color} />
-                {isSelected && (
-                  <circle
-                    cx={x1}
-                    cy="50%"
-                    r="5"
-                    fill="#ffffff"
-                    stroke="#38bdf8"
-                    strokeWidth="2"
-                    className="cursor-ew-resize pointer-events-auto"
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      setDraggingHandle({ drawingId: id, handle: 'p1' });
-                    }}
-                  />
-                )}
-              </g>
-            );
-          }
-
-          if (type === 'PRICE_LABEL') {
-            return (
-              <g
-                key={id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedDrawingId(id);
-                }}
-                className="pointer-events-auto cursor-pointer"
-              >
-                <circle cx={x1} cy={y1} r="4" fill={color} />
-                <rect x={x1 + 8} y={y1 - 12} width="80" height="24" rx="4" fill="#1e222d" stroke={isSelected ? '#38bdf8' : color} strokeWidth="1" />
-                <text x={x1 + 12} y={y1 + 4} fill="#ffffff" fontSize="11" fontWeight="bold" fontFamily="monospace">
-                  {fmtPrice(p1.price, symbol)}
-                </text>
-                {isSelected && (
-                  <circle
-                    cx={x1}
-                    cy={y1}
-                    r="5"
-                    fill="#ffffff"
-                    stroke="#38bdf8"
-                    strokeWidth="2"
-                    className="cursor-move pointer-events-auto"
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      setDraggingHandle({ drawingId: id, handle: 'p1' });
-                    }}
-                  />
-                )}
-              </g>
-            );
-          }
-
-          if (type === 'TEXT') {
-            return (
-              <g
-                key={id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedDrawingId(id);
-                }}
-                className="pointer-events-auto cursor-pointer"
-              >
-                <rect x={x1 - 4} y={y1 - 16} width={(d.text?.length ?? 8) * 8 + 12} height="22" rx="4" fill="#0b0e14" stroke={isSelected ? '#38bdf8' : '#334155'} strokeWidth="1" />
-                <text x={x1 + 2} y={y1 - 1} fill={color} fontSize="12" fontWeight="600" fontFamily="monospace">
-                  {d.text ?? ''}
-                </text>
-                {isSelected && (
-                  <circle
-                    cx={x1}
-                    cy={y1}
-                    r="5"
-                    fill="#ffffff"
-                    stroke="#38bdf8"
-                    strokeWidth="2"
-                    className="cursor-move pointer-events-auto"
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      setDraggingHandle({ drawingId: id, handle: 'p1' });
-                    }}
-                  />
-                )}
-              </g>
-            );
-          }
-
-          if (!p2) return null;
-
-          if (type === 'TRENDLINE') {
-            return (
-              <g
-                key={id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedDrawingId(id);
-                }}
-                className="pointer-events-auto cursor-pointer"
-              >
-                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={lineWidth} />
-                <circle cx={x1} cy={y1} r={isSelected ? 4 : 3} fill={isSelected ? '#ffffff' : color} stroke={color} strokeWidth="1.5" />
-                <circle cx={x2} cy={y2} r={isSelected ? 4 : 3} fill={isSelected ? '#ffffff' : color} stroke={color} strokeWidth="1.5" />
-                {isSelected && (
-                  <>
-                    <circle
-                      cx={x1}
-                      cy={y1}
-                      r="5.5"
-                      fill="#ffffff"
-                      stroke="#38bdf8"
-                      strokeWidth="2"
-                      className="cursor-move pointer-events-auto"
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        setDraggingHandle({ drawingId: id, handle: 'p1' });
-                      }}
-                    />
-                    <circle
-                      cx={x2}
-                      cy={y2}
-                      r="5.5"
-                      fill="#ffffff"
-                      stroke="#38bdf8"
-                      strokeWidth="2"
-                      className="cursor-move pointer-events-auto"
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        setDraggingHandle({ drawingId: id, handle: 'p2' });
-                      }}
-                    />
-                  </>
-                )}
-              </g>
-            );
-          }
-
-          if (type === 'RAY') {
-            const dx = x2 - x1;
-            const dy = y2 - y1;
-            const factor = 100;
-            return (
-              <g
-                key={id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedDrawingId(id);
-                }}
-                className="pointer-events-auto cursor-pointer"
-              >
-                <line x1={x1} y1={y1} x2={x1 + dx * factor} y2={y1 + dy * factor} stroke={color} strokeWidth={lineWidth} />
-                <circle cx={x1} cy={y1} r="3" fill={color} />
-                <circle cx={x2} cy={y2} r="3" fill={color} />
-                {isSelected && (
-                  <>
-                    <circle
-                      cx={x1}
-                      cy={y1}
-                      r="5.5"
-                      fill="#ffffff"
-                      stroke="#38bdf8"
-                      strokeWidth="2"
-                      className="cursor-move pointer-events-auto"
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        setDraggingHandle({ drawingId: id, handle: 'p1' });
-                      }}
-                    />
-                    <circle
-                      cx={x2}
-                      cy={y2}
-                      r="5.5"
-                      fill="#ffffff"
-                      stroke="#38bdf8"
-                      strokeWidth="2"
-                      className="cursor-move pointer-events-auto"
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        setDraggingHandle({ drawingId: id, handle: 'p2' });
-                      }}
-                    />
-                  </>
-                )}
-              </g>
-            );
-          }
-
-          if (type === 'RECTANGLE') {
-            const rx = Math.min(x1, x2);
-            const ry = Math.min(y1, y2);
-            const rw = Math.abs(x2 - x1);
-            const rh = Math.abs(y2 - y1);
-            return (
-              <g
-                key={id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedDrawingId(id);
-                }}
-                className="pointer-events-auto cursor-pointer"
-              >
-                <rect x={rx} y={ry} width={rw} height={rh} fill="rgba(168, 85, 247, 0.15)" stroke={color} strokeWidth={lineWidth} />
-                {isSelected && (
-                  <>
-                    <circle
-                      cx={x1}
-                      cy={y1}
-                      r="5.5"
-                      fill="#ffffff"
-                      stroke="#38bdf8"
-                      strokeWidth="2"
-                      className="cursor-move pointer-events-auto"
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        setDraggingHandle({ drawingId: id, handle: 'p1' });
-                      }}
-                    />
-                    <circle
-                      cx={x2}
-                      cy={y2}
-                      r="5.5"
-                      fill="#ffffff"
-                      stroke="#38bdf8"
-                      strokeWidth="2"
-                      className="cursor-move pointer-events-auto"
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        setDraggingHandle({ drawingId: id, handle: 'p2' });
-                      }}
-                    />
-                  </>
-                )}
-              </g>
-            );
-          }
-
-          if (type === 'CIRCLE') {
-            const cx = x1;
-            const cy = y1;
-            const r = Math.hypot(x2 - x1, y2 - y1);
-            return (
-              <g
-                key={id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedDrawingId(id);
-                }}
-                className="pointer-events-auto cursor-pointer"
-              >
-                <circle cx={cx} cy={cy} r={r} fill="rgba(236, 72, 153, 0.12)" stroke={color} strokeWidth={lineWidth} />
-                {isSelected && (
-                  <>
-                    <circle
-                      cx={x1}
-                      cy={y1}
-                      r="5.5"
-                      fill="#ffffff"
-                      stroke="#38bdf8"
-                      strokeWidth="2"
-                      className="cursor-move pointer-events-auto"
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        setDraggingHandle({ drawingId: id, handle: 'p1' });
-                      }}
-                    />
-                    <circle
-                      cx={x2}
-                      cy={y2}
-                      r="5.5"
-                      fill="#ffffff"
-                      stroke="#38bdf8"
-                      strokeWidth="2"
-                      className="cursor-move pointer-events-auto"
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        setDraggingHandle({ drawingId: id, handle: 'p2' });
-                      }}
-                    />
-                  </>
-                )}
-              </g>
-            );
-          }
-
-          if (type === 'FIBONACCI') {
-            const deltaY = y2 - y1;
-            const deltaPrice = (p2.price ?? 0) - p1.price;
-            return (
-              <g
-                key={id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedDrawingId(id);
-                }}
-                className="pointer-events-auto cursor-pointer"
-              >
-                {FIB_LEVELS.map((lvl) => {
-                  const yLevel = y1 + deltaY * lvl;
-                  const priceLevel = p1.price + deltaPrice * lvl;
-                  return (
-                    <g key={lvl}>
-                      <line
-                        x1={Math.min(x1, x2)}
-                        y1={yLevel}
-                        x2="100%"
-                        y2={yLevel}
-                        stroke={color}
-                        strokeWidth="1"
-                        strokeDasharray="2 2"
-                        opacity="0.8"
-                      />
-                      <text x="10" y={yLevel - 3} fill="#94a3b8" fontSize="9" fontFamily="monospace">
-                        {(lvl * 100).toFixed(1)}% ({fmtPrice(priceLevel, symbol)})
-                      </text>
-                    </g>
-                  );
-                })}
-                {isSelected && (
-                  <>
-                    <circle
-                      cx={x1}
-                      cy={y1}
-                      r="5.5"
-                      fill="#ffffff"
-                      stroke="#38bdf8"
-                      strokeWidth="2"
-                      className="cursor-move pointer-events-auto"
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        setDraggingHandle({ drawingId: id, handle: 'p1' });
-                      }}
-                    />
-                    <circle
-                      cx={x2}
-                      cy={y2}
-                      r="5.5"
-                      fill="#ffffff"
-                      stroke="#38bdf8"
-                      strokeWidth="2"
-                      className="cursor-move pointer-events-auto"
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        setDraggingHandle({ drawingId: id, handle: 'p2' });
-                      }}
-                    />
-                  </>
-                )}
-              </g>
-            );
-          }
-
-          if (type === 'POSITION_LONG' || type === 'POSITION_SHORT' || type === 'POSITION_TOOL') {
-            const isLong = type !== 'POSITION_SHORT';
-            const entryPrice = d.entryPrice ?? p1.price;
-            const targetPrice = d.targetPrice ?? (isLong ? entryPrice * 1.02 : entryPrice * 0.98);
-            const stopPrice = d.stopPrice ?? (isLong ? entryPrice * 0.99 : entryPrice * 1.01);
-
-            const entryY = y1;
-            const targetY = seriesApi?.priceToCoordinate(targetPrice) ?? (isLong ? entryY - 60 : entryY + 60);
-            const stopY = seriesApi?.priceToCoordinate(stopPrice) ?? (isLong ? entryY + 30 : entryY - 30);
-
-            const rx = Math.min(x1, x2);
-            const rw = Math.max(140, Math.abs(x2 - x1));
-
-            const rewardH = Math.abs(targetY - entryY);
-            const riskH = Math.abs(stopY - entryY);
-            const rewardY = Math.min(entryY, targetY);
-            const riskY = Math.min(entryY, stopY);
-
-            const rrRatio = d.riskReward ?? Number((Math.abs(targetPrice - entryPrice) / Math.max(0.0001, Math.abs(entryPrice - stopPrice))).toFixed(2));
-            const targetPct = (((targetPrice - entryPrice) / entryPrice) * 100).toFixed(2);
-            const stopPct = (((stopPrice - entryPrice) / entryPrice) * 100).toFixed(2);
-
-            return (
-              <g
-                key={id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedDrawingId(id);
-                }}
-                className="pointer-events-auto cursor-pointer"
-              >
-                {/* Reward Zone Box */}
-                <rect
-                  x={rx}
-                  y={rewardY}
-                  width={rw}
-                  height={rewardH}
-                  fill="rgba(34, 197, 94, 0.20)"
-                  stroke="#22c55e"
-                  strokeWidth="1.5"
-                />
-                {/* Risk Zone Box */}
-                <rect
-                  x={rx}
-                  y={riskY}
-                  width={rw}
-                  height={riskH}
-                  fill="rgba(239, 68, 68, 0.20)"
-                  stroke="#ef4444"
-                  strokeWidth="1.5"
-                />
-
-                {/* Entry Separator Line */}
-                <line x1={rx} y1={entryY} x2={rx + rw} y2={entryY} stroke="#ffffff" strokeWidth="1.5" strokeDasharray="3 3" />
-
-                {/* Target Label */}
-                <text x={rx + 6} y={rewardY + 14} fill="#22c55e" fontSize="10" fontWeight="bold" fontFamily="monospace">
-                  Target: {fmtPrice(targetPrice, symbol)} ({targetPct}%)
-                </text>
-
-                {/* Stop Label */}
-                <text x={rx + 6} y={riskY + riskH - 6} fill="#ef4444" fontSize="10" fontWeight="bold" fontFamily="monospace">
-                  Stop: {fmtPrice(stopPrice, symbol)} ({stopPct}%)
-                </text>
-
-                {/* Center Badge: Risk/Reward Ratio */}
-                <rect x={rx + rw / 2 - 45} y={entryY - 10} width="90" height="20" rx="4" fill="#0b0e14" stroke="#ffffff" strokeWidth="1" />
-                <text x={rx + rw / 2} y={entryY + 4} fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
-                  R:R {rrRatio}
-                </text>
-
-                {/* Draggable Target Handle */}
-                <circle
-                  cx={rx + rw}
-                  cy={targetY}
-                  r="5"
-                  fill="#22c55e"
-                  stroke="#ffffff"
-                  strokeWidth="1.5"
-                  className="cursor-ns-resize"
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                    setDraggingHandle({ drawingId: id, handle: 'target' });
-                  }}
-                />
-
-                {/* Draggable Stop Handle */}
-                <circle
-                  cx={rx + rw}
-                  cy={stopY}
-                  r="5"
-                  fill="#ef4444"
-                  stroke="#ffffff"
-                  strokeWidth="1.5"
-                  className="cursor-ns-resize"
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                    setDraggingHandle({ drawingId: id, handle: 'stop' });
-                  }}
-                />
-              </g>
-            );
-          }
-
-          return null;
+                ))}
+            </g>
+          );
         })}
       </svg>
 
-      {/* Floating Drawing Context Action Bar */}
-      <DrawingContextBar
-        selectedDrawing={selectedDrawing}
-        onUpdateDrawing={updateDrawing}
-        onDeleteDrawing={deleteDrawing}
-        onClose={() => setSelectedDrawingId(null)}
-      />
+      {/* Floating style panel for selected drawing */}
+      {selectedDrawing && !isHiddenAll && (
+        <DrawingContextBar
+          selectedDrawing={selectedDrawing}
+          onUpdateDrawing={updateDrawing}
+          onDeleteDrawing={deleteDrawing}
+          onClose={() => setSelectedDrawingId(null)}
+          onBringToFront={bringToFront}
+          onSendToBack={sendToBack}
+        />
+      )}
     </div>
   );
 }

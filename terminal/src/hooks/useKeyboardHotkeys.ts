@@ -3,6 +3,7 @@ import { useTerminalStore } from '../store/useTerminalStore';
 import { usePsychologyStore } from '../store/usePsychologyStore';
 import { audioHaptics } from '../utils/notify';
 import type { Timeframe } from '../types/terminal';
+import { drawingEvents } from '../components/drawing/framework/DrawingEvents';
 
 interface UseKeyboardHotkeysProps {
   onOpenCheatsheet?: () => void;
@@ -78,25 +79,25 @@ export function useKeyboardHotkeys({ onOpenCheatsheet }: UseKeyboardHotkeysProps
       if (e.altKey && (e.key === 't' || e.key === 'T')) {
         e.preventDefault();
         audioHaptics.tick();
-        (window as any).__selectDrawingTool?.('TRENDLINE');
+        drawingEvents.selectTool('TRENDLINE');
         return;
       }
       if (e.altKey && (e.key === 'h' || e.key === 'H')) {
         e.preventDefault();
         audioHaptics.tick();
-        (window as any).__selectDrawingTool?.('HORIZONTAL_LINE');
+        drawingEvents.selectTool('HORIZONTAL_LINE');
         return;
       }
       if (e.altKey && (e.key === 'v' || e.key === 'V')) {
         e.preventDefault();
         audioHaptics.tick();
-        (window as any).__selectDrawingTool?.('VERTICAL_LINE');
+        drawingEvents.selectTool('VERTICAL_LINE');
         return;
       }
       if (e.altKey && (e.key === 'f' || e.key === 'F')) {
         e.preventDefault();
         audioHaptics.tick();
-        (window as any).__selectDrawingTool?.('FIBONACCI');
+        drawingEvents.selectTool('FIBONACCI');
         return;
       }
 

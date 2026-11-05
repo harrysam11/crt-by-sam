@@ -25,6 +25,8 @@ import ChartRulerOverlay from './ChartRulerOverlay';
 import StickyNotesOverlay from './StickyNotesOverlay';
 import DrawingToolbar from '../drawing/DrawingToolbar';
 import DrawingOverlay from '../drawing/DrawingOverlay';
+import FavoritesBar from '../drawing/FavoritesBar';
+import { drawingEvents } from '../drawing/framework/DrawingEvents';
 import IndicatorsModal from './IndicatorsModal';
 import BarReplayController from './BarReplayController';
 import ChartSettingsModal, { DEFAULT_CHART_SETTINGS, type ChartSettingsState } from './ChartSettingsModal';
@@ -300,10 +302,12 @@ export default function TradingChart({
     (window as any).__resetChartScale = () => {
       api.current?.candles.priceScale().applyOptions({ autoScale: true });
     };
+    const unsubTool = drawingEvents.onSelectTool((tool) => setActiveTool(tool));
     return () => {
       delete (window as any).__openSymbolSearch;
       delete (window as any).__selectDrawingTool;
       delete (window as any).__resetChartScale;
+      unsubTool();
     };
   }, []);
 
@@ -1562,7 +1566,7 @@ export default function TradingChart({
             <button
               onClick={() => {
                 audioHaptics.tick();
-                (window as any).__undoDrawing?.();
+                drawingEvents.undo();
               }}
               className="p-1 rounded-full clay-btn transition"
               title="Undo Drawing (Ctrl+Z)"
@@ -1574,7 +1578,7 @@ export default function TradingChart({
             <button
               onClick={() => {
                 audioHaptics.tick();
-                (window as any).__redoDrawing?.();
+                drawingEvents.redo();
               }}
               className="p-1 rounded-full clay-btn transition"
               title="Redo Drawing (Ctrl+Y)"
@@ -1952,6 +1956,9 @@ export default function TradingChart({
             clearTrigger={clearDrawingTrigger}
             externalLineTrigger={externalLineTrigger}
           />
+
+          {/* Floating Favorites Toolbar */}
+          <FavoritesBar />
 
           {/* TradingView Price Scale Hover Action Flyout */}
           <PriceScaleActionFlyout

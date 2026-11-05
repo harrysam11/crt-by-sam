@@ -11,6 +11,7 @@ export type ToolType =
   | 'HORIZONTAL_RAY'
   | 'VERTICAL_LINE'
   | 'PARALLEL_CHANNEL'
+  | 'ARROW'
   // Fibonacci
   | 'FIBONACCI'
   | 'FIB_EXTENSION'
@@ -44,19 +45,33 @@ export interface DrawingItem {
   points?: Point2D[];
   color: string;
   fillColor?: string;
+  fillOpacity?: number;
   lineWidth: number;
   lineStyle?: 'solid' | 'dashed' | 'dotted';
   locked?: boolean;
   hidden?: boolean;
+  zIndex?: number;
   text?: string;
+  fontSize?: number;
   // Position Tool Specifics
   entryPrice?: number;
   stopPrice?: number;
   targetPrice?: number;
   riskReward?: number;
+  // Measurement Tool Specifics
+  startBarIndex?: number;
+  endBarIndex?: number;
+  templateName?: string;
 }
 
 export interface MagnetConfig {
   enabled: boolean;
   mode: 'WEAK' | 'STRONG'; // Weak = within 15px; Strong = always snaps to nearest OHLC
+}
+
+export interface DrawingHandle {
+  id: string;
+  x: number;
+  y: number;
+  cursor?: string;
 }
