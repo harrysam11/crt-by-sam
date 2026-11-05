@@ -178,7 +178,8 @@ export default function TradingChart({
     oi?: number | null;
   }>({});
   const [isLogScale, setIsLogScale] = useState(false);
-  const [showVolumeProfile, setShowVolumeProfile] = useState(true);
+  const [showVolumeProfile, setShowVolumeProfile] = useState(false);
+  const [showVolume, setShowVolume] = useState(true);
   const [isSymbolSearchOpen, setIsSymbolSearchOpen] = useState(false);
   const [externalLineTrigger, setExternalLineTrigger] = useState<{ price: number; type: 'LINE' | 'RAY' } | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<ChartContextMenuPos | null>(null);
@@ -187,10 +188,12 @@ export default function TradingChart({
   const [isTfMenuOpen, setIsTfMenuOpen] = useState(false);
   const [isStyleMenuOpen, setIsStyleMenuOpen] = useState(false);
   const [isLayersMenuOpen, setIsLayersMenuOpen] = useState(false);
+  const [isColorMenuOpen, setIsColorMenuOpen] = useState(false);
 
   const tfMenuRef = useRef<HTMLDivElement>(null);
   const styleMenuRef = useRef<HTMLDivElement>(null);
   const layersMenuRef = useRef<HTMLDivElement>(null);
+  const colorMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleOutside = (e: MouseEvent) => {
@@ -204,12 +207,27 @@ export default function TradingChart({
       if (layersMenuRef.current && !layersMenuRef.current.contains(target)) {
         setIsLayersMenuOpen(false);
       }
+      if (colorMenuRef.current && !colorMenuRef.current.contains(target)) {
+        setIsColorMenuOpen(false);
+      }
     };
-    if (isTfMenuOpen || isStyleMenuOpen || isLayersMenuOpen) {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsTfMenuOpen(false);
+        setIsStyleMenuOpen(false);
+        setIsLayersMenuOpen(false);
+        setIsColorMenuOpen(false);
+      }
+    };
+    if (isTfMenuOpen || isStyleMenuOpen || isLayersMenuOpen || isColorMenuOpen) {
       window.addEventListener('mousedown', handleOutside);
+      window.addEventListener('keydown', handleEscape);
     }
-    return () => window.removeEventListener('mousedown', handleOutside);
-  }, [isTfMenuOpen, isStyleMenuOpen, isLayersMenuOpen]);
+    return () => {
+      window.removeEventListener('mousedown', handleOutside);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [isTfMenuOpen, isStyleMenuOpen, isLayersMenuOpen, isColorMenuOpen]);
 
   const favoriteTimeframes = useMemo(
     () => TIMEFRAMES[provider].filter((t) => FAVORITE_TIMEFRAMES.includes(t)),
@@ -227,6 +245,31 @@ export default function TradingChart({
       (isNotesOpen ? 1 : 0)
     );
   }, [showVolumeProfile, isGhostVisible, showSessionOHL, canvasOrderLines.length, showRiskHUD, isRulerActive, isNotesOpen]);
+
+  const toggleTfMenu = () => {
+    setIsStyleMenuOpen(false);
+    setIsLayersMenuOpen(false);
+    setIsColorMenuOpen(false);
+    setIsTfMenuOpen((v) => !v);
+  };
+  const toggleStyleMenu = () => {
+    setIsTfMenuOpen(false);
+    setIsLayersMenuOpen(false);
+    setIsColorMenuOpen(false);
+    setIsStyleMenuOpen((v) => !v);
+  };
+  const toggleColorMenu = () => {
+    setIsTfMenuOpen(false);
+    setIsStyleMenuOpen(false);
+    setIsLayersMenuOpen(false);
+    setIsColorMenuOpen((v) => !v);
+  };
+  const toggleLayersMenu = () => {
+    setIsTfMenuOpen(false);
+    setIsStyleMenuOpen(false);
+    setIsColorMenuOpen(false);
+    setIsLayersMenuOpen((v) => !v);
+  };
 
   // Register global hotkey openers for symbol search, tool selection, and scale reset
   useEffect(() => {
@@ -310,8 +353,39 @@ export default function TradingChart({
         onRemove: () => setShowOI(false),
       });
     }
+
+    // Volume Histogram layer
+    list.push({
+      id: 'vol',
+      name: 'Volume',
+      color: '#a1a1aa',
+      value: currentOhlc?.volume ? fmtQty(currentOhlc.volume) : undefined,
+      visible: showVolume,
+      onToggleVisible: () => {
+        const next = !showVolume;
+        setShowVolume(next);
+        api.current?.volume.applyOptions({ visible: next });
+      },
+      onRemove: () => {
+        setShowVolume(false);
+        api.current?.volume.applyOptions({ visible: false });
+      },
+    });
+
+    // Volume Profile (VPVR) layer
+    if (showVolumeProfile) {
+      list.push({
+        id: 'vpvr',
+        name: 'Volume Profile (VPVR)',
+        color: '#38bdf8',
+        visible: showVolumeProfile,
+        onToggleVisible: () => setShowVolumeProfile(false),
+        onRemove: () => setShowVolumeProfile(false),
+      });
+    }
+
     return list;
-  }, [showSma, showEma, showVwap, showBbands, showRsi, showOI, indicatorValues]);
+  }, [showSma, showEma, showVwap, showBbands, showRsi, showOI, showVolume, showVolumeProfile, currentOhlc, indicatorValues]);
 
   // Effective candles respecting Bar Replay slice
   const effectiveCandles = useMemo(() => {
@@ -496,19 +570,25 @@ export default function TradingChart({
       localization: { timeFormatter: localTime },
     });
 
+    const isDarkInit = chartSettings.candleDownColor === '#101015' || chartSettings.candleDownColor === '#050508';
+    const borderDownInit = isDarkInit ? '#71717a' : chartSettings.candleDownColor;
     const cs = chart.addCandlestickSeries({
-      upColor: '#ffffff',
-      downColor: '#101015',
+      upColor: chartSettings.candleUpColor || '#ffffff',
+      downColor: chartSettings.candleDownColor || '#101015',
       borderVisible: true,
-      borderUpColor: '#ffffff',
-      borderDownColor: '#71717a',
+      borderUpColor: chartSettings.candleUpColor || '#ffffff',
+      borderDownColor: borderDownInit,
       wickVisible: true,
-      wickUpColor: '#ffffff',
-      wickDownColor: '#71717a',
+      wickUpColor: chartSettings.candleUpColor || '#ffffff',
+      wickDownColor: borderDownInit,
     });
     cs.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.12 } });
 
-    const vs = chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '' });
+    const vs = chart.addHistogramSeries({
+      priceFormat: { type: 'volume' },
+      priceScaleId: '',
+      visible: showVolume,
+    });
     vs.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
 
     const lineOpts = { lineWidth: 1 as const, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false };
@@ -637,34 +717,43 @@ export default function TradingChart({
     });
   }, [themeConfig.wallpaperType, themeConfig.mediaUrl]);
 
-  // Update pastel candle palette when Zen Mode toggles
+  // Update pastel candle palette ONLY when Zen Mode is explicitly active
   useEffect(() => {
     if (!api.current) return;
-    const isZen = zenMode.active && zenMode.softPastelCandles;
-    const upColor = isZen ? '#4a7c59' : '#089981';
-    const downColor = isZen ? '#8b5d5d' : '#f23645';
-    api.current.candles.applyOptions({
-      upColor,
-      downColor,
-      wickUpColor: upColor,
-      wickDownColor: downColor,
-    });
+    if (zenMode.active && zenMode.softPastelCandles) {
+      const upColor = '#4a7c59';
+      const downColor = '#8b5d5d';
+      api.current.candles.applyOptions({
+        upColor,
+        downColor,
+        borderUpColor: upColor,
+        borderDownColor: downColor,
+        wickUpColor: upColor,
+        wickDownColor: downColor,
+      });
+    }
   }, [zenMode.active, zenMode.softPastelCandles]);
 
   // Dynamic Chart Settings synchronization
   useEffect(() => {
     const a = api.current;
     if (!a) return;
-    a.candles.applyOptions({
-      upColor: chartSettings.candleUpColor,
-      downColor: chartSettings.candleDownColor,
-      borderUpColor: chartSettings.candleUpColor,
-      borderDownColor: chartSettings.candleDownColor,
-      wickUpColor: chartSettings.candleUpColor,
-      wickDownColor: chartSettings.candleDownColor,
-      lastValueVisible: chartSettings.showLastPriceLine,
-      priceLineVisible: chartSettings.showLastPriceLine,
-    });
+    if (chartStyle !== 'FOOTPRINT') {
+      const isDark = chartSettings.candleDownColor === '#101015' || chartSettings.candleDownColor === '#050508';
+      const borderDown = isDark ? '#71717a' : chartSettings.candleDownColor;
+      a.candles.applyOptions({
+        upColor: chartSettings.candleUpColor,
+        downColor: chartSettings.candleDownColor,
+        borderVisible: true,
+        borderUpColor: chartSettings.candleUpColor,
+        borderDownColor: borderDown,
+        wickVisible: true,
+        wickUpColor: chartSettings.candleUpColor,
+        wickDownColor: borderDown,
+        lastValueVisible: chartSettings.showLastPriceLine,
+        priceLineVisible: chartSettings.showLastPriceLine,
+      });
+    }
     a.chart.applyOptions({
       grid: {
         vertLines: {
@@ -814,15 +903,17 @@ export default function TradingChart({
         wickDownColor: 'rgba(255, 255, 255, 0.25)',
       });
     } else {
+      const isDark = chartSettings.candleDownColor === '#101015' || chartSettings.candleDownColor === '#050508';
+      const borderDown = isDark ? '#71717a' : chartSettings.candleDownColor;
       a.candles.applyOptions({
-        upColor: chartSettings.candleUpColor || '#089981',
-        downColor: chartSettings.candleDownColor || '#f23645',
+        upColor: chartSettings.candleUpColor || '#ffffff',
+        downColor: chartSettings.candleDownColor || '#101015',
         borderVisible: true,
-        borderUpColor: chartSettings.candleUpColor || '#089981',
-        borderDownColor: chartSettings.candleDownColor || '#f23645',
+        borderUpColor: chartSettings.candleUpColor || '#ffffff',
+        borderDownColor: borderDown,
         wickVisible: true,
-        wickUpColor: chartSettings.candleUpColor || '#089981',
-        wickDownColor: chartSettings.candleDownColor || '#f23645',
+        wickUpColor: chartSettings.candleUpColor || '#ffffff',
+        wickDownColor: borderDown,
       });
     }
   }, [chartStyle, chartSettings]);
@@ -963,7 +1054,7 @@ export default function TradingChart({
             <button
               onClick={() => {
                 audioHaptics.tick();
-                setIsTfMenuOpen((v) => !v);
+                toggleTfMenu();
               }}
               className="p-1 rounded-full clay-btn transition ml-1"
               title="All Timeframes"
@@ -1012,7 +1103,7 @@ export default function TradingChart({
             <button
               onClick={() => {
                 audioHaptics.tick();
-                setIsStyleMenuOpen((v) => !v);
+                toggleStyleMenu();
               }}
               className="flex items-center gap-1.5 clay-pill px-3 py-1 text-xs font-semibold text-white transition"
               title="Chart Style (Candles, Heikin-Ashi, Footprint)"
@@ -1089,6 +1180,131 @@ export default function TradingChart({
 
           <span className="h-4 w-px bg-grid shrink-0" />
 
+          {/* Candle Colors / Theme Dropdown */}
+          <div className="relative shrink-0" ref={colorMenuRef}>
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                toggleColorMenu();
+              }}
+              className="flex items-center gap-1.5 clay-pill px-3 py-1 text-xs font-semibold text-white transition"
+              title="Candle Colors & Themes"
+            >
+              <span className="flex items-center gap-1">
+                <span
+                  className="w-2.5 h-2.5 rounded-full border border-black/40 shadow-xs"
+                  style={{ backgroundColor: chartSettings.candleUpColor }}
+                />
+                <span
+                  className="w-2.5 h-2.5 rounded-full border border-white/40 shadow-xs"
+                  style={{ backgroundColor: chartSettings.candleDownColor }}
+                />
+              </span>
+              <span>Theme</span>
+              <svg className={`h-3 w-3 text-slate-400 transition-transform ${isColorMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {isColorMenuOpen && (
+              <div className="absolute left-0 top-full mt-2 z-50 w-64 clay-popover p-3 shadow-2xl font-mono text-xs select-none">
+                <div className="px-1 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-2 flex items-center justify-between">
+                  <span>Candle Palette</span>
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      resetChartSettings();
+                    }}
+                    className="text-[10px] text-slate-400 hover:text-white transition"
+                  >
+                    Reset
+                  </button>
+                </div>
+
+                <div className="text-[10px] text-slate-400 font-semibold mb-1.5 uppercase">Presets</div>
+                <div className="grid grid-cols-1 gap-1 mb-3">
+                  {[
+                    { name: 'Claymorph B&W', up: '#ffffff', down: '#101015' },
+                    { name: 'TradingView Classic', up: '#089981', down: '#f23645' },
+                    { name: 'Cyberpunk Neon', up: '#00ffcc', down: '#ff0055' },
+                    { name: 'Solar Amber', up: '#f59e0b', down: '#64748b' },
+                    { name: 'Emerald Matrix', up: '#22c55e', down: '#18181b' },
+                  ].map((preset) => {
+                    const isSelected =
+                      chartSettings.candleUpColor.toLowerCase() === preset.up.toLowerCase() &&
+                      chartSettings.candleDownColor.toLowerCase() === preset.down.toLowerCase();
+                    return (
+                      <button
+                        key={preset.name}
+                        onClick={() => {
+                          audioHaptics.tick();
+                          updateChartSettings({ candleUpColor: preset.up, candleDownColor: preset.down });
+                        }}
+                        className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition ${
+                          isSelected ? 'clay-btn-active font-bold' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-1">
+                            <span className="w-2.5 h-2.5 rounded-full border border-black/40" style={{ backgroundColor: preset.up }} />
+                            <span className="w-2.5 h-2.5 rounded-full border border-white/40" style={{ backgroundColor: preset.down }} />
+                          </span>
+                          <span>{preset.name}</span>
+                        </div>
+                        {isSelected && (
+                          <svg className="h-3.5 w-3.5 text-black shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="border-t border-grid/60 pt-2 mb-1">
+                  <div className="text-[10px] text-slate-400 font-semibold mb-2 uppercase">Custom Colors</div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between bg-black/40 px-2.5 py-1.5 rounded-lg border border-white/5">
+                      <span className="text-slate-300 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: chartSettings.candleUpColor }} />
+                        Bull / Up Candle
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase">{chartSettings.candleUpColor}</span>
+                        <input
+                          type="color"
+                          value={chartSettings.candleUpColor}
+                          onChange={(e) => updateChartSettings({ candleUpColor: e.target.value })}
+                          className="h-6 w-7 rounded cursor-pointer border-0 bg-transparent p-0"
+                          title="Pick Bull Candle Color"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-black/40 px-2.5 py-1.5 rounded-lg border border-white/5">
+                      <span className="text-slate-300 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: chartSettings.candleDownColor }} />
+                        Bear / Down Candle
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase">{chartSettings.candleDownColor}</span>
+                        <input
+                          type="color"
+                          value={chartSettings.candleDownColor}
+                          onChange={(e) => updateChartSettings({ candleDownColor: e.target.value })}
+                          className="h-6 w-7 rounded cursor-pointer border-0 bg-transparent p-0"
+                          title="Pick Bear Candle Color"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <span className="h-4 w-px bg-grid shrink-0" />
+
           {/* fx Indicators Button */}
           <button
             onClick={() => {
@@ -1105,6 +1321,42 @@ export default function TradingChart({
                 {activeIndicatorsList.length}
               </span>
             )}
+          </button>
+
+          {/* Quick Volume Histogram Toggle */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              const next = !showVolume;
+              setShowVolume(next);
+              api.current?.volume.applyOptions({ visible: next });
+            }}
+            className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold transition shrink-0 ${
+              showVolume ? 'clay-pill-active' : 'clay-pill text-slate-400 hover:text-white'
+            }`}
+            title="Toggle Bottom Volume Bars"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <span>Vol</span>
+          </button>
+
+          {/* Quick Visible Range Volume Profile (VPVR) Toggle */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setShowVolumeProfile((v) => !v);
+            }}
+            className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold transition shrink-0 ${
+              showVolumeProfile ? 'clay-pill-active' : 'clay-pill text-slate-400 hover:text-white'
+            }`}
+            title="Toggle Visible Range Volume Profile (VPVR & POC/VAH/VAL lines)"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h10M4 14h14M4 18h8" />
+            </svg>
+            <span>VPVR</span>
           </button>
 
           {/* Bar Replay Historical Time Machine Trigger */}
@@ -1177,7 +1429,7 @@ export default function TradingChart({
             <button
               onClick={() => {
                 audioHaptics.tick();
-                setIsLayersMenuOpen((v) => !v);
+                toggleLayersMenu();
               }}
               className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold transition ${
                 activeLayersCount > 0
