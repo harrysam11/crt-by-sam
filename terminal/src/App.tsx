@@ -66,6 +66,16 @@ export default function App() {
     onOpenCheatsheet: () => setIsHotkeyOpen(true),
   });
 
+  // Global window openers for Screener and Calendar
+  useEffect(() => {
+    (window as any).__openScreener = () => setIsScreenerOpen(true);
+    (window as any).__openCalendar = () => setIsCalendarOpen(true);
+    return () => {
+      delete (window as any).__openScreener;
+      delete (window as any).__openCalendar;
+    };
+  }, []);
+
   // Dark & Light Theme Synchronizer
   useEffect(() => {
     const applyTheme = () => {

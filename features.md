@@ -227,6 +227,24 @@ A high-performance, self-hosted financial charting and paper-trading terminal bu
 
 ---
 
+## 12. Market Screener, Macro Calendar & Script Studio (Phase 6)
+
+- **Real-Time Multi-Market Screener**:
+  - Live batch query to Binance 24h ticker API for crypto and Yahoo Finance proxy for NSE/BSE, US Equities, Commodities, and Forex.
+  - Calculated 14-period RSI and technical momentum bias (`BULLISH`, `BEARISH`, `OVERBOUGHT`, `OVERSOLD`, `NEUTRAL`).
+  - Filtering by Asset Class, Performance (Gainers, Top Gainers, Losers, Top Losers), and Technical Signals.
+  - Instant symbol loading on chart canvas with 1 click.
+- **Global Macro Economic Calendar & News Wire**:
+  - Weekly macro calendar events from FairEconomy / ForexFactory with Impact levels (`HIGH`, `MED`, `LOW`, `HOLIDAY`), Forecast, Previous, Currency, and Date/Time.
+  - Live financial news stories from Yahoo Finance with headlines, publishers, time-ago stamps, and related ticker buttons.
+- **Dual-Engine Script Studio (JavaScript / TypeScript & Pine Script v5)**:
+  - Sandboxed JavaScript indicator runner with built-in `ta` library (`ta.sma`, `ta.ema`, `ta.rsi`, `ta.highest`, `ta.lowest`, `ta.stddev`, `ta.crossover`, `ta.crossunder`, `ta.toPlot`).
+  - Pine Script v5 runner powered by PineTS transpiler.
+  - Code editor with line numbers, code copy, preset library, execution runtime metrics, and error console.
+  - Real-time line series rendering directly onto `TradingChart` canvas.
+
+---
+
 ## File Architecture Mapping
 
 ```

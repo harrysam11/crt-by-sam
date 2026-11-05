@@ -10,6 +10,12 @@ const proxy = {
     rewrite: (p: string) => p.replace(/^\/api\/yahoo/, ''),
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36' },
   },
+  '/api/calendar': {
+    target: 'https://nfs.faireconomy.media',
+    changeOrigin: true,
+    rewrite: (p: string) => p.replace(/^\/api\/calendar/, ''),
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+  },
 };
 
 export default defineConfig({

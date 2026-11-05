@@ -100,6 +100,27 @@ export function useKeyboardHotkeys({ onOpenCheatsheet }: UseKeyboardHotkeysProps
         drawingEvents.selectTool('FIBONACCI');
         return;
       }
+      if (e.altKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        audioHaptics.tick();
+        const openAlert = (window as any).__openCreateAlert;
+        if (typeof openAlert === 'function') openAlert();
+        return;
+      }
+      if (e.altKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        audioHaptics.tick();
+        const openScreener = (window as any).__openScreener;
+        if (typeof openScreener === 'function') openScreener();
+        return;
+      }
+      if (e.altKey && (e.key === 'e' || e.key === 'E')) {
+        e.preventDefault();
+        audioHaptics.tick();
+        const openCal = (window as any).__openCalendar;
+        if (typeof openCal === 'function') openCal();
+        return;
+      }
 
       // Hotkey: Space / Shift+Space -> Cycle through Watchlist symbols
       if (e.key === ' ' && !e.ctrlKey && !e.altKey && !e.metaKey) {

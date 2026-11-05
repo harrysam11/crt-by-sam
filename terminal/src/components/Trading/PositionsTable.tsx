@@ -4,7 +4,7 @@ import { fmtPnl, fmtPrice, fmtQty, fmtTime, labelOf, pnlClass } from '../../util
 import { audioHaptics } from '../../utils/notify';
 import AlertsTab from './AlertsTab';
 import StatsTab from './StatsTab';
-import PineEditor from '../../features/pine/PineEditor';
+import ScriptStudio from '../../features/pine/ScriptStudio';
 
 const TYPE_LABEL = { MARKET: 'Market', LIMIT: 'Limit', STOP_LOSS: 'Stop loss', TAKE_PROFIT: 'Take profit' } as const;
 type Tab = 'positions' | 'orders' | 'journal' | 'alerts' | 'pine';
@@ -62,7 +62,7 @@ export default function PositionsTable() {
             Orders ({pending} open)
           </button>
           <button className={tabCls(tab === 'pine')} onClick={() => setTab('pine')}>
-            Pine Editor
+            Script Studio
           </button>
           <button className={tabCls(tab === 'journal')} onClick={() => setTab('journal')}>
             Journal
@@ -236,7 +236,7 @@ export default function PositionsTable() {
         ))}
 
         {tab === 'pine' && (
-          <PineEditor
+          <ScriptStudio
             onApplyPlots={(plots) => setPinePlots(plots)}
             onClearPlots={() => setPinePlots([])}
           />
