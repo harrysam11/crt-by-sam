@@ -59,6 +59,67 @@ export default function DrawingOverlay({
     handle: 'target' | 'stop' | 'p1' | 'p2';
   } | null>(null);
 
+  // Undo / Redo History Stack
+  const [history, setHistory] = useState<DrawingItem[][]>(() => [drawings]);
+  const [historyIdx, setHistoryIdx] = useState(0);
+
+  const pushState = useCallback((newDrawings: DrawingItem[]) => {
+    setHistory((prev) => [...prev.slice(0, historyIdx + 1), newDrawings]);
+    setHistoryIdx((prev) => prev + 1);
+  }, [historyIdx]);
+
+  const undo = useCallback(() => {
+    if (historyIdx > 0) {
+      audioHaptics.tick();
+      const prev = history[historyIdx - 1];
+      setHistoryIdx((idx) => idx - 1);
+      setDrawings(prev);
+      setSelectedDrawingId(null);
+    }
+  }, [historyIdx, history]);
+
+  const redo = useCallback(() => {
+    if (historyIdx < history.length - 1) {
+      audioHaptics.tick();
+      const next = history[historyIdx + 1];
+      setHistoryIdx((idx) => idx + 1);
+      setDrawings(next);
+      setSelectedDrawingId(null);
+    }
+  }, [historyIdx, history]);
+
+  // Global hotkeys (Ctrl+Z to Undo, Ctrl+Y or Ctrl+Shift+Z to Redo)
+  useEffect(() => {
+    const handleUndoRedo = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        if (e.shiftKey) {
+          e.preventDefault();
+          redo();
+        } else {
+          e.preventDefault();
+          undo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handleUndoRedo);
+    return () => window.removeEventListener('keydown', handleUndoRedo);
+  }, [undo, redo]);
+
+  // Bind global undo/redo handlers for toolbar buttons
+  useEffect(() => {
+    (window as any).__undoDrawing = undo;
+    (window as any).__redoDrawing = redo;
+    return () => {
+      delete (window as any).__undoDrawing;
+      delete (window as any).__redoDrawing;
+    };
+  }, [undo, redo]);
+
   const [, setRerenderKey] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -124,9 +185,10 @@ export default function DrawingOverlay({
   useEffect(() => {
     if (clearTrigger) {
       setDrawings([]);
+      pushState([]);
       setSelectedDrawingId(null);
     }
-  }, [clearTrigger]);
+  }, [clearTrigger, pushState]);
 
   // Magnet snapping helper to snap to nearest OHLC
   const snapPoint = useCallback(
@@ -442,19 +504,27 @@ export default function DrawingOverlay({
 
     if (activeDrawing && activeDrawing.p2) {
       audioHaptics.tick();
-      setDrawings((prev) => [...prev, activeDrawing]);
+      const next = [...drawings, activeDrawing];
+      setDrawings(next);
+      pushState(next);
       setSelectedDrawingId(activeDrawing.id);
       setActiveDrawing(null);
     }
   };
 
   const updateDrawing = (id: string, patch: Partial<DrawingItem>) => {
-    setDrawings((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+    setDrawings((prev) => {
+      const next = prev.map((d) => (d.id === id ? { ...d, ...patch } : d));
+      pushState(next);
+      return next;
+    });
   };
 
   const deleteDrawing = (id: string) => {
     audioHaptics.tick();
-    setDrawings((prev) => prev.filter((d) => d.id !== id));
+    const next = drawings.filter((d) => d.id !== id);
+    setDrawings(next);
+    pushState(next);
     if (selectedDrawingId === id) setSelectedDrawingId(null);
   };
 

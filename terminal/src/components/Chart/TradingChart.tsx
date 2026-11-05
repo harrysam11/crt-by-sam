@@ -32,6 +32,7 @@ import ChartLegendHUD, { type ActiveIndicatorInfo } from './ChartLegendHUD';
 import VolumeProfileOverlay from './VolumeProfileOverlay';
 import PriceScaleActionFlyout from './PriceScaleActionFlyout';
 import SymbolSearchModal from '../Search/SymbolSearchModal';
+import ChartContextMenu, { type ChartContextMenuPos } from './ChartContextMenu';
 import ShareChartModal from '../share/ShareChartModal';
 import RiskHUD from '../RiskHUD';
 
@@ -86,6 +87,7 @@ export default function TradingChart({
   const candles = useTerminalStore((s) => s.candles);
   const error = useTerminalStore((s) => s.error);
   const placeOrder = useTerminalStore((s) => s.placeOrder);
+  const addAlert = useTerminalStore((s) => s.addAlert);
 
   // Psychology and Skins Store
   const zenMode = usePsychologyStore((s) => s.zenMode);
@@ -176,6 +178,7 @@ export default function TradingChart({
   const [showVolumeProfile, setShowVolumeProfile] = useState(true);
   const [isSymbolSearchOpen, setIsSymbolSearchOpen] = useState(false);
   const [externalLineTrigger, setExternalLineTrigger] = useState<{ price: number; type: 'LINE' | 'RAY' } | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<ChartContextMenuPos | null>(null);
 
   // Register global hotkey openers for symbol search, tool selection, and scale reset
   useEffect(() => {
@@ -940,6 +943,21 @@ export default function TradingChart({
           <span>Replay</span>
         </button>
 
+        {/* Quick Alert Trigger Button */}
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            addAlert(symbol, currentPrice, 'PRICE');
+          }}
+          className="flex items-center gap-1.5 rounded border border-grid bg-slate-900/60 px-2 py-1 text-xs font-semibold text-slate-200 hover:border-amber-400 hover:text-amber-300 transition"
+          title="Create Alert at Current Price (Alt+A)"
+        >
+          <svg className="h-3.5 w-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          <span>Alert</span>
+        </button>
+
         <span className="mx-1 h-4 w-px bg-grid" />
 
         {/* Session OHL Lines Toggle */}
@@ -1051,6 +1069,52 @@ export default function TradingChart({
           Snapshot
         </button>
 
+        {/* Undo / Redo Global Controls */}
+        <div className="flex items-center gap-0.5 border-l border-grid pl-1">
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              (window as any).__undoDrawing?.();
+            }}
+            className="p-1 rounded text-muted hover:text-white hover:bg-slate-800 transition"
+            title="Undo (Ctrl+Z)"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a5 5 0 015 5v2m-15-7l4-4m-4 4l4 4" />
+            </svg>
+          </button>
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              (window as any).__redoDrawing?.();
+            }}
+            className="p-1 rounded text-muted hover:text-white hover:bg-slate-800 transition"
+            title="Redo (Ctrl+Y)"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10H11a5 5 0 00-5 5v2m15-7l-4-4m4 4l-4 4" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Fullscreen Toggle */}
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            if (!document.fullscreenElement) {
+              document.documentElement.requestFullscreen?.();
+            } else {
+              document.exitFullscreen?.();
+            }
+          }}
+          className="p-1 rounded text-muted hover:text-white hover:bg-slate-800 transition"
+          title="Toggle Fullscreen"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+          </svg>
+        </button>
+
         {/* Chart Settings Gear Icon */}
         <button
           onClick={() => {
@@ -1151,6 +1215,21 @@ export default function TradingChart({
             onDoubleClick={() => {
               audioHaptics.tick();
               api.current?.candles.priceScale().applyOptions({ autoScale: true });
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              if (!seriesApi || !chartApi || !box.current) return;
+              const rect = box.current.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const y = e.clientY - rect.top;
+              const price = seriesApi.coordinateToPrice(y) ?? currentPrice;
+              const time = chartApi.timeScale().coordinateToTime(x);
+              setContextMenuPos({
+                x: e.clientX,
+                y: e.clientY,
+                price,
+                time: typeof time === 'number' ? time : undefined,
+              });
             }}
           />
 
@@ -1330,6 +1409,45 @@ export default function TradingChart({
       <SymbolSearchModal
         isOpen={isSymbolSearchOpen}
         onClose={() => setIsSymbolSearchOpen(false)}
+      />
+
+      {/* TradingView-Style In-Chart Canvas Context Menu */}
+      <ChartContextMenu
+        pos={contextMenuPos}
+        symbol={symbol}
+        onClose={() => setContextMenuPos(null)}
+        onResetScale={() => {
+          audioHaptics.tick();
+          api.current?.candles.priceScale().applyOptions({ autoScale: true });
+        }}
+        onAddAlert={(price) => {
+          audioHaptics.tick();
+          addAlert(symbol, price, 'PRICE');
+        }}
+        onCreateOrder={(price) => {
+          audioHaptics.tick();
+          placeOrder({
+            symbol,
+            side: price < currentPrice ? 'BUY' : 'SELL',
+            type: 'LIMIT',
+            price,
+            qty: 0.1,
+            leverage: 10,
+          });
+        }}
+        onAddHorizontalLine={(price) => setExternalLineTrigger({ price, type: 'LINE' })}
+        onAddHorizontalRay={(price) => setExternalLineTrigger({ price, type: 'RAY' })}
+        onStartReplayAtTime={(time) => {
+          const idx = candles.findIndex((c) => c.time >= time);
+          if (idx !== -1) {
+            audioHaptics.tick();
+            setReplayIndex(idx);
+            setIsReplayActive(true);
+          }
+        }}
+        onOpenRuler={() => setIsRulerActive(true)}
+        onOpenIndicators={() => setIsIndicatorsModalOpen(true)}
+        onOpenSettings={() => setIsChartSettingsOpen(true)}
       />
     </div>
   );

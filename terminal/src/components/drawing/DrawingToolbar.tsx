@@ -291,6 +291,36 @@ export default function DrawingToolbar({
 
       <div className="h-px bg-grid my-0.5" />
 
+      {/* Undo Drawing Action */}
+      <button
+        onClick={() => {
+          audioHaptics.tick();
+          (window as any).__undoDrawing?.();
+        }}
+        className="p-2 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition"
+        title="Undo (Ctrl+Z)"
+      >
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a5 5 0 015 5v2m-15-7l4-4m-4 4l4 4" />
+        </svg>
+      </button>
+
+      {/* Redo Drawing Action */}
+      <button
+        onClick={() => {
+          audioHaptics.tick();
+          (window as any).__redoDrawing?.();
+        }}
+        className="p-2 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition"
+        title="Redo (Ctrl+Y)"
+      >
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10H11a5 5 0 00-5 5v2m15-7l-4-4m4 4l-4 4" />
+        </svg>
+      </button>
+
+      <div className="h-px bg-grid my-0.5" />
+
       {/* Magnet Snapping Toggle */}
       <button
         onClick={() => {
