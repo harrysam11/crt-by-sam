@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { ISeriesApi } from 'lightweight-charts';
+import type { ISeriesApi, SeriesType } from 'lightweight-charts';
 import { useDerivativesStore } from '../../store/useDerivativesStore';
 import { useTerminalStore } from '../../store/useTerminalStore';
 import { toUsd } from '../../services/instruments';
@@ -8,7 +8,7 @@ import { audioHaptics } from '../../utils/notify';
 import type { CanvasOrderLine } from '../../types/derivatives';
 
 interface CanvasOrderOverlayProps {
-  seriesApi: ISeriesApi<'Candlestick'> | null;
+  seriesApi: ISeriesApi<SeriesType> | null;
   onExecuteOrders?: (entry: CanvasOrderLine, sl?: CanvasOrderLine, tp?: CanvasOrderLine) => void;
 }
 

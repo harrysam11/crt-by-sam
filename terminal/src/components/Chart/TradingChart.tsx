@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createChart, ColorType, CrosshairMode, LineStyle, PriceScaleMode,
-  type CandlestickData, type IChartApi, type IPriceLine, type ISeriesApi, type Time, type UTCTimestamp,
+  type CandlestickData, type IChartApi, type IPriceLine, type ISeriesApi, type SeriesType, type Time, type UTCTimestamp,
 } from 'lightweight-charts';
 import { useTerminalStore } from '../../store/useTerminalStore';
 import { usePsychologyStore } from '../../store/usePsychologyStore';
@@ -12,7 +12,7 @@ import { ema, sma, rsi, bollingerBands, heikinAshi } from '../../services/indica
 import { generateOIHistory } from '../../services/nseOptionChain';
 import { decimalsFor, fmtPrice, fmtQty, labelOf } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
-import type { Candle, Timeframe } from '../../types/terminal';
+import type { Candle, ChartStyle, ChartTimezone, PriceScaleType, Timeframe } from '../../types/terminal';
 import type { CanvasOrderLine } from '../../types/derivatives';
 import type { ToolType, MagnetConfig } from '../drawing/types';
 import ChartSkinsLayer from '../ChartSkinsLayer';
@@ -57,6 +57,10 @@ const tickLabel = (t: Time, type: number) => {
 interface Api {
   chart: IChartApi;
   candles: ISeriesApi<'Candlestick'>;
+  barSeries: ISeriesApi<'Bar'>;
+  lineSeries: ISeriesApi<'Line'>;
+  areaSeries: ISeriesApi<'Area'>;
+  baselineSeries: ISeriesApi<'Baseline'>;
   volume: ISeriesApi<'Histogram'>;
   sma: ISeriesApi<'Line'>;
   ema: ISeriesApi<'Line'>;
@@ -105,7 +109,7 @@ export default function TradingChart({
   const provider = getInstrument(symbol)?.provider ?? 'binance';
 
   // Indicators & Chart Styles
-  const [chartStyle, setChartStyle] = useState<'CANDLE' | 'HEIKIN_ASHI' | 'FOOTPRINT'>('CANDLE');
+  const [chartStyle, setChartStyle] = useState<ChartStyle>('CANDLE');
   const [showSma, setShowSma] = useState(true);
   const [showEma, setShowEma] = useState(true);
   const [showVwap, setShowVwap] = useState(true);
@@ -177,7 +181,8 @@ export default function TradingChart({
     rsi?: number | null;
     oi?: number | null;
   }>({});
-  const [isLogScale, setIsLogScale] = useState(false);
+  const [scaleMode, setScaleMode] = useState<PriceScaleType>('NORMAL');
+  const [timezone, setTimezone] = useState<ChartTimezone>('UTC');
   const [showVolumeProfile, setShowVolumeProfile] = useState(false);
   const [showVolume, setShowVolume] = useState(true);
   const [isSymbolSearchOpen, setIsSymbolSearchOpen] = useState(false);
@@ -269,6 +274,23 @@ export default function TradingChart({
     setIsStyleMenuOpen(false);
     setIsColorMenuOpen(false);
     setIsLayersMenuOpen((v) => !v);
+  };
+
+  const handleSetScaleMode = (mode: PriceScaleType) => {
+    setScaleMode(mode);
+    const a = api.current;
+    if (!a) return;
+    const pMode =
+      mode === 'LOGARITHMIC'
+        ? PriceScaleMode.Logarithmic
+        : mode === 'PERCENTAGE'
+        ? PriceScaleMode.Percentage
+        : PriceScaleMode.Normal;
+    a.candles.priceScale().applyOptions({ mode: pMode });
+    a.barSeries.priceScale().applyOptions({ mode: pMode });
+    a.lineSeries.priceScale().applyOptions({ mode: pMode });
+    a.areaSeries.priceScale().applyOptions({ mode: pMode });
+    a.baselineSeries.priceScale().applyOptions({ mode: pMode });
   };
 
   // Register global hotkey openers for symbol search, tool selection, and scale reset
@@ -447,7 +469,7 @@ export default function TradingChart({
 
   // Expose chart APIs to state for overlay layers (Ghost / Canvas drag & drop)
   const [chartApi, setChartApi] = useState<IChartApi | null>(null);
-  const [seriesApi, setSeriesApi] = useState<ISeriesApi<'Candlestick'> | null>(null);
+  const [seriesApi, setSeriesApi] = useState<ISeriesApi<SeriesType> | null>(null);
   const [boxDimensions, setBoxDimensions] = useState<{ w: number; h: number }>({ w: 800, h: 500 });
 
   useEffect(() => {
@@ -581,8 +603,44 @@ export default function TradingChart({
       wickVisible: true,
       wickUpColor: chartSettings.candleUpColor || '#ffffff',
       wickDownColor: borderDownInit,
+      visible: chartStyle === 'CANDLE' || chartStyle === 'HOLLOW_CANDLE' || chartStyle === 'HEIKIN_ASHI' || chartStyle === 'FOOTPRINT',
     });
     cs.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.12 } });
+
+    const barSeries = chart.addBarSeries({
+      upColor: chartSettings.candleUpColor || '#ffffff',
+      downColor: borderDownInit,
+      visible: chartStyle === 'BAR',
+    });
+    barSeries.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.12 } });
+
+    const lineSeries = chart.addLineSeries({
+      color: chartSettings.candleUpColor || '#ffffff',
+      lineWidth: 2,
+      visible: chartStyle === 'LINE',
+    });
+    lineSeries.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.12 } });
+
+    const areaSeries = chart.addAreaSeries({
+      topColor: 'rgba(255, 255, 255, 0.28)',
+      bottomColor: 'rgba(255, 255, 255, 0.02)',
+      lineColor: chartSettings.candleUpColor || '#ffffff',
+      lineWidth: 2,
+      visible: chartStyle === 'AREA',
+    });
+    areaSeries.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.12 } });
+
+    const baselineSeries = chart.addBaselineSeries({
+      baseValue: { type: 'price', price: 0 },
+      topLineColor: '#089981',
+      topFillColor1: 'rgba(8, 153, 129, 0.28)',
+      topFillColor2: 'rgba(8, 153, 129, 0.05)',
+      bottomLineColor: '#f23645',
+      bottomFillColor1: 'rgba(242, 54, 69, 0.05)',
+      bottomFillColor2: 'rgba(242, 54, 69, 0.28)',
+      visible: chartStyle === 'BASELINE',
+    });
+    baselineSeries.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.12 } });
 
     const vs = chart.addHistogramSeries({
       priceFormat: { type: 'volume' },
@@ -627,6 +685,10 @@ export default function TradingChart({
     api.current = {
       chart,
       candles: cs,
+      barSeries,
+      lineSeries,
+      areaSeries,
+      baselineSeries,
       volume: vs,
       sma: smaS,
       ema: emaS,
@@ -670,7 +732,13 @@ export default function TradingChart({
     const onLive = (c: Candle) => {
       try {
         const st = live.current;
-        cs.update(bar(c));
+        const b = bar(c);
+        const lPoint = { time: c.time as UTCTimestamp, value: c.close };
+        cs.update(b);
+        barSeries.update(b);
+        lineSeries.update(lPoint);
+        areaSeries.update(lPoint);
+        baselineSeries.update(lPoint);
         vs.update(vol(c));
         if (c.time > st.lastTime) { st.emaPrev = st.lastEma; st.closes.push(c.close); st.lastTime = c.time; }
         else if (st.closes.length) st.closes[st.closes.length - 1] = c.close;
@@ -786,13 +854,23 @@ export default function TradingChart({
     const d = decimalsFor(symbol, closes[n - 1]);
     const priceFormat = { type: 'price' as const, precision: d, minMove: Math.pow(10, -d) };
     a.candles.applyOptions({ priceFormat });
+    a.barSeries.applyOptions({ priceFormat });
+    a.lineSeries.applyOptions({ priceFormat });
+    a.areaSeries.applyOptions({ priceFormat });
+    a.baselineSeries.applyOptions({ priceFormat });
     a.sma.applyOptions({ priceFormat });
     a.ema.applyOptions({ priceFormat });
     a.vwap.applyOptions({ priceFormat });
     a.bbUpper.applyOptions({ priceFormat });
     a.bbLower.applyOptions({ priceFormat });
 
-    a.candles.setData(displayCandles.map(bar));
+    const barData = displayCandles.map(bar);
+    const lineData = displayCandles.map((c) => ({ time: c.time as UTCTimestamp, value: c.close }));
+    a.candles.setData(barData);
+    a.barSeries.setData(barData);
+    a.lineSeries.setData(lineData);
+    a.areaSeries.setData(lineData);
+    a.baselineSeries.setData(lineData);
     a.volume.setData(displayCandles.map(vol));
     a.sma.setData(pts(displayCandles, s));
     a.ema.setData(pts(displayCandles, e));
@@ -890,10 +968,30 @@ export default function TradingChart({
   useEffect(() => { api.current?.rsi.applyOptions({ visible: showRsi }); }, [showRsi]);
   useEffect(() => { api.current?.oi.applyOptions({ visible: showOI }); }, [showOI]);
 
-  // Adjust candle opacity when Footprint cluster chart mode is active
+  // Adjust series visibility, styling & active series API when chartStyle or chartSettings changes
   useEffect(() => {
     const a = api.current;
     if (!a) return;
+
+    // Toggle series visibility
+    a.candles.applyOptions({
+      visible: chartStyle === 'CANDLE' || chartStyle === 'HOLLOW_CANDLE' || chartStyle === 'HEIKIN_ASHI' || chartStyle === 'FOOTPRINT',
+    });
+    a.barSeries.applyOptions({ visible: chartStyle === 'BAR' });
+    a.lineSeries.applyOptions({ visible: chartStyle === 'LINE' });
+    a.areaSeries.applyOptions({ visible: chartStyle === 'AREA' });
+    a.baselineSeries.applyOptions({ visible: chartStyle === 'BASELINE' });
+
+    // Set active series for drawings and scales
+    if (chartStyle === 'BAR') setSeriesApi(a.barSeries);
+    else if (chartStyle === 'LINE') setSeriesApi(a.lineSeries);
+    else if (chartStyle === 'AREA') setSeriesApi(a.areaSeries);
+    else if (chartStyle === 'BASELINE') setSeriesApi(a.baselineSeries);
+    else setSeriesApi(a.candles);
+
+    const isDark = chartSettings.candleDownColor === '#101015' || chartSettings.candleDownColor === '#050508';
+    const borderDown = isDark ? '#71717a' : chartSettings.candleDownColor;
+
     if (chartStyle === 'FOOTPRINT') {
       a.candles.applyOptions({
         upColor: 'transparent',
@@ -902,9 +1000,18 @@ export default function TradingChart({
         wickUpColor: 'rgba(255, 255, 255, 0.25)',
         wickDownColor: 'rgba(255, 255, 255, 0.25)',
       });
+    } else if (chartStyle === 'HOLLOW_CANDLE') {
+      a.candles.applyOptions({
+        upColor: 'transparent',
+        downColor: chartSettings.candleDownColor || '#101015',
+        borderVisible: true,
+        borderUpColor: chartSettings.candleUpColor || '#ffffff',
+        borderDownColor: borderDown,
+        wickVisible: true,
+        wickUpColor: chartSettings.candleUpColor || '#ffffff',
+        wickDownColor: borderDown,
+      });
     } else {
-      const isDark = chartSettings.candleDownColor === '#101015' || chartSettings.candleDownColor === '#050508';
-      const borderDown = isDark ? '#71717a' : chartSettings.candleDownColor;
       a.candles.applyOptions({
         upColor: chartSettings.candleUpColor || '#ffffff',
         downColor: chartSettings.candleDownColor || '#101015',
@@ -914,6 +1021,16 @@ export default function TradingChart({
         wickVisible: true,
         wickUpColor: chartSettings.candleUpColor || '#ffffff',
         wickDownColor: borderDown,
+      });
+      a.barSeries.applyOptions({
+        upColor: chartSettings.candleUpColor || '#ffffff',
+        downColor: borderDown,
+      });
+      a.lineSeries.applyOptions({
+        color: chartSettings.candleUpColor || '#ffffff',
+      });
+      a.areaSeries.applyOptions({
+        lineColor: chartSettings.candleUpColor || '#ffffff',
       });
     }
   }, [chartStyle, chartSettings]);
@@ -1118,12 +1235,42 @@ export default function TradingChart({
                   <line x1="17" y1="16" x2="17" y2="20" strokeLinecap="round" />
                 </svg>
               )}
+              {chartStyle === 'BAR' && (
+                <svg className="h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <line x1="12" y1="2" x2="12" y2="22" strokeLinecap="round" />
+                  <line x1="8" y1="7" x2="12" y2="7" strokeLinecap="round" />
+                  <line x1="12" y1="17" x2="16" y2="17" strokeLinecap="round" />
+                </svg>
+              )}
+              {chartStyle === 'HOLLOW_CANDLE' && (
+                <svg className="h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <line x1="9" y1="2" x2="9" y2="6" strokeLinecap="round" />
+                  <rect x="6" y="6" width="6" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth={1.5} />
+                  <line x1="9" y1="16" x2="9" y2="22" strokeLinecap="round" />
+                </svg>
+              )}
               {chartStyle === 'HEIKIN_ASHI' && (
                 <svg className="h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <line x1="8" y1="3" x2="8" y2="21" strokeLinecap="round" />
                   <rect x="5" y="7" width="6" height="10" rx="1" fill="currentColor" fillOpacity={0.2} />
                   <line x1="16" y1="5" x2="16" y2="19" strokeLinecap="round" />
                   <rect x="13" y="9" width="6" height="7" rx="1" fill="currentColor" fillOpacity={0.2} />
+                </svg>
+              )}
+              {chartStyle === 'LINE' && (
+                <svg className="h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8" />
+                </svg>
+              )}
+              {chartStyle === 'AREA' && (
+                <svg className="h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8v13H3z" fill="currentColor" fillOpacity={0.2} />
+                </svg>
+              )}
+              {chartStyle === 'BASELINE' && (
+                <svg className="h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <line x1="2" y1="12" x2="22" y2="12" strokeDasharray="2 2" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 15l5-6 4 3 8-7" />
                 </svg>
               )}
               {chartStyle === 'FOOTPRINT' && (
@@ -1136,7 +1283,15 @@ export default function TradingChart({
                   <rect x="12" y="16" width="8" height="4" rx="0.5" fill="currentColor" fillOpacity={0.6} />
                 </svg>
               )}
-              <span>{chartStyle === 'CANDLE' ? 'Candles' : chartStyle === 'HEIKIN_ASHI' ? 'Heikin-Ashi' : 'Footprint'}</span>
+              <span>{
+                chartStyle === 'CANDLE' ? 'Candles' :
+                chartStyle === 'BAR' ? 'Bars' :
+                chartStyle === 'HOLLOW_CANDLE' ? 'Hollow' :
+                chartStyle === 'HEIKIN_ASHI' ? 'Heikin-Ashi' :
+                chartStyle === 'LINE' ? 'Line' :
+                chartStyle === 'AREA' ? 'Area' :
+                chartStyle === 'BASELINE' ? 'Baseline' : 'Footprint'
+              }</span>
               <svg className={`h-3 w-3 text-slate-400 transition-transform ${isStyleMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -1144,27 +1299,35 @@ export default function TradingChart({
 
             {/* Candle Style Menu */}
             {isStyleMenuOpen && (
-              <div className="absolute left-0 top-full mt-2 z-50 w-56 clay-popover p-2 shadow-2xl font-mono text-xs">
+              <div className="absolute left-0 top-full mt-2 z-50 w-60 clay-popover p-2 shadow-2xl font-mono text-xs max-h-80 overflow-y-auto">
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1">
+                  Chart Style
+                </div>
                 {[
                   { id: 'CANDLE', label: 'Candlestick', desc: 'Standard OHLC price bars' },
+                  { id: 'BAR', label: 'Bar Chart', desc: 'High/Low bars with open/close ticks' },
+                  { id: 'HOLLOW_CANDLE', label: 'Hollow Candles', desc: 'TradingView hollow body bars' },
                   { id: 'HEIKIN_ASHI', label: 'Heikin-Ashi', desc: 'Smoothed trend calculation' },
+                  { id: 'LINE', label: 'Line Chart', desc: 'Continuous close price line' },
+                  { id: 'AREA', label: 'Area Chart', desc: 'Filled gradient baseline' },
+                  { id: 'BASELINE', label: 'Baseline Chart', desc: 'Price relative to baseline' },
                   { id: 'FOOTPRINT', label: 'Footprint Clusters', desc: 'Institutional Bid x Ask order flow' },
                 ].map((s) => (
                   <button
                     key={s.id}
                     onClick={() => {
                       audioHaptics.tick();
-                      setChartStyle(s.id as any);
+                      setChartStyle(s.id as ChartStyle);
                       setIsStyleMenuOpen(false);
                     }}
-                    className={`flex w-full items-start justify-between px-2.5 py-2 rounded-lg text-left transition ${
+                    className={`flex w-full items-start justify-between px-2.5 py-1.5 rounded-lg text-left transition ${
                       chartStyle === s.id
                         ? 'clay-btn-active font-bold'
                         : 'text-slate-300 hover:bg-white/10 hover:text-white'
                     }`}
                   >
                     <div>
-                      <div className="font-semibold">{s.label}</div>
+                      <div className="font-semibold text-xs">{s.label}</div>
                       <div className="text-[10px] text-slate-400 font-normal">{s.desc}</div>
                     </div>
                     {chartStyle === s.id && (
@@ -1556,8 +1719,46 @@ export default function TradingChart({
           </div>
         </div>
 
-        {/* Right Section: Snapshot, Settings, Fullscreen */}
+        {/* Right Section: Session, Scale, Timezone, Snapshot, Settings, Fullscreen */}
         <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          {/* Market Session Status Badge */}
+          <div className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/40 border border-white/5 text-[10px] font-mono shrink-0">
+            <span className={`w-1.5 h-1.5 rounded-full ${provider === 'binance' ? 'bg-emerald-400 animate-pulse' : 'bg-emerald-400'}`} />
+            <span className="text-slate-400 font-semibold">
+              {provider === 'binance' ? '24/7 LIVE' : 'REGULAR'}
+            </span>
+          </div>
+
+          {/* Scale Mode Switcher */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              const nextMode: PriceScaleType =
+                scaleMode === 'NORMAL' ? 'LOGARITHMIC' : scaleMode === 'LOGARITHMIC' ? 'PERCENTAGE' : 'NORMAL';
+              handleSetScaleMode(nextMode);
+            }}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold clay-pill text-slate-300 hover:text-white transition shrink-0"
+            title={`Price Scale Mode: ${scaleMode} (Click to toggle Normal / Log / %)`}
+          >
+            <span className="text-[10px] text-slate-400 font-normal">Scale:</span>
+            <span className="font-bold text-white text-[11px]">{scaleMode === 'NORMAL' ? 'Lin' : scaleMode === 'LOGARITHMIC' ? 'Log' : '%'}</span>
+          </button>
+
+          {/* Timezone Switcher */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              const tzs: ChartTimezone[] = ['UTC', 'Asia/Kolkata', 'America/New_York', 'Europe/London', 'Asia/Tokyo'];
+              const nextTz = tzs[(tzs.indexOf(timezone) + 1) % tzs.length];
+              setTimezone(nextTz);
+            }}
+            className="flex items-center gap-1 px-2 py-1 text-xs font-semibold clay-pill text-slate-400 hover:text-white transition shrink-0"
+            title={`Chart Timezone: ${timezone} (Click to cycle UTC / IST / EDT / GMT / JST)`}
+          >
+            <span className="text-[10px] font-mono text-slate-300">
+              {timezone === 'UTC' ? 'UTC' : timezone === 'Asia/Kolkata' ? 'IST' : timezone === 'America/New_York' ? 'EDT' : timezone === 'Europe/London' ? 'GMT' : 'JST'}
+            </span>
+          </button>
           {/* Share Chart Snapshot Modal Trigger */}
           <button
             onClick={() => {
@@ -1822,8 +2023,19 @@ export default function TradingChart({
         </div>
 
         {/* Right: Scale & Timezone */}
-        <div className="flex items-center gap-2 text-[10px]">
-          <span className="font-mono text-slate-400 font-medium">UTC</span>
+        <div className="flex items-center gap-1.5 text-[10px]">
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              const tzs: ChartTimezone[] = ['UTC', 'Asia/Kolkata', 'America/New_York', 'Europe/London', 'Asia/Tokyo'];
+              const nextTz = tzs[(tzs.indexOf(timezone) + 1) % tzs.length];
+              setTimezone(nextTz);
+            }}
+            className="px-2 py-0.5 rounded-full clay-btn font-mono text-slate-300 hover:text-white transition"
+            title={`Timezone: ${timezone} (Click to toggle)`}
+          >
+            {timezone === 'UTC' ? 'UTC' : timezone === 'Asia/Kolkata' ? 'IST' : timezone === 'America/New_York' ? 'EDT' : timezone === 'Europe/London' ? 'GMT' : 'JST'}
+          </button>
           <button
             onClick={() => {
               audioHaptics.tick();
@@ -1837,18 +2049,38 @@ export default function TradingChart({
           <button
             onClick={() => {
               audioHaptics.tick();
-              const next = !isLogScale;
-              setIsLogScale(next);
-              api.current?.candles.priceScale().applyOptions({
-                mode: next ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
-              });
+              handleSetScaleMode('NORMAL');
             }}
             className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition ${
-              isLogScale ? 'clay-pill-active' : 'clay-pill'
+              scaleMode === 'NORMAL' ? 'clay-pill-active' : 'clay-pill'
+            }`}
+            title="Linear / Normal scale"
+          >
+            lin
+          </button>
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              handleSetScaleMode('LOGARITHMIC');
+            }}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition ${
+              scaleMode === 'LOGARITHMIC' ? 'clay-pill-active' : 'clay-pill'
             }`}
             title="Logarithmic scale"
           >
             log
+          </button>
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              handleSetScaleMode('PERCENTAGE');
+            }}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition ${
+              scaleMode === 'PERCENTAGE' ? 'clay-pill-active' : 'clay-pill'
+            }`}
+            title="Percentage scale"
+          >
+            %
           </button>
         </div>
       </div>
@@ -1894,6 +2126,12 @@ export default function TradingChart({
       <ChartContextMenu
         pos={contextMenuPos}
         symbol={symbol}
+        chartStyle={chartStyle}
+        onSetChartStyle={setChartStyle}
+        scaleMode={scaleMode}
+        onSetScaleMode={handleSetScaleMode}
+        timezone={timezone}
+        onSetTimezone={setTimezone}
         onClose={() => setContextMenuPos(null)}
         onResetScale={() => {
           audioHaptics.tick();
@@ -1927,6 +2165,7 @@ export default function TradingChart({
         onOpenRuler={() => setIsRulerActive(true)}
         onOpenIndicators={() => setIsIndicatorsModalOpen(true)}
         onOpenSettings={() => setIsChartSettingsOpen(true)}
+        onClearDrawings={() => setClearDrawingTrigger(Date.now())}
       />
     </div>
   );

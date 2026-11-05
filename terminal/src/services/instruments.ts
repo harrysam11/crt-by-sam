@@ -52,10 +52,11 @@ export const CATEGORY_LABEL: Record<AssetCategory, string> = {
   CRYPTO: 'Crypto', FOREX: 'Forex', COMMODITY: 'Commodities', US_STOCK: 'US stocks', IN_STOCK: 'India', INDEX: 'Indices',
 };
 
-/** Binance supports 1s; Yahoo has no 1s data, and 4h is built client-side from 1h. */
+/** Supported multi-timeframes across providers. Custom resolutions are aggregated dynamically. */
 export const TIMEFRAMES: Record<Provider, Timeframe[]> = {
-  binance: ['1s', '1m', '5m', '15m', '1h', '4h', '1d'],
-  yahoo: ['1m', '5m', '15m', '1h', '4h', '1d'],
+  binance: ['1s', '1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'],
+  yahoo: ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'],
+  custom: ['1m', '5m', '15m', '1h', '4h', '1d'],
 };
 
 const registry = new Map<string, Instrument>();

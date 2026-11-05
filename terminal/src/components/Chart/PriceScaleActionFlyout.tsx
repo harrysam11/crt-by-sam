@@ -8,13 +8,13 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import type { ISeriesApi } from 'lightweight-charts';
+import type { ISeriesApi, SeriesType } from 'lightweight-charts';
 import { useTerminalStore } from '../../store/useTerminalStore';
 import { fmtPrice } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
 
 interface PriceScaleActionFlyoutProps {
-  seriesApi: ISeriesApi<'Candlestick'> | null;
+  seriesApi: ISeriesApi<SeriesType> | null;
   containerHeight: number;
   symbol: string;
   onAddHorizontalLine?: (price: number) => void;

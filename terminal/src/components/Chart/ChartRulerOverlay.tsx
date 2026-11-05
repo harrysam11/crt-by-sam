@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import type { IChartApi, ISeriesApi } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi, SeriesType } from 'lightweight-charts';
 
 interface ChartRulerOverlayProps {
   isActive: boolean;
   onClose: () => void;
   chartApi: IChartApi | null;
-  seriesApi: ISeriesApi<'Candlestick'> | null;
+  seriesApi: ISeriesApi<SeriesType> | null;
 }
 
 interface Point {

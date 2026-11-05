@@ -1,12 +1,14 @@
 /**
  * TradingView-Style In-Chart Canvas Right-Click Context Menu.
  * Opens on right-click anywhere on the chart canvas with precise price & time coordinates.
+ * Includes Price Scale modes (Normal, Log, Percentage), Chart Styles, Drawing controls, and settings.
  * ZERO EMOJI POLICY strictly enforced.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { fmtPrice } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
+import type { ChartStyle, ChartTimezone, PriceScaleType } from '../../types/terminal';
 
 export interface ChartContextMenuPos {
   x: number;
@@ -18,6 +20,12 @@ export interface ChartContextMenuPos {
 interface ChartContextMenuProps {
   pos: ChartContextMenuPos | null;
   symbol: string;
+  chartStyle: ChartStyle;
+  onSetChartStyle: (style: ChartStyle) => void;
+  scaleMode: PriceScaleType;
+  onSetScaleMode: (mode: PriceScaleType) => void;
+  timezone: ChartTimezone;
+  onSetTimezone: (tz: ChartTimezone) => void;
   onClose: () => void;
   onResetScale: () => void;
   onAddAlert: (price: number) => void;
@@ -28,11 +36,18 @@ interface ChartContextMenuProps {
   onOpenRuler: () => void;
   onOpenIndicators: () => void;
   onOpenSettings: () => void;
+  onClearDrawings?: () => void;
 }
 
 export default function ChartContextMenu({
   pos,
   symbol,
+  chartStyle,
+  onSetChartStyle,
+  scaleMode,
+  onSetScaleMode,
+  timezone,
+  onSetTimezone,
   onClose,
   onResetScale,
   onAddAlert,
@@ -43,8 +58,10 @@ export default function ChartContextMenu({
   onOpenRuler,
   onOpenIndicators,
   onOpenSettings,
+  onClearDrawings,
 }: ChartContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [activeSubmenu, setActiveSubmenu] = useState<'STYLE' | 'SCALE' | 'TZ' | null>(null);
 
   // Close on click outside or Escape
   useEffect(() => {
@@ -73,8 +90,8 @@ export default function ChartContextMenu({
   if (!pos) return null;
 
   // Ensure menu stays within window bounds
-  const menuWidth = 240;
-  const menuHeight = 360;
+  const menuWidth = 250;
+  const menuHeight = 440;
   const clampedX = Math.min(pos.x, window.innerWidth - menuWidth - 10);
   const clampedY = Math.min(pos.y, window.innerHeight - menuHeight - 10);
 
@@ -84,11 +101,11 @@ export default function ChartContextMenu({
     <div
       ref={menuRef}
       style={{ left: clampedX, top: clampedY }}
-      className="fixed z-50 w-60 rounded-lg border border-grid/90 bg-panel/95 py-1.5 shadow-2xl backdrop-blur-md select-none font-mono text-[11px] text-slate-200"
+      className="fixed z-50 w-64 rounded-xl border border-grid/90 bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl select-none font-mono text-[11px] text-slate-200"
     >
       {/* Price Header */}
       <div className="border-b border-grid/60 px-3 py-1.5 flex items-center justify-between text-muted text-[10px]">
-        <span>{symbol}</span>
+        <span className="font-semibold text-white">{symbol}</span>
         <span className="font-bold text-accent">{formattedPrice}</span>
       </div>
 
@@ -100,15 +117,15 @@ export default function ChartContextMenu({
             onResetScale();
             onClose();
           }}
-          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-accent/15 hover:text-white transition"
+          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
         >
           <div className="flex items-center gap-2">
             <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            <span>Reset chart view</span>
+            <span>Reset price scale</span>
           </div>
-          <kbd className="text-[9px] text-slate-500 bg-slate-900 px-1 py-0.5 rounded border border-grid">Alt+R</kbd>
+          <kbd className="text-[9px] text-slate-400 bg-black/60 px-1 py-0.5 rounded border border-white/10">Alt+R</kbd>
         </button>
 
         {/* Add Alert */}
@@ -118,7 +135,7 @@ export default function ChartContextMenu({
             onAddAlert(pos.price);
             onClose();
           }}
-          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-accent/15 hover:text-white transition"
+          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
         >
           <div className="flex items-center gap-2">
             <svg className="h-3.5 w-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -126,7 +143,7 @@ export default function ChartContextMenu({
             </svg>
             <span>Add alert at {formattedPrice}</span>
           </div>
-          <kbd className="text-[9px] text-slate-500 bg-slate-900 px-1 py-0.5 rounded border border-grid">Alt+A</kbd>
+          <kbd className="text-[9px] text-slate-400 bg-black/60 px-1 py-0.5 rounded border border-white/10">Alt+A</kbd>
         </button>
 
         {/* Create Limit Order */}
@@ -136,7 +153,7 @@ export default function ChartContextMenu({
             onCreateOrder(pos.price);
             onClose();
           }}
-          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-accent/15 hover:text-white transition"
+          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
         >
           <div className="flex items-center gap-2">
             <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -149,6 +166,159 @@ export default function ChartContextMenu({
 
       <div className="my-1 border-t border-grid/60" />
 
+      {/* Scale Mode Switcher */}
+      <div className="relative">
+        <button
+          onMouseEnter={() => setActiveSubmenu('SCALE')}
+          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+        >
+          <div className="flex items-center gap-2">
+            <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 18h12l3-18H3z" />
+            </svg>
+            <span>Scale: {scaleMode}</span>
+          </div>
+          <span className="text-slate-400">{'>'}</span>
+        </button>
+
+        {activeSubmenu === 'SCALE' && (
+          <div
+            onMouseLeave={() => setActiveSubmenu(null)}
+            className="absolute left-full top-0 ml-1 w-48 rounded-xl border border-grid/90 bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl"
+          >
+            {(['NORMAL', 'LOGARITHMIC', 'PERCENTAGE'] as PriceScaleType[]).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => {
+                  audioHaptics.tick();
+                  onSetScaleMode(mode);
+                  onClose();
+                }}
+                className={`flex w-full items-center justify-between px-3 py-1.5 text-left transition ${
+                  scaleMode === mode ? 'font-bold text-white bg-white/10' : 'text-slate-300 hover:bg-white/5'
+                }`}
+              >
+                <span>{mode}</span>
+                {scaleMode === mode && (
+                  <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Chart Style Switcher */}
+      <div className="relative">
+        <button
+          onMouseEnter={() => setActiveSubmenu('STYLE')}
+          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+        >
+          <div className="flex items-center gap-2">
+            <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <span>Style: {chartStyle}</span>
+          </div>
+          <span className="text-slate-400">{'>'}</span>
+        </button>
+
+        {activeSubmenu === 'STYLE' && (
+          <div
+            onMouseLeave={() => setActiveSubmenu(null)}
+            className="absolute left-full top-0 ml-1 w-52 rounded-xl border border-grid/90 bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl"
+          >
+            {(
+              [
+                { id: 'CANDLE', label: 'Candlestick' },
+                { id: 'BAR', label: 'Bar Chart' },
+                { id: 'HOLLOW_CANDLE', label: 'Hollow Candles' },
+                { id: 'HEIKIN_ASHI', label: 'Heikin-Ashi' },
+                { id: 'LINE', label: 'Line Chart' },
+                { id: 'AREA', label: 'Area Chart' },
+                { id: 'BASELINE', label: 'Baseline Chart' },
+              ] as const
+            ).map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  audioHaptics.tick();
+                  onSetChartStyle(item.id);
+                  onClose();
+                }}
+                className={`flex w-full items-center justify-between px-3 py-1.5 text-left transition ${
+                  chartStyle === item.id ? 'font-bold text-white bg-white/10' : 'text-slate-300 hover:bg-white/5'
+                }`}
+              >
+                <span>{item.label}</span>
+                {chartStyle === item.id && (
+                  <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Timezone Switcher */}
+      <div className="relative">
+        <button
+          onMouseEnter={() => setActiveSubmenu('TZ')}
+          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+        >
+          <div className="flex items-center gap-2">
+            <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="truncate">TZ: {timezone.replace('America/', '').replace('Asia/', '').replace('Europe/', '')}</span>
+          </div>
+          <span className="text-slate-400">{'>'}</span>
+        </button>
+
+        {activeSubmenu === 'TZ' && (
+          <div
+            onMouseLeave={() => setActiveSubmenu(null)}
+            className="absolute left-full top-0 ml-1 w-52 rounded-xl border border-grid/90 bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl"
+          >
+            {(
+              [
+                { id: 'UTC', label: 'UTC (Universal)' },
+                { id: 'Asia/Kolkata', label: 'Kolkata (IST +5:30)' },
+                { id: 'America/New_York', label: 'New York (EDT/EST)' },
+                { id: 'Europe/London', label: 'London (BST/GMT)' },
+                { id: 'Asia/Tokyo', label: 'Tokyo (JST +9:00)' },
+                { id: 'Asia/Hong_Kong', label: 'Hong Kong (HKT +8:00)' },
+              ] as const
+            ).map((tz) => (
+              <button
+                key={tz.id}
+                onClick={() => {
+                  audioHaptics.tick();
+                  onSetTimezone(tz.id);
+                  onClose();
+                }}
+                className={`flex w-full items-center justify-between px-3 py-1.5 text-left transition ${
+                  timezone === tz.id ? 'font-bold text-white bg-white/10' : 'text-slate-300 hover:bg-white/5'
+                }`}
+              >
+                <span>{tz.label}</span>
+                {timezone === tz.id && (
+                  <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="my-1 border-t border-grid/60" />
+
       {/* Drawings Section */}
       <div className="py-1">
         <button
@@ -157,15 +327,15 @@ export default function ChartContextMenu({
             onAddHorizontalLine(pos.price);
             onClose();
           }}
-          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-accent/15 hover:text-white transition"
+          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
         >
           <div className="flex items-center gap-2">
             <svg className="h-3.5 w-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16" />
             </svg>
-            <span>Horizontal Line at price</span>
+            <span>Horizontal line at price</span>
           </div>
-          <kbd className="text-[9px] text-slate-500 bg-slate-900 px-1 py-0.5 rounded border border-grid">Alt+H</kbd>
+          <kbd className="text-[9px] text-slate-400 bg-black/60 px-1 py-0.5 rounded border border-white/10">Alt+H</kbd>
         </button>
 
         <button
@@ -174,12 +344,12 @@ export default function ChartContextMenu({
             onAddHorizontalRay(pos.price);
             onClose();
           }}
-          className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-accent/15 hover:text-white transition"
+          className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
         >
           <svg className="h-3.5 w-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h11M9 12a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
-          <span>Horizontal Ray</span>
+          <span>Horizontal ray</span>
         </button>
 
         <button
@@ -188,13 +358,29 @@ export default function ChartContextMenu({
             onOpenRuler();
             onClose();
           }}
-          className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-accent/15 hover:text-white transition"
+          className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
         >
           <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
-          <span>Measure (Ruler)</span>
+          <span>Measure tool</span>
         </button>
+
+        {onClearDrawings && (
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              onClearDrawings();
+              onClose();
+            }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-red-400 hover:bg-red-500/10 transition"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>Remove all drawings</span>
+          </button>
+        )}
       </div>
 
       <div className="my-1 border-t border-grid/60" />
@@ -208,12 +394,12 @@ export default function ChartContextMenu({
               onStartReplayAtTime(pos.time!);
               onClose();
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-accent/15 hover:text-white transition"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
           >
             <svg className="h-3.5 w-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
             </svg>
-            <span>Bar Replay from this bar</span>
+            <span>Bar replay from here</span>
           </button>
         )}
 
@@ -223,10 +409,10 @@ export default function ChartContextMenu({
             onOpenIndicators();
             onClose();
           }}
-          className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-accent/15 hover:text-white transition"
+          className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
         >
           <span className="font-bold text-accent text-[12px] w-3.5 text-center">fx</span>
-          <span>Indicators & Strategies...</span>
+          <span>Indicators & metrics...</span>
         </button>
 
         <button
@@ -235,7 +421,7 @@ export default function ChartContextMenu({
             onOpenSettings();
             onClose();
           }}
-          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-accent/15 hover:text-white transition"
+          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
         >
           <div className="flex items-center gap-2">
             <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

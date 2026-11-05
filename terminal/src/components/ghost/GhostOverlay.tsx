@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import type { IChartApi, ISeriesApi } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi, SeriesType } from 'lightweight-charts';
 import { useDerivativesStore } from '../../store/useDerivativesStore';
 import { useTerminalStore } from '../../store/useTerminalStore';
 import type { Candle } from '../../types/terminal';
 
 interface GhostOverlayProps {
   chartApi: IChartApi | null;
-  seriesApi: ISeriesApi<'Candlestick'> | null;
+  seriesApi: ISeriesApi<SeriesType> | null;
 }
 
 interface AggregatedBox {

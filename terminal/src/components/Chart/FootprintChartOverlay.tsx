@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { IChartApi, ISeriesApi, UTCTimestamp, LogicalRange } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi, SeriesType, UTCTimestamp, LogicalRange } from 'lightweight-charts';
 import type { Candle } from '../../types/terminal';
 import type { FootprintCandle, FootprintMode } from '../../types/derivatives';
 import { generateFootprintCandle } from '../../services/footprintMath';
@@ -18,7 +18,7 @@ import { fmtQty } from '../../utils/formatters';
 
 interface FootprintChartOverlayProps {
   chartApi: IChartApi | null;
-  seriesApi: ISeriesApi<'Candlestick'> | null;
+  seriesApi: ISeriesApi<SeriesType> | null;
   candles: Candle[];
   containerWidth: number;
   containerHeight: number;

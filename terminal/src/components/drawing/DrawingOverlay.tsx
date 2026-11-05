@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import type { IChartApi, ISeriesApi } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi, SeriesType } from 'lightweight-charts';
 import type { ToolType, DrawingItem, Point2D, MagnetConfig } from './types';
 import type { Candle } from '../../types/terminal';
 import { fmtPrice } from '../../utils/formatters';
@@ -17,7 +17,7 @@ import DrawingContextBar from './DrawingContextBar';
 interface DrawingOverlayProps {
   symbol: string;
   activeTool: ToolType;
-  seriesApi: ISeriesApi<'Candlestick'> | null;
+  seriesApi: ISeriesApi<SeriesType> | null;
   chartApi: IChartApi | null;
   candles?: Candle[];
   magnetConfig?: MagnetConfig;

@@ -1,20 +1,22 @@
 /**
  * TradingView-Style Institutional Symbol Search Modal.
+ * Integrates directly with DatafeedHub (Binance, Yahoo Finance, Custom User Provider).
  * Opens on:
  * - Keyboard shortcut "/" or "Ctrl+K"
  * - Direct alphanumeric typing when not in an input field
  * - Clicking symbol badge in top toolbar or chart legend HUD
  * Features:
- * - Category filters: All, Crypto, India (NSE), Forex, Commodities, Stocks, Indices
- * - Instant fuzzy search across IDs, names, and labels
+ * - Category filters: All, Crypto, India (NSE/BSE), Forex, Commodities, Stocks, Indices
+ * - Dynamic debounced multi-provider search across symbols, companies, and tickers
  * - Keyboard navigation (Up/Down/Enter/Escape)
  * - Recent symbol history & favorites
  * ZERO EMOJI POLICY strictly enforced.
  */
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTerminalStore } from '../../store/useTerminalStore';
-import { DEFAULT_INSTRUMENTS, CATEGORY_LABEL } from '../../services/instruments';
+import { DEFAULT_INSTRUMENTS, CATEGORY_LABEL, registerInstruments } from '../../services/instruments';
+import { datafeedHub } from '../../services/datafeed';
 import type { AssetCategory, Instrument } from '../../types/terminal';
 import { audioHaptics } from '../../utils/notify';
 
@@ -35,11 +37,15 @@ export default function SymbolSearchModal({
   const [query, setQuery] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<AssetCategory | 'ALL'>('ALL');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [searchResults, setSearchResults] = useState<Instrument[]>(DEFAULT_INSTRUMENTS);
+  const [isLoading, setIsLoading] = useState(false);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Recent symbols from localStorage
-  const [recentSymbols, setRecentSymbols] = useState<string[]>(() => {
+  const [, setRecentSymbols] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem('crt_recent_symbols');
       return stored ? JSON.parse(stored) : ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', '^NSEI'];
@@ -56,24 +62,42 @@ export default function SymbolSearchModal({
     }
   }, [isOpen, initialQuery]);
 
-  // Filter instruments based on search query and category
-  const filteredInstruments = useMemo(() => {
-    const q = query.trim().toUpperCase();
-    return DEFAULT_INSTRUMENTS.filter((inst) => {
-      const matchesCategory = selectedCategory === 'ALL' || inst.category === selectedCategory;
-      if (!matchesCategory) return false;
-      if (!q) return true;
-      return (
-        inst.id.toUpperCase().includes(q) ||
-        inst.label.toUpperCase().includes(q) ||
-        inst.name.toUpperCase().includes(q)
-      );
-    });
-  }, [query, selectedCategory]);
+  // Dynamic debounced search via DatafeedHub
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    const timer = setTimeout(async () => {
+      setIsLoading(true);
+      try {
+        const cat = selectedCategory === 'ALL' ? undefined : selectedCategory;
+        const results = await datafeedHub.searchSymbols(query, cat, controller.signal);
+        setSearchResults(results);
+        setSelectedIndex(0);
+      } catch (err: unknown) {
+        if ((err as Error)?.name !== 'AbortError') {
+          setSearchResults(DEFAULT_INSTRUMENTS.filter((i) => selectedCategory === 'ALL' || i.category === selectedCategory));
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }, 120);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [isOpen, query, selectedCategory]);
 
   // Handle selecting an instrument
   const handleSelectInstrument = (inst: Instrument) => {
     audioHaptics.tick();
+    registerInstruments([inst]);
     setSymbol(inst.id);
 
     // Save to recents
@@ -95,13 +119,13 @@ export default function SymbolSearchModal({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setSelectedIndex((prev) => Math.min(filteredInstruments.length - 1, prev + 1));
+        setSelectedIndex((prev) => Math.min(searchResults.length - 1, prev + 1));
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSelectedIndex((prev) => Math.max(0, prev - 1));
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        const selected = filteredInstruments[selectedIndex];
+        const selected = searchResults[selectedIndex];
         if (selected) {
           handleSelectInstrument(selected);
         }
@@ -113,7 +137,7 @@ export default function SymbolSearchModal({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, filteredInstruments, selectedIndex]);
+  }, [isOpen, searchResults, selectedIndex]);
 
   // Auto-scroll selected item into view
   useEffect(() => {
@@ -143,9 +167,12 @@ export default function SymbolSearchModal({
               setQuery(e.target.value);
               setSelectedIndex(0);
             }}
-            placeholder="Search symbol, company, or market..."
+            placeholder="Search symbol, company, ticker, or NSE/BSE stock..."
             className="w-full bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none tracking-wide"
           />
+          {isLoading && (
+            <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2 shrink-0" />
+          )}
           {query && (
             <button
               onClick={() => {
@@ -188,12 +215,12 @@ export default function SymbolSearchModal({
 
         {/* Results List */}
         <div ref={listRef} className="flex-1 overflow-y-auto divide-y divide-grid/30 p-2 space-y-1">
-          {filteredInstruments.length === 0 ? (
+          {searchResults.length === 0 ? (
             <div className="py-12 text-center text-muted text-xs">
-              No matching instruments found for "{query}".
+              {isLoading ? 'Searching live markets...' : `No matching instruments found for "${query}".`}
             </div>
           ) : (
-            filteredInstruments.map((inst, idx) => {
+            searchResults.map((inst, idx) => {
               const isSelected = selectedIndex === idx;
               const isCurrent = currentSymbol === inst.id;
 
@@ -244,11 +271,11 @@ export default function SymbolSearchModal({
         {/* Footer Navigation Info */}
         <div className="flex items-center justify-between border-t border-grid/50 px-4 py-2.5 bg-panel/90 text-[10px] text-muted">
           <div className="flex items-center gap-3">
-            <span><kbd className="clay-badge px-1 py-0.5 text-white">↑</kbd> <kbd className="clay-badge px-1 py-0.5 text-white">↓</kbd> navigate</span>
+            <span><kbd className="clay-badge px-1 py-0.5 text-white">^</kbd> <kbd className="clay-badge px-1 py-0.5 text-white">v</kbd> navigate</span>
             <span><kbd className="clay-badge px-1.5 py-0.5 text-white">ENTER</kbd> select</span>
             <span><kbd className="clay-badge px-1 py-0.5 text-white">ESC</kbd> close</span>
           </div>
-          <span>{filteredInstruments.length} instruments</span>
+          <span>{searchResults.length} instruments</span>
         </div>
       </div>
     </div>
