@@ -19,6 +19,8 @@ import ChartSkinsLayer from '../ChartSkinsLayer';
 import ChartSkinsModal from '../ChartSkinsModal';
 import GhostOverlay from '../ghost/GhostOverlay';
 import CanvasOrderOverlay from '../canvas/CanvasOrderOverlay';
+import ChartTradingOverlay from './ChartTradingOverlay';
+import CreateAlertModal from '../Trading/CreateAlertModal';
 import CandleCountdown from './CandleCountdown';
 import FootprintChartOverlay from './FootprintChartOverlay';
 import ChartRulerOverlay from './ChartRulerOverlay';
@@ -259,6 +261,8 @@ export default function TradingChart({
   const [isSymbolSearchOpen, setIsSymbolSearchOpen] = useState(false);
   const [externalLineTrigger, setExternalLineTrigger] = useState<{ price: number; type: 'LINE' | 'RAY' } | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<ChartContextMenuPos | null>(null);
+  const [isCreateAlertOpen, setIsCreateAlertOpen] = useState(false);
+  const [alertInitialPrice, setAlertInitialPrice] = useState<number | undefined>(undefined);
 
   // Phase 3 Indicator Framework Store Hooks
   const activeInstances = useIndicatorsStore((s) => s.activeInstances);
@@ -375,6 +379,10 @@ export default function TradingChart({
   // Register global hotkey openers for symbol search, tool selection, and scale reset
   useEffect(() => {
     (window as any).__openSymbolSearch = () => setIsSymbolSearchOpen(true);
+    (window as any).__openCreateAlert = (p?: number) => {
+      setAlertInitialPrice(p ?? useTerminalStore.getState().currentPrice);
+      setIsCreateAlertOpen(true);
+    };
     (window as any).__selectDrawingTool = (tool: ToolType) => setActiveTool(tool);
     (window as any).__resetChartScale = () => {
       api.current?.candles.priceScale().applyOptions({ autoScale: true });
@@ -382,6 +390,7 @@ export default function TradingChart({
     const unsubTool = drawingEvents.onSelectTool((tool) => setActiveTool(tool));
     return () => {
       delete (window as any).__openSymbolSearch;
+      delete (window as any).__openCreateAlert;
       delete (window as any).__selectDrawingTool;
       delete (window as any).__resetChartScale;
       unsubTool();
@@ -540,17 +549,25 @@ export default function TradingChart({
           return prev;
         }
         audioHaptics.tick();
-        return prev + 1;
+        const next = prev + 1;
+        if (candles[next]) {
+          useTerminalStore.getState().updatePriceTick(symbol, candles[next].close);
+        }
+        return next;
       });
     }, replaySpeedMs);
     return () => clearInterval(interval);
-  }, [isReplayActive, isReplayPlaying, replaySpeedMs, candles.length]);
+  }, [isReplayActive, isReplayPlaying, replaySpeedMs, candles, symbol]);
 
   const startReplay = () => {
     audioHaptics.tick();
     setIsReplayActive(true);
-    setReplayIndex(Math.max(0, candles.length - 40));
+    const startIdx = Math.max(0, candles.length - 40);
+    setReplayIndex(startIdx);
     setIsReplayPlaying(false);
+    if (candles[startIdx]) {
+      useTerminalStore.getState().updatePriceTick(symbol, candles[startIdx].close);
+    }
   };
 
   const exitReplay = () => {
@@ -562,7 +579,13 @@ export default function TradingChart({
 
   const handleStepForward = () => {
     audioHaptics.tick();
-    setReplayIndex((prev) => Math.min(candles.length - 1, prev + 1));
+    setReplayIndex((prev) => {
+      const next = Math.min(candles.length - 1, prev + 1);
+      if (candles[next]) {
+        useTerminalStore.getState().updatePriceTick(symbol, candles[next].close);
+      }
+      return next;
+    });
   };
 
   const handleToggleIndicator = (key: string) => {
@@ -1790,14 +1813,15 @@ export default function TradingChart({
             <span>Replay</span>
           </button>
 
-          {/* Quick Alert Trigger Button */}
+          {/* Create Alert Dialog Trigger Button */}
           <button
             onClick={() => {
               audioHaptics.tick();
-              addAlert(symbol, currentPrice, 'PRICE');
+              setAlertInitialPrice(currentPrice);
+              setIsCreateAlertOpen(true);
             }}
             className="flex items-center gap-1.5 clay-pill px-3 py-1 text-xs font-semibold text-white transition shrink-0"
-            title="Create Alert at Current Price (Alt+A)"
+            title="Create Institutional Alert (Alt+A)"
           >
             <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -2117,6 +2141,9 @@ export default function TradingChart({
                   audioHaptics.tick();
                   setReplayIndex(idx);
                   setIsSelectingCutPoint(false);
+                  if (candles[idx]) {
+                    useTerminalStore.getState().updatePriceTick(symbol, candles[idx].close);
+                  }
                 }
               }
             }}
@@ -2254,6 +2281,12 @@ export default function TradingChart({
           <CanvasOrderOverlay
             seriesApi={seriesApi}
             onExecuteOrders={handleExecuteCanvasOrders}
+          />
+
+          {/* Interactive In-Chart Trading & Order Drag Overlay */}
+          <ChartTradingOverlay
+            symbol={symbol}
+            seriesApi={seriesApi}
           />
 
           {/* Risk Sizing HUD Widget */}
@@ -2429,7 +2462,8 @@ export default function TradingChart({
         }}
         onAddAlert={(price) => {
           audioHaptics.tick();
-          addAlert(symbol, price, 'PRICE');
+          setAlertInitialPrice(price);
+          setIsCreateAlertOpen(true);
         }}
         onCreateOrder={(price) => {
           audioHaptics.tick();
@@ -2450,12 +2484,22 @@ export default function TradingChart({
             audioHaptics.tick();
             setReplayIndex(idx);
             setIsReplayActive(true);
+            if (candles[idx]) {
+              useTerminalStore.getState().updatePriceTick(symbol, candles[idx].close);
+            }
           }
         }}
         onOpenRuler={() => setIsRulerActive(true)}
         onOpenIndicators={() => setIsIndicatorsModalOpen(true)}
         onOpenSettings={() => setIsChartSettingsOpen(true)}
         onClearDrawings={() => setClearDrawingTrigger(Date.now())}
+      />
+
+      {/* TradingView-Style Institutional Create Alert Dialog */}
+      <CreateAlertModal
+        isOpen={isCreateAlertOpen}
+        onClose={() => setIsCreateAlertOpen(false)}
+        initialPrice={alertInitialPrice}
       />
     </div>
   );

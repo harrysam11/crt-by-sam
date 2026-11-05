@@ -104,6 +104,29 @@ class AudioHapticsEngine {
       /* Audio blocked */
     }
   }
+
+  /** High-priority three-tone chime for price, indicator, or drawing alerts */
+  alert(): void {
+    try {
+      const ctx = this.getContext();
+      if (!ctx) return;
+      [880, 1174.66, 1760].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        const start = ctx.currentTime + idx * 0.08;
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.06, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.16);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.2);
+      });
+    } catch {
+      /* Audio blocked */
+    }
+  }
 }
 
 export const audioHaptics = new AudioHapticsEngine();
@@ -119,7 +142,7 @@ export function requestNotify(): void {
 }
 
 export function notifyAlert(title: string, body: string): void {
-  audioHaptics.fill();
+  audioHaptics.alert();
   if ('Notification' in window && Notification.permission === 'granted') {
     new Notification(title, { body });
   }

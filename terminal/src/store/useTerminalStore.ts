@@ -59,7 +59,12 @@ interface TerminalState {
   snapBreakEven: (symbol: string) => void;
   closeAllPositions: () => void;
   addAlert: (symbol: string, price: number, type?: 'PRICE' | 'UNREALIZED_LOSS') => void;
+  addAdvancedAlert: (alert: Omit<Alert, 'id' | 'createdAt' | 'triggered'>) => void;
+  updateAlertPrice: (id: string, newPrice: number) => void;
+  toggleAlert: (id: string) => void;
   removeAlert: (id: string) => void;
+  updateOrderPrice: (id: string, newPrice: number) => void;
+  updatePositionBrackets: (symbol: string, sl?: number, tp?: number) => void;
   resetAccount: () => void;
 }
 
@@ -159,6 +164,7 @@ export const useTerminalStore = create<TerminalState>()(
         const priceHits = get().alerts.filter(
           (a) =>
             !a.triggered &&
+            a.active !== false &&
             a.type !== 'UNREALIZED_LOSS' &&
             a.symbol === symbol &&
             (a.dir === 'above' ? price >= a.price : price <= a.price)
@@ -167,6 +173,7 @@ export const useTerminalStore = create<TerminalState>()(
         const lossHits = get().alerts.filter(
           (a) =>
             !a.triggered &&
+            a.active !== false &&
             a.type === 'UNREALIZED_LOSS' &&
             currentUnrealizedLoss >= a.price
         );
@@ -179,7 +186,10 @@ export const useTerminalStore = create<TerminalState>()(
         }));
 
         priceHits.forEach((a) => {
-          notifyAlert(`${getInstrument(symbol)?.label ?? symbol} Price Alert`, `Price reached ${a.price}`);
+          notifyAlert(
+            `${getInstrument(symbol)?.label ?? symbol} Alert`,
+            a.note || `Price reached ${fmtPrice(a.price, symbol)}`
+          );
           dispatchPriceAlertTelegram(symbol, a.price, price);
         });
         lossHits.forEach((a) =>
@@ -442,6 +452,105 @@ export const useTerminalStore = create<TerminalState>()(
             ],
           }));
         },
+        addAdvancedAlert: (req) => {
+          const now = get().prices[req.symbol] ?? get().currentPrice ?? 0;
+          requestNotify();
+          const item: Alert = {
+            id: uid(),
+            symbol: req.symbol,
+            price: req.price,
+            dir: req.dir || (req.price >= now ? 'above' : 'below'),
+            triggered: false,
+            createdAt: Date.now(),
+            type: req.type || 'PRICE',
+            condition: req.condition,
+            note: req.note,
+            active: true,
+          };
+          set((s) => ({ alerts: [...s.alerts, item] }));
+        },
+
+        updateAlertPrice: (id, newPrice) => {
+          if (!(newPrice > 0)) return;
+          const now = get().currentPrice;
+          set((s) => ({
+            alerts: s.alerts.map((a) =>
+              a.id === id
+                ? {
+                    ...a,
+                    price: newPrice,
+                    dir: newPrice >= now ? 'above' : 'below',
+                    triggered: false,
+                    active: true,
+                  }
+                : a
+            ),
+          }));
+        },
+
+        toggleAlert: (id) => {
+          set((s) => ({
+            alerts: s.alerts.map((a) => (a.id === id ? { ...a, active: a.active === false ? true : false } : a)),
+          }));
+        },
+
+        updateOrderPrice: (id, newPrice) => {
+          if (!(newPrice > 0)) return;
+          set((s) => ({
+            orders: s.orders.map((o) => {
+              if (o.id !== id || o.status !== 'PENDING') return o;
+              if (o.type === 'LIMIT') return { ...o, price: newPrice };
+              return { ...o, triggerPrice: newPrice };
+            }),
+          }));
+        },
+
+        updatePositionBrackets: (symbol, sl, tp) => {
+          const s = get();
+          const pos = s.positions[symbol];
+          if (!pos) return;
+          const exitSide: OrderSide = pos.side === 'LONG' ? 'SELL' : 'BUY';
+          let orders = [...s.orders];
+
+          if (sl !== undefined) {
+            orders = orders.filter((o) => !(o.status === 'PENDING' && o.symbol === symbol && o.type === 'STOP_LOSS'));
+            if (sl > 0) {
+              orders.push({
+                id: uid(),
+                symbol,
+                side: exitSide,
+                type: 'STOP_LOSS',
+                price: 0,
+                triggerPrice: sl,
+                qty: pos.size,
+                status: 'PENDING',
+                timestamp: Date.now(),
+                reduceOnly: true,
+              });
+            }
+          }
+
+          if (tp !== undefined) {
+            orders = orders.filter((o) => !(o.status === 'PENDING' && o.symbol === symbol && o.type === 'TAKE_PROFIT'));
+            if (tp > 0) {
+              orders.push({
+                id: uid(),
+                symbol,
+                side: exitSide,
+                type: 'TAKE_PROFIT',
+                price: 0,
+                triggerPrice: tp,
+                qty: pos.size,
+                status: 'PENDING',
+                timestamp: Date.now(),
+                reduceOnly: true,
+              });
+            }
+          }
+
+          set({ orders: trimOrders(orders) });
+        },
+
         removeAlert: (id) => set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) })),
 
         resetAccount: () => set({ positions: {}, orders: [], trades: [], balance: START_BALANCE }),

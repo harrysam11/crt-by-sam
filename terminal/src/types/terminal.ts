@@ -71,6 +71,8 @@ export interface QuoteInfo {
   name?: string;
 }
 
+export type AlertConditionType = 'PRICE' | 'UNREALIZED_LOSS' | 'INDICATOR_CROSS' | 'DRAWING_CROSS';
+
 export interface Alert {
   id: string;
   symbol: string;
@@ -78,7 +80,15 @@ export interface Alert {
   dir: 'above' | 'below';
   triggered: boolean;
   createdAt: number;
-  type?: 'PRICE' | 'UNREALIZED_LOSS';
+  type?: AlertConditionType;
+  condition?: {
+    indicatorId?: string;
+    operator?: 'CROSSING' | 'CROSSING_UP' | 'CROSSING_DOWN' | 'GREATER_THAN' | 'LESS_THAN';
+    targetValue?: number;
+    drawingId?: string;
+  };
+  note?: string;
+  active?: boolean;
 }
 
 export interface DepthLevel { price: number; qty: number }
