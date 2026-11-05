@@ -38,10 +38,10 @@ export default function DrawingContextBar({
   return (
     <div
       style={{ left: posX, top: posY }}
-      className="absolute z-40 flex items-center gap-2 rounded-xl border border-grid bg-panel/95 px-3 py-1.5 shadow-2xl backdrop-blur-md font-mono text-xs select-none"
+      className="clay-popover absolute z-40 flex items-center gap-2 px-3 py-1.5 font-mono text-xs select-none"
     >
       {/* Color Palette */}
-      <div className="flex items-center gap-1.5 pr-2 border-r border-grid">
+      <div className="flex items-center gap-1.5 pr-2 border-r border-grid/50">
         {PRESET_COLORS.map((col) => (
           <button
             key={col}
@@ -59,7 +59,7 @@ export default function DrawingContextBar({
       </div>
 
       {/* Line Width */}
-      <div className="flex items-center gap-1 pr-2 border-r border-grid">
+      <div className="flex items-center gap-1 pr-2 border-r border-grid/50">
         {[1, 2, 3, 4].map((w) => (
           <button
             key={w}
@@ -67,8 +67,8 @@ export default function DrawingContextBar({
               audioHaptics.tick();
               onUpdateDrawing(selectedDrawing.id, { lineWidth: w });
             }}
-            className={`px-1.5 py-0.5 rounded text-[10px] ${
-              selectedDrawing.lineWidth === w ? 'bg-accent/20 text-accent font-bold' : 'text-slate-400 hover:text-white'
+            className={`px-2 py-0.5 text-[10px] transition ${
+              selectedDrawing.lineWidth === w ? 'clay-btn-active font-bold' : 'clay-btn text-muted hover:text-white'
             }`}
           >
             {w}px
@@ -82,8 +82,8 @@ export default function DrawingContextBar({
           audioHaptics.tick();
           onUpdateDrawing(selectedDrawing.id, { locked: !selectedDrawing.locked });
         }}
-        className={`px-1.5 py-0.5 rounded text-[10px] ${
-          selectedDrawing.locked ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-slate-400 hover:text-white'
+        className={`px-2 py-0.5 text-[10px] transition ${
+          selectedDrawing.locked ? 'clay-btn-active font-bold' : 'clay-btn text-muted hover:text-white'
         }`}
         title={selectedDrawing.locked ? 'Unlock Drawing' : 'Lock Drawing'}
       >
@@ -96,7 +96,7 @@ export default function DrawingContextBar({
           audioHaptics.tick();
           onDeleteDrawing(selectedDrawing.id);
         }}
-        className="px-1.5 py-0.5 rounded text-[10px] text-red-400 hover:bg-red-500/20 transition"
+        className="clay-btn px-2 py-0.5 text-[10px] text-zinc-400 hover:text-white transition"
         title="Delete Drawing (Del)"
       >
         Delete
@@ -105,10 +105,10 @@ export default function DrawingContextBar({
       {/* Close Floating Bar */}
       <button
         onClick={onClose}
-        className="text-slate-500 hover:text-white text-xs pl-1"
+        className="clay-btn h-5 w-5 text-muted hover:text-white text-[10px]"
         title="Deselect"
       >
-        [x]
+        x
       </button>
     </div>
   );

@@ -193,37 +193,37 @@ export default function Header({
   const displayPnl = hideDollar ? (open >= 0 ? '+Target Track' : '-Risk Zone') : fmtPnl(open);
 
   return (
-    <header className="relative flex h-11 shrink-0 items-center gap-2 border-b border-grid bg-panel px-3 select-none font-mono text-xs overflow-x-auto">
+    <header className="relative flex h-12 shrink-0 items-center gap-2.5 border-b border-grid bg-panel px-3 select-none font-mono text-xs overflow-x-auto shadow-clay-card z-20">
       {/* Daily Drawdown Ambient Progress Bar along top border */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-grid/30 overflow-hidden">
         <div
           className={`h-full transition-all duration-500 ${
-            drawdownPct > 80 ? 'bg-red-500' : drawdownPct > 50 ? 'bg-amber-400' : 'bg-emerald-400'
+            drawdownPct > 80 ? 'bg-red-500' : drawdownPct > 50 ? 'bg-zinc-400' : 'bg-white'
           }`}
           style={{ width: `${drawdownPct}%` }}
           title={`Daily Drawdown: $${realizedLossToday.toFixed(2)} / $${riskRules.maxDailyLoss} (${drawdownPct}%)`}
         />
       </div>
 
-      <div className="flex items-baseline gap-2 whitespace-nowrap">
-        <span className="text-sm font-bold text-white">{labelOf(symbol)}</span>
-        <span className={`num text-base font-semibold ${dir === 'up' ? 'text-up' : dir === 'down' ? 'text-down' : 'text-white'}`}>
+      <div className="flex items-center gap-2 whitespace-nowrap">
+        <span className="text-sm font-black text-white tracking-wide">{labelOf(symbol)}</span>
+        <span className={`num text-base font-bold ${dir === 'up' ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]' : dir === 'down' ? 'text-zinc-500' : 'text-white'}`}>
           {fmtPrice(price, symbol)}
         </span>
-        <span className="text-xs text-muted">{inst?.currency}</span>
-        <span className={`num text-xs ${pnlClass(change)}`}>{fmtPct(change)}</span>
-        {marketOpen === false && <span className="rounded bg-grid px-1.5 py-0.5 text-xs text-yellow-400">Market closed</span>}
+        <span className="text-xs text-muted font-medium">{inst?.currency}</span>
+        <span className="num text-xs font-bold text-white bg-white/10 px-1.5 py-0.5 rounded-full border border-white/10">{fmtPct(change)}</span>
+        {marketOpen === false && <span className="clay-badge px-2 py-0.5 text-xs text-zinc-400">Market closed</span>}
 
         {/* Kill-Switch alert pill */}
         {killSwitch.isLocked && (
-          <span className="rounded bg-red-500/20 border border-red-500/40 px-2 py-0.5 text-[11px] font-bold text-red-400 animate-pulse">
+          <span className="rounded-full bg-red-500/20 border border-red-500/40 px-2 py-0.5 text-[11px] font-bold text-red-400 animate-pulse">
             [Locked]
           </span>
         )}
 
         {/* Session Opening Countdown */}
         <span
-          className="rounded border border-grid bg-slate-900/60 px-1.5 py-0.5 text-[10px] text-cyan-300 hidden xl:inline-block"
+          className="clay-badge px-2 py-0.5 text-[10px] text-zinc-300 hidden xl:inline-block"
           title={`Time until ${sessionInfo.name} session open`}
         >
           {sessionInfo.name}: {sessionInfo.remaining}
@@ -240,8 +240,8 @@ export default function Header({
             audioHaptics.tick();
             setIsMasked((v) => !v);
           }}
-          className={`rounded border border-grid px-1.5 py-0.5 text-[10px] text-muted hover:border-accent hover:text-white transition ${
-            isMasked ? 'bg-accent/20 border-accent text-accent' : ''
+          className={`px-2 py-0.5 text-[10px] font-bold transition ${
+            isMasked ? 'clay-pill-active' : 'clay-pill'
           }`}
           title="Toggle Stealth Balance Masking"
         >
@@ -255,7 +255,7 @@ export default function Header({
           value={displayHwm}
           sub={!hideDollar && hwmDrawdown > 0 ? `-${fmtUsd(hwmDrawdown)}` : undefined}
         />
-        <Stat label="Open PnL" value={displayPnl} cls={hideDollar ? 'text-teal-300' : pnlClass(open)} />
+        <Stat label="Open PnL" value={displayPnl} cls={hideDollar ? 'text-zinc-300' : pnlClass(open)} />
 
         {/* Session PnL Sparkline Header */}
         {sparklinePoints && (
@@ -264,7 +264,7 @@ export default function Header({
             <svg width="48" height="14" className="overflow-visible">
               <polyline
                 fill="none"
-                stroke={open >= 0 ? '#22c55e' : '#ef4444'}
+                stroke={open >= 0 ? '#ffffff' : '#71717a'}
                 strokeWidth="1.5"
                 points={sparklinePoints}
               />
@@ -273,17 +273,17 @@ export default function Header({
         )}
 
         {/* Feature Toggles Cluster */}
-        <div className="flex items-center gap-1 border-l border-grid pl-2">
+        <div className="flex items-center gap-1.5 border-l border-grid pl-2">
           {/* Zen Mode Button */}
           <button
             onClick={() => {
               audioHaptics.tick();
               toggleZenMode();
             }}
-            className={`rounded px-2 py-1 font-medium transition ${
+            className={`px-2.5 py-1 text-xs font-semibold transition ${
               zenMode.active
-                ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
-                : 'text-muted hover:text-white'
+                ? 'clay-pill-active'
+                : 'clay-pill'
             }`}
             title="Toggle Zen Mode (Alt+Z)"
           >
@@ -297,24 +297,24 @@ export default function Header({
                 audioHaptics.tick();
                 setIsInstToolsOpen((v) => !v);
               }}
-              className={`flex items-center gap-1.5 rounded border px-2 py-1 font-semibold transition ${
+              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold transition ${
                 isInstToolsOpen
-                  ? 'border-accent text-accent bg-accent/10 shadow-sm'
-                  : 'border-grid text-slate-300 hover:text-white hover:bg-slate-800'
+                  ? 'clay-pill-active'
+                  : 'clay-pill'
               }`}
               title="Institutional Analytics & Derivatives Suite"
             >
-              <svg className="h-3.5 w-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
               <span>Institutional</span>
-              <svg className={`h-3 w-3 text-slate-400 transition-transform ${isInstToolsOpen ? 'rotate-180 text-accent' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className={`h-3 w-3 text-slate-400 transition-transform ${isInstToolsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
 
             {isInstToolsOpen && (
-              <div className="absolute right-0 top-full mt-1.5 z-50 w-64 rounded-lg border border-grid bg-panel/95 p-1.5 shadow-2xl backdrop-blur-md select-none font-mono text-xs">
+              <div className="absolute right-0 top-full mt-2 z-50 w-64 clay-popover p-2 shadow-2xl select-none font-mono text-xs">
                 {onOpenCalendar && (
                   <button
                     onClick={() => { audioHaptics.tick(); onOpenCalendar(); setIsInstToolsOpen(false); }}
@@ -425,7 +425,7 @@ export default function Header({
                 audioHaptics.tick();
                 onOpenSettings();
               }}
-              className="rounded px-2 py-1 text-muted hover:text-white hover:bg-grid transition font-semibold"
+              className="clay-btn px-2.5 py-1 text-xs font-semibold transition"
               title="Settings, Billing, Theme & Telegram Notifications"
             >
               Settings
@@ -439,8 +439,8 @@ export default function Header({
                 audioHaptics.tick();
                 onTogglePopout();
               }}
-              className={`rounded px-2 py-1 transition ${
-                isPopoutActive ? 'bg-accent text-white font-bold' : 'text-muted hover:text-white'
+              className={`px-2.5 py-1 text-xs font-semibold transition ${
+                isPopoutActive ? 'clay-btn-active' : 'clay-btn'
               }`}
               title="Open Compact Pop-out Window (Picture-in-Picture)"
             >
@@ -455,7 +455,7 @@ export default function Header({
                 audioHaptics.tick();
                 onOpenHotkeys();
               }}
-              className="rounded border border-grid px-2 py-0.5 font-bold text-muted hover:text-white"
+              className="clay-btn px-2 py-0.5 font-bold text-muted hover:text-white"
               title="Keyboard Shortcuts Cheatsheet (?)"
             >
               [?]
@@ -469,10 +469,10 @@ export default function Header({
                 audioHaptics.tick();
                 onOpenSettings('PROFILE');
               }}
-              className="rounded border border-accent/60 bg-accent/15 px-2 py-0.5 text-xs font-bold text-accent hover:bg-accent hover:text-black transition flex items-center gap-1.5"
+              className="clay-pill-active px-2.5 py-0.5 text-xs font-bold transition flex items-center gap-1.5"
               title="Open Trader Profile & Subscription Details"
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+              <span className="h-1.5 w-1.5 rounded-full bg-black" />
               <span>PA [PRO+]</span>
             </button>
           )}
@@ -480,7 +480,7 @@ export default function Header({
 
         {/* Stale data warning indicator */}
         {(feed === 'closed' || feed === 'reconnecting') && (
-          <span className="rounded bg-yellow-500/20 border border-yellow-500/40 px-2 py-0.5 text-[10px] font-bold text-yellow-300 animate-pulse">
+          <span className="rounded-full bg-yellow-500/20 border border-yellow-500/40 px-2 py-0.5 text-[10px] font-bold text-yellow-300 animate-pulse">
             [STALE FEED WARNING]
           </span>
         )}
@@ -489,7 +489,7 @@ export default function Header({
         {loadTelegramConfig().enabled && (
           <button
             onClick={() => onOpenSettings?.('TELEGRAM')}
-            className="rounded bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 text-[10px] font-bold text-sky-400 hover:bg-sky-500 hover:text-white transition"
+            className="clay-badge px-2 py-0.5 text-[10px] font-bold text-white hover:bg-white hover:text-black transition"
             title="Telegram Real-time Bot Alerts: Active"
           >
             [TG: ON]
@@ -498,7 +498,7 @@ export default function Header({
 
         {/* Read-Only Sandbox Mode Badge */}
         <span
-          className="rounded bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-400"
+          className="clay-badge px-2 py-0.5 text-[10px] font-bold text-white/80"
           title="Secure Read-Only Sandbox: Paper Capital"
         >
           [SANDBOX]
@@ -511,7 +511,7 @@ export default function Header({
         >
           <span className={`h-2 w-2 rounded-full ${DOT[feed]}`} />
           <span>{feedText}</span>
-          {pingMs > 0 && <span className="text-up font-bold">{pingMs}ms</span>}
+          {pingMs > 0 && <span className="text-white font-bold">{pingMs}ms</span>}
         </span>
       </div>
     </header>
@@ -520,12 +520,13 @@ export default function Header({
 
 function Stat({ label, value, sub, cls = 'text-white' }: { label: string; value: string; sub?: string; cls?: string }) {
   return (
-    <div className="hidden flex-col leading-tight sm:flex font-mono">
+    <div className="hidden flex-col leading-tight sm:flex font-mono px-2 py-0.5 rounded-xl border border-white/5 bg-[#14141a]/60 shadow-clay-btn">
       <div className="flex items-center gap-1">
         <span className="text-[10px] text-muted">{label}</span>
-        {sub && <span className="text-[9px] text-down font-medium">{sub}</span>}
+        {sub && <span className="text-[9px] text-white/50 font-medium">{sub}</span>}
       </div>
-      <span className={`text-xs font-semibold ${cls}`}>{value}</span>
+      <span className={`text-xs font-bold ${cls}`}>{value}</span>
     </div>
   );
 }
+

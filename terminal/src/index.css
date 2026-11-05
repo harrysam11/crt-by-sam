@@ -3,26 +3,221 @@
 @tailwind utilities;
 
 :root {
-  --color-bg: #0b0e14;
-  --color-panel: #10141c;
-  --color-grid: #1e222d;
-  --color-text: #d1d4dc;
-  --color-muted: #6b7384;
+  --color-bg: #050508;
+  --color-panel: #101015;
+  --color-grid: #1e1e26;
+  --color-text: #f4f4f6;
+  --color-muted: #828290;
+  --color-accent: #ffffff;
+  --color-up: #ffffff;
+  --color-down: #52525c;
 }
 
 html.theme-light, body.theme-light, #root.theme-light {
-  --color-bg: #f8fafc;
+  --color-bg: #f4f4f6;
   --color-panel: #ffffff;
-  --color-grid: #e2e8f0;
-  --color-text: #1e293b;
-  --color-muted: #64748b;
-  background: #f8fafc !important;
-  color: #1e293b !important;
+  --color-grid: #e4e4e7;
+  --color-text: #09090b;
+  --color-muted: #71717a;
+  --color-accent: #09090b;
+  --color-up: #09090b;
+  --color-down: #a1a1aa;
+  background: #f4f4f6 !important;
+  color: #09090b !important;
 }
 
-html, body, #root { height: 100%; margin: 0; background: var(--color-bg); }
-body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: var(--color-text); }
-.num { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: var(--color-grid); border-radius: 4px; }
-input:focus-visible, button:focus-visible { outline: 1px solid #4c8dff; outline-offset: 1px; }
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  overflow: hidden;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 12px;
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.num {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Claymorphism Black & White Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #08080b;
+}
+::-webkit-scrollbar-thumb {
+  background: #22222b;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.1);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #33333f;
+}
+
+/* Claymorphic Focus State */
+input:focus-visible, button:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 1px;
+}
+
+/* =========================================================================
+   CLAYMORPHISM BLACK & WHITE DESIGN SYSTEM
+   ========================================================================= */
+
+/* 1. Tactile 3D Clay Card */
+.clay-card {
+  background: #111116;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  box-shadow:
+    6px 6px 14px #020204,
+    -3px -3px 8px rgba(255, 255, 255, 0.03),
+    inset 1px 1px 1.5px rgba(255, 255, 255, 0.12),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.65);
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 2. Tactile 3D Clay Pill Button */
+.clay-pill {
+  background: #15151c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  box-shadow:
+    4px 4px 10px #020204,
+    -2px -2px 6px rgba(255, 255, 255, 0.03),
+    inset 1px 1px 1px rgba(255, 255, 255, 0.12),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.55);
+  color: #d4d4d8;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.clay-pill:hover {
+  background: #1c1c24;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow:
+    5px 5px 12px #020204,
+    -3px -3px 8px rgba(255, 255, 255, 0.05),
+    inset 1px 1px 1.5px rgba(255, 255, 255, 0.18),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.clay-pill:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow:
+    inset 2px 2px 5px rgba(0, 0, 0, 0.8),
+    inset -1px -1px 2px rgba(255, 255, 255, 0.06);
+}
+
+/* 3. Inverted High-Contrast Clay Active Pill */
+.clay-pill-active {
+  background: #ffffff !important;
+  color: #000000 !important;
+  font-weight: 700 !important;
+  border: 1px solid #ffffff !important;
+  border-radius: 9999px !important;
+  box-shadow:
+    0 0 16px rgba(255, 255, 255, 0.35),
+    4px 4px 10px #020204,
+    inset 1px 1px 2px rgba(255, 255, 255, 0.8),
+    inset -2px -2px 3px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* 4. Rounded Clay Button (for compact toolbars and icons) */
+.clay-btn {
+  background: #14141a;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  box-shadow:
+    3px 3px 8px #020204,
+    -2px -2px 5px rgba(255, 255, 255, 0.03),
+    inset 1px 1px 1px rgba(255, 255, 255, 0.1),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.5);
+  color: #d4d4d8;
+  transition: all 0.14s ease;
+}
+
+.clay-btn:hover {
+  background: #1b1b22;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    4px 4px 10px #020204,
+    -2px -2px 6px rgba(255, 255, 255, 0.05),
+    inset 1px 1px 1px rgba(255, 255, 255, 0.16);
+}
+
+.clay-btn:active {
+  transform: translateY(1px) scale(0.97);
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.8),
+    inset -1px -1px 1.5px rgba(255, 255, 255, 0.06);
+}
+
+.clay-btn-active {
+  background: #ffffff !important;
+  color: #000000 !important;
+  font-weight: 700 !important;
+  border: 1px solid #ffffff !important;
+  box-shadow:
+    0 0 14px rgba(255, 255, 255, 0.3),
+    3px 3px 8px #020204,
+    inset 1px 1px 2px rgba(255, 255, 255, 0.8),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* 5. Recessed Inset Clay Surface (Search bars, inputs, chart container) */
+.clay-inset {
+  background: #09090d;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  box-shadow:
+    inset 3px 3px 8px #020203,
+    inset -2px -2px 6px rgba(255, 255, 255, 0.03);
+}
+
+/* 6. Clay Floating Dropdown Popover */
+.clay-popover {
+  background: #0f0f14;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow:
+    10px 10px 30px #000000,
+    -4px -4px 14px rgba(255, 255, 255, 0.03),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.12),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(12px);
+}
+
+/* 7. Fullscreen Clay Modal Dialog */
+.clay-modal {
+  background: #0e0e13;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  box-shadow:
+    16px 16px 48px #000000,
+    -8px -8px 24px rgba(255, 255, 255, 0.03),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.15),
+    inset -3px -3px 6px rgba(0, 0, 0, 0.7);
+}
+
+/* 8. Small Clay Pill Tag / Badge */
+.clay-badge {
+  background: #171720;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 9999px;
+  box-shadow:
+    2px 2px 5px #020204,
+    inset 1px 1px 1px rgba(255, 255, 255, 0.12);
+}

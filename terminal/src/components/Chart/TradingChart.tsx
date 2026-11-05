@@ -40,7 +40,7 @@ const SMA_N = 20, EMA_N = 50, EMA_K = 2 / (EMA_N + 1);
 const FAVORITE_TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
 const bar = (c: Candle) => ({ time: c.time as UTCTimestamp, open: c.open, high: c.high, low: c.low, close: c.close });
-const vol = (c: Candle) => ({ time: c.time as UTCTimestamp, value: c.volume, color: c.close >= c.open ? 'rgba(8,153,129,.35)' : 'rgba(242,54,69,.35)' });
+const vol = (c: Candle) => ({ time: c.time as UTCTimestamp, value: c.volume, color: c.close >= c.open ? 'rgba(255,255,255,.45)' : 'rgba(113,113,122,.35)' });
 const pts = (cs: Candle[], v: (number | null)[]) =>
   cs.flatMap((c, i) => (v[i] == null ? [] : [{ time: c.time as UTCTimestamp, value: v[i] as number }]));
 
@@ -427,44 +427,44 @@ export default function TradingChart({
   useEffect(() => {
     const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
     const isZen = zenMode.active && zenMode.softPastelCandles;
-    const upColor = isZen ? '#4a7c59' : '#089981';
-    const downColor = isZen ? '#8b5d5d' : '#f23645';
+    const upColor = '#ffffff';
+    const downColor = '#101015';
 
     const chart = createChart(box.current!, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: isCustomBg ? 'transparent' : '#0b0e14' },
-        textColor: '#8b93a7',
+        background: { type: ColorType.Solid, color: isCustomBg ? 'transparent' : '#050508' },
+        textColor: '#828290',
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
-        horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
+        vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
+        horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          color: 'rgba(255, 255, 255, 0.25)',
+          color: 'rgba(255, 255, 255, 0.35)',
           width: 1,
           style: LineStyle.Dashed,
-          labelBackgroundColor: '#1e222d',
+          labelBackgroundColor: '#181820',
         },
         horzLine: {
-          color: 'rgba(255, 255, 255, 0.25)',
+          color: 'rgba(255, 255, 255, 0.35)',
           width: 1,
           style: LineStyle.Dashed,
-          labelBackgroundColor: '#1e222d',
+          labelBackgroundColor: '#181820',
         },
       },
       rightPriceScale: {
-        borderColor: '#1e222d',
+        borderColor: '#1e1e26',
         scaleMargins: { top: 0.08, bottom: 0.12 },
         autoScale: true,
         alignLabels: true,
         borderVisible: true,
       },
       timeScale: {
-        borderColor: '#1e222d',
+        borderColor: '#1e1e26',
         timeVisible: true,
         secondsVisible: false,
         tickMarkFormatter: tickLabel,
@@ -495,14 +495,14 @@ export default function TradingChart({
     });
 
     const cs = chart.addCandlestickSeries({
-      upColor,
-      downColor,
+      upColor: '#ffffff',
+      downColor: '#101015',
       borderVisible: true,
-      borderUpColor: upColor,
-      borderDownColor: downColor,
+      borderUpColor: '#ffffff',
+      borderDownColor: '#71717a',
       wickVisible: true,
-      wickUpColor: upColor,
-      wickDownColor: downColor,
+      wickUpColor: '#ffffff',
+      wickDownColor: '#71717a',
     });
     cs.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.12 } });
 
@@ -875,16 +875,16 @@ export default function TradingChart({
       <ChartSkinsLayer />
 
       {/* Institutional TradingView-Style Chart Top Toolbar */}
-      <div className="relative z-20 flex items-center justify-between border-b border-grid bg-panel/85 px-2 py-1 backdrop-blur-md select-none text-xs">
+      <div className="relative z-20 flex items-center justify-between border-b border-grid bg-panel px-2.5 py-1.5 select-none text-xs shadow-clay-card">
         {/* Left Section: Symbol, Timeframes, Candle Style, Indicators, Replay, Alert, Undo/Redo, Layers */}
-        <div className="flex items-center gap-1.5 overflow-x-auto min-w-0">
+        <div className="flex items-center gap-2 overflow-x-auto min-w-0">
           {/* Symbol Search Trigger */}
           <button
             onClick={() => {
               audioHaptics.tick();
               setIsSymbolSearchOpen(true);
             }}
-            className="flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-bold text-white hover:bg-slate-800 hover:text-accent border border-grid/60 bg-slate-900/60 transition cursor-pointer shrink-0"
+            className="flex items-center gap-1.5 clay-pill px-3 py-1 text-xs font-bold text-white transition cursor-pointer shrink-0"
             title="Search symbols (/ or Ctrl+K)"
           >
             <span>{labelOf(symbol)}</span>
@@ -897,14 +897,14 @@ export default function TradingChart({
 
           {/* Timeframe Favorites & Dropdown */}
           <div className="relative flex items-center shrink-0" ref={tfMenuRef}>
-            <div className="flex items-center gap-0.5">
+            <div className="flex items-center gap-1">
               {favoriteTimeframes.map((t) => (
                 <button
                   key={t}
-                  className={`rounded px-2 py-1 text-xs transition ${
+                  className={`px-2.5 py-0.5 text-xs transition ${
                     t === timeframe
-                      ? 'bg-accent/20 border border-accent/60 text-accent font-bold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                      ? 'clay-pill-active'
+                      : 'clay-pill'
                   }`}
                   onClick={() => {
                     audioHaptics.tick();
@@ -916,7 +916,7 @@ export default function TradingChart({
               ))}
               {!favoriteTimeframes.includes(timeframe) && (
                 <button
-                  className="rounded px-2 py-1 text-xs bg-accent/20 border border-accent/60 text-accent font-bold"
+                  className="px-2.5 py-0.5 text-xs clay-pill-active"
                 >
                   {timeframe}
                 </button>
@@ -929,7 +929,7 @@ export default function TradingChart({
                 audioHaptics.tick();
                 setIsTfMenuOpen((v) => !v);
               }}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition ml-0.5"
+              className="p-1 rounded-full clay-btn transition ml-1"
               title="All Timeframes"
             >
               <svg className={`h-3 w-3 transition-transform ${isTfMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -939,8 +939,8 @@ export default function TradingChart({
 
             {/* Timeframe Dropdown Menu */}
             {isTfMenuOpen && (
-              <div className="absolute left-0 top-full mt-1.5 z-50 w-44 rounded-lg border border-grid bg-panel/95 p-1.5 shadow-2xl backdrop-blur-md font-mono text-xs">
-                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <div className="absolute left-0 top-full mt-2 z-50 w-44 clay-popover p-2 shadow-2xl font-mono text-xs">
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1">
                   Select Timeframe
                 </div>
                 {TIMEFRAMES[provider].map((t) => (
@@ -951,15 +951,15 @@ export default function TradingChart({
                       setTimeframe(t);
                       setIsTfMenuOpen(false);
                     }}
-                    className={`flex w-full items-center justify-between px-2.5 py-1.5 rounded transition ${
+                    className={`flex w-full items-center justify-between px-2.5 py-1.5 rounded-lg transition ${
                       t === timeframe
-                        ? 'bg-accent/20 text-accent font-bold'
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                        ? 'clay-btn-active font-bold'
+                        : 'text-slate-300 hover:bg-white/10 hover:text-white'
                     }`}
                   >
                     <span>{t}</span>
                     {t === timeframe && (
-                      <svg className="h-3.5 w-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-3.5 w-3.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
@@ -978,11 +978,11 @@ export default function TradingChart({
                 audioHaptics.tick();
                 setIsStyleMenuOpen((v) => !v);
               }}
-              className="flex items-center gap-1.5 rounded border border-grid/60 bg-slate-900/60 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:border-accent hover:text-white transition"
+              className="flex items-center gap-1.5 clay-pill px-3 py-1 text-xs font-semibold text-white transition"
               title="Chart Style (Candles, Heikin-Ashi, Footprint)"
             >
               {chartStyle === 'CANDLE' && (
-                <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <svg className="h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <line x1="9" y1="2" x2="9" y2="6" strokeLinecap="round" />
                   <rect x="6" y="6" width="6" height="10" rx="1" fill="currentColor" fillOpacity={0.2} />
                   <line x1="9" y1="16" x2="9" y2="22" strokeLinecap="round" />
@@ -992,7 +992,7 @@ export default function TradingChart({
                 </svg>
               )}
               {chartStyle === 'HEIKIN_ASHI' && (
-                <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <svg className="h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <line x1="8" y1="3" x2="8" y2="21" strokeLinecap="round" />
                   <rect x="5" y="7" width="6" height="10" rx="1" fill="currentColor" fillOpacity={0.2} />
                   <line x1="16" y1="5" x2="16" y2="19" strokeLinecap="round" />
@@ -1000,7 +1000,7 @@ export default function TradingChart({
                 </svg>
               )}
               {chartStyle === 'FOOTPRINT' && (
-                <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <svg className="h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <rect x="4" y="4" width="7" height="4" rx="0.5" fill="currentColor" fillOpacity={0.4} />
                   <rect x="13" y="4" width="7" height="4" rx="0.5" fill="currentColor" fillOpacity={0.7} />
                   <rect x="4" y="10" width="9" height="4" rx="0.5" fill="currentColor" fillOpacity={0.8} />
@@ -1017,7 +1017,7 @@ export default function TradingChart({
 
             {/* Candle Style Menu */}
             {isStyleMenuOpen && (
-              <div className="absolute left-0 top-full mt-1.5 z-50 w-56 rounded-lg border border-grid bg-panel/95 p-1.5 shadow-2xl backdrop-blur-md font-mono text-xs">
+              <div className="absolute left-0 top-full mt-2 z-50 w-56 clay-popover p-2 shadow-2xl font-mono text-xs">
                 {[
                   { id: 'CANDLE', label: 'Candlestick', desc: 'Standard OHLC price bars' },
                   { id: 'HEIKIN_ASHI', label: 'Heikin-Ashi', desc: 'Smoothed trend calculation' },
@@ -1030,10 +1030,10 @@ export default function TradingChart({
                       setChartStyle(s.id as any);
                       setIsStyleMenuOpen(false);
                     }}
-                    className={`flex w-full items-start justify-between px-2.5 py-2 rounded text-left transition ${
+                    className={`flex w-full items-start justify-between px-2.5 py-2 rounded-lg text-left transition ${
                       chartStyle === s.id
-                        ? 'bg-accent/20 text-accent font-bold'
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                        ? 'clay-btn-active font-bold'
+                        : 'text-slate-300 hover:bg-white/10 hover:text-white'
                     }`}
                   >
                     <div>
@@ -1041,7 +1041,7 @@ export default function TradingChart({
                       <div className="text-[10px] text-slate-400 font-normal">{s.desc}</div>
                     </div>
                     {chartStyle === s.id && (
-                      <svg className="h-3.5 w-3.5 text-accent shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-3.5 w-3.5 text-black shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
@@ -1059,13 +1059,13 @@ export default function TradingChart({
               audioHaptics.tick();
               setIsIndicatorsModalOpen(true);
             }}
-            className="flex items-center gap-1.5 rounded border border-grid/60 bg-slate-900/60 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:border-accent hover:text-white transition shrink-0"
+            className="flex items-center gap-1.5 clay-pill px-3 py-1 text-xs font-semibold text-white transition shrink-0"
             title="Indicators, Metrics & Strategies (fx)"
           >
-            <span className="font-bold text-accent">fx</span>
+            <span className="font-bold text-white">fx</span>
             <span>Indicators</span>
             {activeIndicatorsList.length > 0 && (
-              <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-accent/20 text-accent text-[10px] font-bold">
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-white text-black text-[10px] font-bold">
                 {activeIndicatorsList.length}
               </span>
             )}
@@ -1078,14 +1078,14 @@ export default function TradingChart({
               if (isReplayActive) exitReplay();
               else startReplay();
             }}
-            className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-semibold transition shrink-0 ${
+            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold transition shrink-0 ${
               isReplayActive
-                ? 'bg-amber-400 text-black font-bold ring-1 ring-amber-400 shadow-sm'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                ? 'clay-pill-active'
+                : 'clay-pill'
             }`}
             title="Bar Replay Historical Time Machine (Space: Play/Pause, Shift+Right: Step)"
           >
-            <svg className="h-3.5 w-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
             </svg>
             <span>Replay</span>
@@ -1097,23 +1097,23 @@ export default function TradingChart({
               audioHaptics.tick();
               addAlert(symbol, currentPrice, 'PRICE');
             }}
-            className="flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition shrink-0"
+            className="flex items-center gap-1.5 clay-pill px-3 py-1 text-xs font-semibold text-white transition shrink-0"
             title="Create Alert at Current Price (Alt+A)"
           >
-            <svg className="h-3.5 w-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
             <span>Alert</span>
           </button>
 
           {/* Undo / Redo Controls */}
-          <div className="flex items-center gap-0.5 border-l border-grid pl-1 shrink-0">
+          <div className="flex items-center gap-1 border-l border-grid pl-1.5 shrink-0">
             <button
               onClick={() => {
                 audioHaptics.tick();
                 (window as any).__undoDrawing?.();
               }}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              className="p-1 rounded-full clay-btn transition"
               title="Undo Drawing (Ctrl+Z)"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1125,7 +1125,7 @@ export default function TradingChart({
                 audioHaptics.tick();
                 (window as any).__redoDrawing?.();
               }}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              className="p-1 rounded-full clay-btn transition"
               title="Redo Drawing (Ctrl+Y)"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1143,10 +1143,10 @@ export default function TradingChart({
                 audioHaptics.tick();
                 setIsLayersMenuOpen((v) => !v);
               }}
-              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-semibold border transition ${
+              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold transition ${
                 activeLayersCount > 0
-                  ? 'border-accent/60 bg-accent/15 text-accent'
-                  : 'border-grid/60 bg-slate-900/60 text-slate-300 hover:text-white hover:border-grid'
+                  ? 'clay-pill-active'
+                  : 'clay-pill'
               }`}
               title="Chart Overlays & Layers"
             >
@@ -1155,7 +1155,7 @@ export default function TradingChart({
               </svg>
               <span>Layers</span>
               {activeLayersCount > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-accent text-black text-[10px] font-bold">
+                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-black text-white text-[10px] font-bold">
                   {activeLayersCount}
                 </span>
               )}
@@ -1166,8 +1166,8 @@ export default function TradingChart({
 
             {/* Layers Dropdown Menu */}
             {isLayersMenuOpen && (
-              <div className="absolute left-0 top-full mt-1.5 z-50 w-72 rounded-lg border border-grid bg-panel/95 p-2 shadow-2xl backdrop-blur-md font-mono text-xs select-none">
-                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1">
+              <div className="absolute left-0 top-full mt-2 z-50 w-72 clay-popover p-2.5 shadow-2xl font-mono text-xs select-none">
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1.5">
                   Chart Overlays & Tools
                 </div>
 
@@ -1232,16 +1232,16 @@ export default function TradingChart({
                         audioHaptics.tick();
                         layer.onToggle();
                       }}
-                      className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-slate-800 text-left transition w-full"
+                      className="flex items-center justify-between px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-left transition w-full"
                     >
                       <div className="flex flex-col pr-2">
-                        <span className={`font-semibold ${layer.active ? 'text-white' : 'text-slate-300'}`}>
+                        <span className={`font-semibold ${layer.active ? 'text-white' : 'text-slate-400'}`}>
                           {layer.label}
                         </span>
-                        <span className="text-[10px] text-slate-400">{layer.desc}</span>
+                        <span className="text-[10px] text-slate-500">{layer.desc}</span>
                       </div>
-                      <div className={`w-8 h-4.5 rounded-full p-0.5 transition shrink-0 ${layer.active ? 'bg-accent' : 'bg-slate-700'}`}>
-                        <div className={`w-3.5 h-3.5 rounded-full bg-white transition transform ${layer.active ? 'translate-x-3.5' : 'translate-x-0'}`} />
+                      <div className={`w-8 h-4.5 rounded-full p-0.5 transition shrink-0 ${layer.active ? 'bg-white' : 'bg-zinc-800'}`}>
+                        <div className={`w-3.5 h-3.5 rounded-full transition transform ${layer.active ? 'translate-x-3.5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
                       </div>
                     </button>
                   ))}
@@ -1253,13 +1253,13 @@ export default function TradingChart({
                         setShowSkinsModal(true);
                         setIsLayersMenuOpen(false);
                       }}
-                      className="flex w-full items-center justify-between px-2 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                      className="flex w-full items-center justify-between px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white transition"
                     >
                       <div className="flex flex-col">
-                        <span className="font-semibold">Chart Wallpaper & Skins</span>
-                        <span className="text-[10px] text-slate-400">Solid, gradient, anime or video backgrounds</span>
+                        <span className="font-semibold text-white">Chart Wallpaper & Skins</span>
+                        <span className="text-[10px] text-slate-500">Solid, gradient, anime or video backgrounds</span>
                       </div>
-                      <span className="text-accent text-[11px] font-bold">Edit</span>
+                      <span className="text-white text-[11px] font-bold">Edit</span>
                     </button>
                   </div>
                 </div>
@@ -1269,14 +1269,14 @@ export default function TradingChart({
         </div>
 
         {/* Right Section: Snapshot, Settings, Fullscreen */}
-        <div className="flex items-center gap-1 shrink-0 ml-2">
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
           {/* Share Chart Snapshot Modal Trigger */}
           <button
             onClick={() => {
               audioHaptics.tick();
               setIsShareModalOpen(true);
             }}
-            className="flex items-center gap-1 rounded border border-accent/60 bg-accent/15 px-2 py-1 text-xs font-semibold text-accent hover:bg-accent hover:text-black transition"
+            className="flex items-center gap-1.5 clay-pill-active px-3 py-1 text-xs font-semibold transition"
             title="Export Watermarked Snapshot or Copy Chart Link"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1292,7 +1292,7 @@ export default function TradingChart({
               audioHaptics.tick();
               setIsChartSettingsOpen(true);
             }}
-            className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1.5 rounded-full clay-btn transition"
             title="Chart Settings (Alt+S)"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1311,7 +1311,7 @@ export default function TradingChart({
                 document.exitFullscreen?.();
               }
             }}
-            className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1.5 rounded-full clay-btn transition"
             title="Toggle Fullscreen"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1320,6 +1320,7 @@ export default function TradingChart({
           </button>
         </div>
       </div>
+
 
       {/* Chart Center Area: Docked Left Rail + Canvas */}
       <div className="relative flex flex-1 min-h-0 w-full overflow-hidden">
@@ -1518,14 +1519,14 @@ export default function TradingChart({
       </div>
 
       {/* TradingView Bottom Range & Scale Bar */}
-      <div className="h-7 shrink-0 border-t border-grid bg-panel/90 px-3 flex items-center justify-between text-[11px] text-slate-400 select-none font-mono">
+      <div className="h-8 shrink-0 border-t border-grid bg-panel px-3 flex items-center justify-between text-[11px] text-slate-300 select-none font-mono shadow-clay-card">
         {/* Left: Time Range Presets */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {(['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', 'ALL'] as const).map((r) => (
             <button
               key={r}
               onClick={() => handleSelectTimeRange(r)}
-              className="px-1.5 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition text-[10px] font-semibold"
+              className="px-2 py-0.5 rounded-full clay-btn text-[10px] font-semibold transition"
             >
               {r}
             </button>
@@ -1534,13 +1535,13 @@ export default function TradingChart({
 
         {/* Right: Scale & Timezone */}
         <div className="flex items-center gap-2 text-[10px]">
-          <span className="font-mono text-slate-400">UTC</span>
+          <span className="font-mono text-slate-400 font-medium">UTC</span>
           <button
             onClick={() => {
               audioHaptics.tick();
               api.current?.candles.priceScale().applyOptions({ autoScale: true });
             }}
-            className="px-1.5 py-0.5 rounded text-accent hover:bg-accent/15 font-bold transition"
+            className="px-2 py-0.5 rounded-full clay-pill-active text-[10px] font-bold transition"
             title="Auto scale (or double-click price scale)"
           >
             auto
@@ -1554,8 +1555,8 @@ export default function TradingChart({
                 mode: next ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
               });
             }}
-            className={`px-1.5 py-0.5 rounded font-bold transition ${
-              isLogScale ? 'bg-accent text-black' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition ${
+              isLogScale ? 'clay-pill-active' : 'clay-pill'
             }`}
             title="Logarithmic scale"
           >

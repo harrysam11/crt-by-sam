@@ -66,12 +66,12 @@ export default function BarReplayController({
   return (
     <div
       ref={containerRef}
-      className="absolute top-2 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 rounded-xl border border-accent/40 bg-panel/95 px-3 py-1.5 shadow-2xl backdrop-blur-md font-mono text-xs select-none ring-1 ring-accent/20"
+      className="clay-popover absolute top-2 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3 py-1.5 font-mono text-xs select-none"
     >
       {/* Replay Mode Badge */}
-      <div className="flex items-center gap-1.5 pr-2 border-r border-grid">
-        <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />
-        <span className="font-bold text-accent tracking-wider text-[11px]">REPLAY</span>
+      <div className="flex items-center gap-1.5 pr-2 border-r border-grid/50">
+        <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
+        <span className="clay-badge font-bold text-[10px] tracking-wider text-white">REPLAY</span>
       </div>
 
       {/* Jump to Bar (Cut Tool) */}
@@ -80,10 +80,10 @@ export default function BarReplayController({
           audioHaptics.tick();
           onSelectCutPoint();
         }}
-        className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition ${
+        className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] transition ${
           isSelectingCutPoint
-            ? 'bg-amber-500/20 text-amber-300 font-bold ring-1 ring-amber-500/40'
-            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+            ? 'clay-pill-active font-bold'
+            : 'clay-pill text-muted hover:text-white'
         }`}
         title="Jump to Bar (Click any candle on chart to start replay from that point)"
       >
@@ -99,7 +99,7 @@ export default function BarReplayController({
           audioHaptics.tick();
           onTogglePlay();
         }}
-        className="flex items-center gap-1 px-2.5 py-1 rounded bg-accent text-black font-bold hover:opacity-90 transition text-[11px]"
+        className="flex items-center gap-1 px-3 py-1 clay-pill-active font-bold transition text-[11px]"
         title="Play / Pause Replay (Space)"
       >
         {isPlaying ? (
@@ -125,7 +125,7 @@ export default function BarReplayController({
           audioHaptics.tick();
           onStepForward();
         }}
-        className="flex items-center gap-1 px-2 py-1 rounded border border-grid text-slate-300 hover:bg-slate-800 hover:text-white transition text-[11px]"
+        className="flex items-center gap-1 px-2.5 py-1 clay-btn text-muted hover:text-white transition text-[11px]"
         title="Step Forward 1 Candle (Shift + Right Arrow)"
       >
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -135,7 +135,7 @@ export default function BarReplayController({
       </button>
 
       {/* Playback Speed Selector */}
-      <div className="flex items-center gap-1 pl-1 pr-2 border-r border-grid">
+      <div className="flex items-center gap-1 pl-1 pr-2 border-r border-grid/50">
         {[
           { label: '0.2s', val: 200 },
           { label: '0.5s', val: 500 },
@@ -148,10 +148,10 @@ export default function BarReplayController({
               audioHaptics.tick();
               onSpeedChange(s.val);
             }}
-            className={`px-1.5 py-0.5 rounded text-[10px] transition ${
+            className={`px-2 py-0.5 text-[10px] transition ${
               speedMs === s.val
-                ? 'bg-accent/20 text-accent font-bold'
-                : 'text-slate-400 hover:text-white'
+                ? 'clay-pill-active font-bold'
+                : 'clay-pill text-muted hover:text-white'
             }`}
           >
             {s.label}
@@ -160,10 +160,10 @@ export default function BarReplayController({
       </div>
 
       {/* Progress & Time Info */}
-      <div className="text-[10px] text-slate-400 px-1 min-w-[110px]">
+      <div className="text-[10px] text-muted px-1 min-w-[110px]">
         <div>Bar {currentReplayIndex + 1} / {totalCandles}</div>
         {currentTimeString && (
-          <div className="text-slate-500 truncate max-w-[120px]">{currentTimeString}</div>
+          <div className="text-zinc-500 truncate max-w-[120px]">{currentTimeString}</div>
         )}
       </div>
 
@@ -173,7 +173,7 @@ export default function BarReplayController({
           audioHaptics.tick();
           onExit();
         }}
-        className="rounded p-1 text-slate-400 hover:text-white hover:bg-slate-800 transition"
+        className="clay-btn h-7 w-7 text-muted hover:text-white transition"
         title="Exit Replay Mode (Esc)"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

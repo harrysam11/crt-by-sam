@@ -27,8 +27,8 @@ export interface ChartSettingsState {
 }
 
 export const DEFAULT_CHART_SETTINGS: ChartSettingsState = {
-  candleUpColor: '#26a69a',
-  candleDownColor: '#ef5350',
+  candleUpColor: '#ffffff',
+  candleDownColor: '#101015',
   showLastPriceLine: true,
   showHighLowLines: false,
   showOhlcValues: true,
@@ -65,22 +65,23 @@ export default function ChartSettingsModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 font-mono select-none">
-      <div className="flex h-[520px] w-full max-w-2xl flex-col rounded-2xl border border-grid bg-panel shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 font-mono select-none">
+      <div className="clay-modal flex h-[520px] w-full max-w-2xl flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-grid px-5 py-3.5 bg-panel/90">
+        <div className="flex items-center justify-between border-b border-grid/50 px-5 py-3.5 bg-panel/90">
           <div className="flex items-center gap-2">
-            <svg className="h-4 w-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <h2 className="text-sm font-semibold text-white">Chart Settings</h2>
+            <h2 className="text-sm font-bold text-white tracking-wide">Chart Settings</h2>
           </div>
           <button
             onClick={onClose}
-            className="rounded p-1 text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="clay-btn h-7 w-7 text-muted hover:text-white"
+            title="Close (Esc)"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -89,7 +90,7 @@ export default function ChartSettingsModal({
         {/* Tab Selector & Body */}
         <div className="flex flex-1 overflow-hidden">
           {/* Tabs */}
-          <div className="w-44 border-r border-grid bg-panel/40 p-2 space-y-1 text-xs">
+          <div className="w-44 border-r border-grid/50 bg-[#09090d]/60 p-2 space-y-1.5 text-xs">
             {[
               { id: 'SYMBOL', label: 'Symbol' },
               { id: 'STATUS_LINE', label: 'Status line' },
@@ -103,10 +104,10 @@ export default function ChartSettingsModal({
                   audioHaptics.tick();
                   setActiveTab(t.id as any);
                 }}
-                className={`w-full px-3 py-2 rounded-lg text-left transition ${
+                className={`w-full px-3 py-2 text-left transition ${
                   activeTab === t.id
-                    ? 'bg-accent/15 text-accent font-semibold'
-                    : 'text-slate-400 hover:bg-slate-800/60 hover:text-white'
+                    ? 'clay-pill-active font-bold'
+                    : 'clay-pill text-muted hover:text-white'
                 }`}
               >
                 {t.label}
@@ -300,21 +301,21 @@ export default function ChartSettingsModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-grid px-5 py-3 bg-panel/90 text-xs">
+        <div className="flex items-center justify-between border-t border-grid/50 px-5 py-3 bg-panel/90 text-xs">
           <button
             onClick={() => {
               audioHaptics.tick();
               onResetDefaults();
             }}
-            className="text-slate-400 hover:text-white transition underline"
+            className="text-muted hover:text-white transition underline"
           >
             Reset Defaults
           </button>
           <button
             onClick={onClose}
-            className="rounded-lg bg-accent px-4 py-1.5 font-bold text-black hover:opacity-90 transition"
+            className="clay-pill-active px-5 py-1.5 font-bold"
           >
-            Ok
+            Done
           </button>
         </div>
       </div>

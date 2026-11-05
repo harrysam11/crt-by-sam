@@ -4,13 +4,25 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: 'var(--color-bg, #0b0e14)',
-        panel: 'var(--color-panel, #10141c)',
-        grid: 'var(--color-grid, #1e222d)',
-        up: '#26a69a',
-        down: '#ef5350',
-        accent: '#4c8dff',
-        muted: 'var(--color-muted, #6b7384)',
+        bg: 'var(--color-bg, #050508)',
+        panel: 'var(--color-panel, #101015)',
+        grid: 'var(--color-grid, #1e1e26)',
+        up: 'var(--color-up, #ffffff)',
+        down: 'var(--color-down, #52525c)',
+        accent: 'var(--color-accent, #ffffff)',
+        muted: 'var(--color-muted, #828290)',
+      },
+      boxShadow: {
+        'clay-card': '6px 6px 14px #020204, -3px -3px 8px rgba(255, 255, 255, 0.03), inset 1px 1px 1.5px rgba(255, 255, 255, 0.12), inset -2px -2px 4px rgba(0, 0, 0, 0.65)',
+        'clay-pill': '4px 4px 10px #020204, -2px -2px 6px rgba(255, 255, 255, 0.03), inset 1px 1px 1px rgba(255, 255, 255, 0.12), inset -1px -1px 2px rgba(0, 0, 0, 0.55)',
+        'clay-pill-active': '0 0 16px rgba(255, 255, 255, 0.35), 4px 4px 10px #020204, inset 1px 1px 2px rgba(255, 255, 255, 0.8), inset -2px -2px 3px rgba(0, 0, 0, 0.25)',
+        'clay-btn': '3px 3px 8px #020204, -2px -2px 5px rgba(255, 255, 255, 0.03), inset 1px 1px 1px rgba(255, 255, 255, 0.1), inset -1px -1px 2px rgba(0, 0, 0, 0.5)',
+        'clay-inset': 'inset 3px 3px 8px #020203, inset -2px -2px 6px rgba(255, 255, 255, 0.03)',
+      },
+      borderRadius: {
+        'clay': '16px',
+        'clay-lg': '22px',
+        'clay-pill': '9999px',
       },
     },
   },

@@ -139,8 +139,8 @@ export default function FootprintDOM() {
   return (
     <div className="flex h-full w-full flex-col bg-panel font-mono text-xs select-none shadow-2xl">
       {/* Top Header / View Toggle */}
-      <div className="flex items-center justify-between border-b border-grid px-3 py-2 bg-bg/60">
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between border-b border-grid/50 px-3 py-2 bg-[#09090d]/60">
+        <div className="flex items-center gap-1.5">
           {(['DOM', 'FOOTPRINT', 'HEATMAP'] as const).map((t) => (
             <button
               key={t}
@@ -148,8 +148,8 @@ export default function FootprintDOM() {
                 audioHaptics.tick();
                 setActiveTab(t);
               }}
-              className={`rounded px-2.5 py-1 text-[11px] font-bold transition ${
-                activeTab === t ? 'bg-accent text-black font-extrabold shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              className={`px-3 py-1 text-[11px] font-bold transition ${
+                activeTab === t ? 'clay-pill-active font-extrabold' : 'clay-pill text-muted hover:text-white'
               }`}
             >
               {t === 'DOM' ? 'DOM Ladder' : t === 'FOOTPRINT' ? 'Footprint' : 'Heatmap'}
@@ -163,7 +163,7 @@ export default function FootprintDOM() {
             if (isDomVisible) toggleDom();
             if (isFootprintVisible) toggleFootprint();
           }}
-          className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800"
+          className="clay-btn h-7 w-7 text-muted hover:text-white"
           aria-label="Close"
           title="Close Sidebar"
         >
@@ -174,16 +174,16 @@ export default function FootprintDOM() {
       </div>
 
       {/* Quick Order Qty Strip */}
-      <div className="flex items-center justify-between border-b border-grid px-3 py-1.5 bg-panel/80 text-[11px]">
+      <div className="flex items-center justify-between border-b border-grid/50 px-3 py-1.5 bg-[#09090d]/40 text-[11px]">
         <div className="flex items-center gap-1.5">
-          <span className="text-slate-400 text-[10px]">Qty:</span>
+          <span className="text-muted text-[10px]">Qty:</span>
           <input
             type="number"
             step="0.01"
             min="0.001"
             value={orderQty}
             onChange={(e) => setOrderQty(Math.max(0.001, parseFloat(e.target.value) || 0.1))}
-            className="w-16 rounded border border-grid bg-bg px-1.5 py-0.5 text-center font-bold text-white focus:border-accent focus:outline-none"
+            className="w-16 clay-inset px-1.5 py-0.5 text-center font-bold text-white focus:outline-none"
           />
         </div>
         <div className="flex items-center gap-1">
@@ -194,8 +194,8 @@ export default function FootprintDOM() {
                 audioHaptics.tick();
                 setOrderQty(q);
               }}
-              className={`px-1.5 py-0.5 rounded text-[10px] transition ${
-                orderQty === q ? 'bg-accent/20 text-accent font-bold ring-1 ring-accent' : 'text-slate-400 hover:text-white bg-slate-800/40'
+              className={`px-2 py-0.5 text-[10px] transition ${
+                orderQty === q ? 'clay-pill-active font-bold' : 'clay-pill text-muted hover:text-white'
               }`}
             >
               {q}
@@ -450,22 +450,22 @@ export default function FootprintDOM() {
       </div>
 
       {/* Fast Execution Bottom Action Strip */}
-      <div className="border-t border-grid bg-panel/95 p-2 space-y-1.5 shadow-lg">
+      <div className="border-t border-grid/50 bg-[#09090d]/80 p-2 space-y-1.5 shadow-lg">
         {/* Market Buy / Sell Grid */}
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={handleMarketBuy}
-            className="flex items-center justify-center gap-1 rounded-lg bg-up px-3 py-2 font-bold text-white hover:opacity-90 active:scale-95 transition shadow-sm text-xs"
+            className="flex items-center justify-center gap-1 clay-pill-active px-3 py-2 font-bold active:scale-95 transition text-xs"
           >
             <span>BUY MKT</span>
-            <span className="text-[10px] opacity-80">({orderQty})</span>
+            <span className="text-[10px] opacity-70">({orderQty})</span>
           </button>
           <button
             onClick={handleMarketSell}
-            className="flex items-center justify-center gap-1 rounded-lg bg-down px-3 py-2 font-bold text-white hover:opacity-90 active:scale-95 transition shadow-sm text-xs"
+            className="flex items-center justify-center gap-1 clay-card border-zinc-600 px-3 py-2 font-bold text-white active:scale-95 transition text-xs"
           >
             <span>SELL MKT</span>
-            <span className="text-[10px] opacity-80">({orderQty})</span>
+            <span className="text-[10px] text-muted">({orderQty})</span>
           </button>
         </div>
 
@@ -473,24 +473,24 @@ export default function FootprintDOM() {
         <div className="grid grid-cols-3 gap-1 text-[10px]">
           <button
             onClick={handleFlatten}
-            className="rounded border border-amber-500/40 bg-amber-500/10 py-1 font-bold text-amber-300 hover:bg-amber-500 hover:text-black transition"
+            className="clay-btn py-1 font-bold text-white hover:text-zinc-300 transition"
             title="Flatten: Close position immediately at market & cancel orders"
           >
             Flatten
           </button>
           <button
             onClick={handleReverse}
-            className="rounded border border-purple-500/40 bg-purple-500/10 py-1 font-bold text-purple-300 hover:bg-purple-500 hover:text-white transition"
+            className="clay-btn py-1 font-bold text-white hover:text-zinc-300 transition"
             title="Reverse: Flip active position to opposite direction"
           >
             Reverse
           </button>
           <button
             onClick={handleCancelAll}
-            className="rounded border border-grid bg-slate-800 py-1 font-semibold text-slate-300 hover:bg-red-500/20 hover:text-red-400 transition"
+            className="clay-btn py-1 font-semibold text-muted hover:text-white transition"
             title="Cancel All: Cancel all pending orders for this symbol"
           >
-            Cancel All ({pendingOrders.length})
+            Cancel ({pendingOrders.length})
           </button>
         </div>
 

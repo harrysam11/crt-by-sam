@@ -222,15 +222,15 @@ export default function App() {
         )}
 
         {/* TradingView-Style Far Right Vertical Icon Dock Rail */}
-        <aside className="w-[44px] shrink-0 border-l border-grid bg-panel/95 flex flex-col items-center py-2.5 gap-2 z-20 select-none font-mono">
+        <aside className="w-[48px] shrink-0 border-l border-grid bg-panel flex flex-col items-center py-3 gap-2.5 z-20 select-none font-mono shadow-clay-card">
           {/* Watchlist Toggle */}
           <button
             onClick={() => {
               audioHaptics.tick();
               setActiveRightDrawer((prev) => (prev === 'WATCHLIST' ? null : 'WATCHLIST'));
             }}
-            className={`p-2 rounded-lg transition ${
-              activeRightDrawer === 'WATCHLIST' ? 'bg-accent text-black font-bold ring-1 ring-accent' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            className={`p-2.5 rounded-xl transition ${
+              activeRightDrawer === 'WATCHLIST' ? 'clay-btn-active' : 'clay-btn text-slate-300'
             }`}
             title="Watchlist & Markets"
           >
@@ -245,8 +245,8 @@ export default function App() {
               audioHaptics.tick();
               setActiveRightDrawer((prev) => (prev === 'DOM' ? null : 'DOM'));
             }}
-            className={`p-2 rounded-lg transition ${
-              activeRightDrawer === 'DOM' ? 'bg-accent text-black font-bold ring-1 ring-accent' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            className={`p-2.5 rounded-xl transition ${
+              activeRightDrawer === 'DOM' ? 'clay-btn-active' : 'clay-btn text-slate-300'
             }`}
             title="Depth of Market (DOM) Ladder & Order Flow"
           >
@@ -261,8 +261,8 @@ export default function App() {
               audioHaptics.tick();
               setActiveRightDrawer((prev) => (prev === 'TRADE' ? null : 'TRADE'));
             }}
-            className={`p-2 rounded-lg transition ${
-              activeRightDrawer === 'TRADE' ? 'bg-accent text-black font-bold ring-1 ring-accent' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            className={`p-2.5 rounded-xl transition ${
+              activeRightDrawer === 'TRADE' ? 'clay-btn-active' : 'clay-btn text-slate-300'
             }`}
             title="Order Entry & Live Order Book"
           >
@@ -277,8 +277,8 @@ export default function App() {
               audioHaptics.tick();
               setActiveRightDrawer((prev) => (prev === 'ANALYTICS' ? null : 'ANALYTICS'));
             }}
-            className={`p-2 rounded-lg transition ${
-              activeRightDrawer === 'ANALYTICS' ? 'bg-accent text-black font-bold ring-1 ring-accent' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            className={`p-2.5 rounded-xl transition ${
+              activeRightDrawer === 'ANALYTICS' ? 'clay-btn-active' : 'clay-btn text-slate-300'
             }`}
             title="Seasonals, Liquidity & News"
           >
@@ -295,7 +295,7 @@ export default function App() {
               audioHaptics.tick();
               setIsOptionChainOpen(true);
             }}
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-2.5 rounded-xl clay-btn text-slate-300 transition"
             title="Option Chain Matrix"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -309,7 +309,7 @@ export default function App() {
               audioHaptics.tick();
               setIsCalendarOpen(true);
             }}
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-2.5 rounded-xl clay-btn text-slate-300 transition"
             title="Macro Calendar"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -317,6 +317,7 @@ export default function App() {
             </svg>
           </button>
         </aside>
+
       </div>
     </div>
   );

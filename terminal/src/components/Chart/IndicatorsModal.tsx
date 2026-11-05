@@ -153,29 +153,29 @@ export default function IndicatorsModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 font-mono select-none">
-      <div className="flex h-[560px] w-full max-w-3xl flex-col rounded-2xl border border-grid bg-panel shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 font-mono select-none">
+      <div className="clay-modal flex h-[560px] w-full max-w-3xl flex-col overflow-hidden">
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-grid px-5 py-3.5 bg-panel/90">
+        <div className="flex items-center justify-between border-b border-grid/50 px-5 py-3.5 bg-panel/90">
           <div className="flex items-center gap-2">
-            <span className="text-accent font-bold text-sm tracking-wider">fx</span>
-            <h2 className="text-sm font-semibold text-white">Indicators, Metrics & Strategies</h2>
+            <span className="clay-badge font-bold text-xs tracking-wider">fx</span>
+            <h2 className="text-sm font-bold text-white tracking-wide">Indicators, Metrics & Strategies</h2>
           </div>
           <button
             onClick={onClose}
-            className="rounded p-1 text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="clay-btn h-7 w-7 text-muted hover:text-white"
             title="Close (Esc)"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         {/* Search Input Bar */}
-        <div className="border-b border-grid px-5 py-2.5 bg-bg/50">
+        <div className="border-b border-grid/50 px-5 py-2.5 bg-[#09090d]/60">
           <div className="relative flex items-center">
-            <svg className="absolute left-3 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="absolute left-3.5 h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -183,7 +183,7 @@ export default function IndicatorsModal({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search indicators (e.g. EMA, VWAP, RSI, Bollinger Bands)..."
-              className="w-full rounded-lg border border-grid bg-panel py-2 pl-9 pr-3 text-xs text-white placeholder-slate-500 focus:border-accent focus:outline-none"
+              className="w-full clay-inset py-2 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:outline-none"
               autoFocus
             />
           </div>
@@ -192,7 +192,7 @@ export default function IndicatorsModal({
         {/* Two-Pane Body */}
         <div className="flex flex-1 overflow-hidden">
           {/* Left Category Sidebar */}
-          <div className="w-52 border-r border-grid bg-panel/40 p-2 space-y-0.5 text-xs">
+          <div className="w-52 border-r border-grid/50 bg-[#09090d]/60 p-2 space-y-1 text-xs">
             {['All', 'Favorites', 'Technicals', 'Oscillators', 'Moving Averages', 'Volume & Volatility'].map((cat) => (
               <button
                 key={cat}
@@ -200,15 +200,15 @@ export default function IndicatorsModal({
                   audioHaptics.tick();
                   setSelectedCategory(cat);
                 }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition ${
+                className={`w-full flex items-center justify-between px-3 py-2 text-left transition ${
                   selectedCategory === cat
-                    ? 'bg-accent/15 text-accent font-semibold'
-                    : 'text-slate-400 hover:bg-slate-800/60 hover:text-white'
+                    ? 'clay-pill-active font-bold'
+                    : 'clay-pill text-muted hover:text-white'
                 }`}
               >
                 <span>{cat}</span>
                 {cat === 'Favorites' && (
-                  <span className="text-[10px] text-slate-500">{favorites.length}</span>
+                  <span className="text-[10px] text-muted">{favorites.length}</span>
                 )}
               </button>
             ))}
@@ -217,7 +217,7 @@ export default function IndicatorsModal({
           {/* Right Indicator List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
             {filteredList.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-xs text-slate-500">
+              <div className="flex h-full items-center justify-center text-xs text-muted">
                 No indicators found matching &quot;{search}&quot;
               </div>
             ) : (
@@ -232,10 +232,10 @@ export default function IndicatorsModal({
                       audioHaptics.tick();
                       onToggleIndicator(ind.key);
                     }}
-                    className={`flex items-start justify-between p-3 rounded-xl border transition cursor-pointer ${
+                    className={`flex items-start justify-between p-3.5 rounded-xl border transition cursor-pointer ${
                       isActive
-                        ? 'border-accent/50 bg-accent/10 shadow-sm'
-                        : 'border-grid bg-panel/60 hover:border-slate-700 hover:bg-panel'
+                        ? 'border-white/40 bg-white/10 shadow-clay-card'
+                        : 'clay-card border-grid/40 hover:border-white/20'
                     }`}
                   >
                     <div className="flex items-start gap-2.5">
@@ -243,7 +243,7 @@ export default function IndicatorsModal({
                       <button
                         onClick={(e) => toggleFavorite(ind.id, e)}
                         className={`mt-0.5 text-xs transition ${
-                          isFav ? 'text-amber-400' : 'text-slate-600 hover:text-slate-400'
+                          isFav ? 'text-white' : 'text-zinc-600 hover:text-zinc-400'
                         }`}
                         title={isFav ? 'Remove from favorites' : 'Add to favorites'}
                       >
@@ -253,13 +253,13 @@ export default function IndicatorsModal({
                       </button>
 
                       <div>
-                        <div className="text-xs font-semibold text-white flex items-center gap-2">
+                        <div className="text-xs font-bold text-white flex items-center gap-2">
                           <span>{ind.name}</span>
-                          <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[9px] text-slate-400 uppercase">
+                          <span className="clay-badge text-[9px] uppercase">
                             {ind.category}
                           </span>
                         </div>
-                        <p className="mt-1 text-[11px] text-slate-400 leading-relaxed">
+                        <p className="mt-1 text-[11px] text-muted leading-relaxed">
                           {ind.desc}
                         </p>
                       </div>
@@ -269,10 +269,10 @@ export default function IndicatorsModal({
                     <div className="pl-4">
                       <button
                         type="button"
-                        className={`rounded-lg px-3 py-1 text-xs font-semibold transition ${
+                        className={`px-3 py-1 text-xs font-bold transition ${
                           isActive
-                            ? 'bg-accent text-black font-bold'
-                            : 'border border-grid text-slate-300 hover:bg-slate-800 hover:text-white'
+                            ? 'clay-pill-active'
+                            : 'clay-pill text-muted hover:text-white'
                         }`}
                       >
                         {isActive ? 'Active' : '+ Add'}
