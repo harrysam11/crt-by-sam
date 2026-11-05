@@ -28,6 +28,10 @@ import DrawingOverlay from '../drawing/DrawingOverlay';
 import FavoritesBar from '../drawing/FavoritesBar';
 import { drawingEvents } from '../drawing/framework/DrawingEvents';
 import IndicatorsModal from './IndicatorsModal';
+import IndicatorSettingsDialog from './IndicatorSettingsDialog';
+import SubPaneChart from './SubPaneChart';
+import { INDICATOR_REGISTRY } from '../../services/indicators/registry';
+import { useIndicatorsStore } from '../../store/useIndicatorsStore';
 import BarReplayController from './BarReplayController';
 import ChartSettingsModal, { DEFAULT_CHART_SETTINGS, type ChartSettingsState } from './ChartSettingsModal';
 import ChartLegendHUD, { type ActiveIndicatorInfo } from './ChartLegendHUD';
@@ -190,6 +194,14 @@ export default function TradingChart({
   const [isSymbolSearchOpen, setIsSymbolSearchOpen] = useState(false);
   const [externalLineTrigger, setExternalLineTrigger] = useState<{ price: number; type: 'LINE' | 'RAY' } | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<ChartContextMenuPos | null>(null);
+
+  // Phase 3 Indicator Framework Store Hooks
+  const activeInstances = useIndicatorsStore((s) => s.activeInstances);
+  const toggleInstanceVisibility = useIndicatorsStore((s) => s.toggleVisibility);
+  const removeInstance = useIndicatorsStore((s) => s.removeInstance);
+  const openSettings = useIndicatorsStore((s) => s.openSettings);
+  const [overlayValues, setOverlayValues] = useState<Record<string, number | null>>({});
+  const overlaySeriesMap = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
 
   // Top Toolbar Dropdown menus
   const [isTfMenuOpen, setIsTfMenuOpen] = useState(false);
@@ -410,8 +422,42 @@ export default function TradingChart({
       });
     }
 
+    // 25+ Framework Active Overlay Indicators (SMA, EMA, VWAP, BB, Ichimoku, Supertrend, etc.)
+    activeInstances
+      .filter((inst) => inst.overlay)
+      .forEach((inst) => {
+        const primaryStyle = Object.values(inst.styles)[0];
+        const val = overlayValues[inst.instanceId];
+        list.push({
+          id: inst.instanceId,
+          name: `${inst.name}`,
+          color: primaryStyle?.color || '#38bdf8',
+          value: val !== null && val !== undefined ? val.toFixed(2) : undefined,
+          visible: inst.visible,
+          onToggleVisible: () => toggleInstanceVisibility(inst.instanceId),
+          onOpenSettings: () => openSettings(inst),
+          onRemove: () => removeInstance(inst.instanceId),
+        });
+      });
+
     return list;
-  }, [showSma, showEma, showVwap, showBbands, showRsi, showOI, showVolume, showVolumeProfile, currentOhlc, indicatorValues]);
+  }, [
+    showSma,
+    showEma,
+    showVwap,
+    showBbands,
+    showRsi,
+    showOI,
+    showVolume,
+    showVolumeProfile,
+    currentOhlc,
+    indicatorValues,
+    activeInstances,
+    overlayValues,
+    toggleInstanceVisibility,
+    openSettings,
+    removeInstance,
+  ]);
 
   // Effective candles respecting Bar Replay slice
   const effectiveCandles = useMemo(() => {
@@ -919,6 +965,83 @@ export default function TradingChart({
       oi: oiBars.length ? oiBars[oiBars.length - 1].totalOI : null,
     });
   }, [effectiveCandles, symbol, chartStyle]);
+
+  // Dynamically compute and sync active overlay indicators on main price chart
+  useEffect(() => {
+    const chart = api.current?.chart;
+    if (!chart || !effectiveCandles.length) return;
+
+    const overlayInstances = activeInstances.filter((inst) => inst.overlay);
+    const activeSeriesKeys = new Set<string>();
+    const latestOverlayValues: Record<string, number | null> = {};
+
+    overlayInstances.forEach((inst) => {
+      const def = INDICATOR_REGISTRY.find((d) => d.id === inst.indicatorId);
+      if (!def) return;
+
+      const calcResult = def.calculate(effectiveCandles, inst.inputs);
+
+      Object.entries(calcResult.plots).forEach(([plotKey, points]) => {
+        const key = `${inst.instanceId}_${plotKey}`;
+        activeSeriesKeys.add(key);
+
+        const style = inst.styles[plotKey] || def.defaultStyles[plotKey];
+        let series = overlaySeriesMap.current.get(key);
+
+        if (!series) {
+          series = chart.addLineSeries({
+            color: style?.color || '#38bdf8',
+            lineWidth: (style?.lineWidth || 2) as 1 | 2 | 3 | 4,
+            lineStyle:
+              style?.lineStyle === 'dashed'
+                ? LineStyle.Dashed
+                : style?.lineStyle === 'dotted'
+                ? LineStyle.Dotted
+                : LineStyle.Solid,
+            visible: inst.visible && (style?.visible ?? true),
+          });
+          overlaySeriesMap.current.set(key, series);
+        } else {
+          series.applyOptions({
+            color: style?.color || '#38bdf8',
+            lineWidth: (style?.lineWidth || 2) as 1 | 2 | 3 | 4,
+            lineStyle:
+              style?.lineStyle === 'dashed'
+                ? LineStyle.Dashed
+                : style?.lineStyle === 'dotted'
+                ? LineStyle.Dotted
+                : LineStyle.Solid,
+            visible: inst.visible && (style?.visible ?? true),
+          });
+        }
+
+        const seriesData = points
+          .filter((p) => p.value !== null && !isNaN(p.value))
+          .map((p) => ({
+            time: p.time as UTCTimestamp,
+            value: p.value as number,
+          }));
+
+        series.setData(seriesData);
+
+        if (seriesData.length > 0) {
+          latestOverlayValues[inst.instanceId] = seriesData[seriesData.length - 1].value;
+        }
+      });
+    });
+
+    // Remove any series no longer active
+    overlaySeriesMap.current.forEach((series, key) => {
+      if (!activeSeriesKeys.has(key)) {
+        try {
+          chart.removeSeries(series);
+        } catch {}
+        overlaySeriesMap.current.delete(key);
+      }
+    });
+
+    setOverlayValues(latestOverlayValues);
+  }, [effectiveCandles, activeInstances]);
 
   // Price lines for positions, orders, alerts, and Session OHL Laser Lines
   useEffect(() => {
@@ -1838,23 +1961,25 @@ export default function TradingChart({
         />
 
         {/* Main Chart Canvas & Overlays Container */}
-        <div
-          className="relative min-h-0 flex-1 h-full overflow-hidden"
-          onClick={(e) => {
-            if (!isSelectingCutPoint || !chartApi || !box.current) return;
-            const rect = box.current.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const time = chartApi.timeScale().coordinateToTime(x);
-            if (time) {
-              const idx = candles.findIndex((c) => c.time >= (time as number));
-              if (idx !== -1) {
-                audioHaptics.tick();
-                setReplayIndex(idx);
-                setIsSelectingCutPoint(false);
+        <div className="relative min-h-0 flex-1 h-full overflow-hidden flex flex-col">
+          {/* Main Price Chart Pane */}
+          <div
+            className="relative flex-1 min-h-0 w-full overflow-hidden"
+            onClick={(e) => {
+              if (!isSelectingCutPoint || !chartApi || !box.current) return;
+              const rect = box.current.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const time = chartApi.timeScale().coordinateToTime(x);
+              if (time) {
+                const idx = candles.findIndex((c) => c.time >= (time as number));
+                if (idx !== -1) {
+                  audioHaptics.tick();
+                  setReplayIndex(idx);
+                  setIsSelectingCutPoint(false);
+                }
               }
-            }
-          }}
-        >
+            }}
+          >
           {/* Institutional TradingView-Grade In-Chart Legend HUD */}
           <ChartLegendHUD
             symbol={symbol}
@@ -2012,7 +2137,20 @@ export default function TradingChart({
             </div>
           )}
         </div>
+
+        {/* SubPane Indicator Charts (Oscillators: RSI, MACD, Stoch, etc.) */}
+        {activeInstances
+          .filter((inst) => !inst.overlay)
+          .map((inst) => (
+            <SubPaneChart
+              key={inst.instanceId}
+              instance={inst}
+              candles={effectiveCandles}
+              mainChartApi={chartApi}
+            />
+          ))}
       </div>
+    </div>
 
       {/* TradingView Bottom Range & Scale Bar */}
       <div className="h-8 shrink-0 border-t border-grid bg-panel px-3 flex items-center justify-between text-[11px] text-slate-300 select-none font-mono shadow-clay-card">
@@ -2107,6 +2245,9 @@ export default function TradingChart({
         }}
         onToggleIndicator={handleToggleIndicator}
       />
+
+      {/* Indicator Settings Dialog (Inputs, Style, Visibility) */}
+      <IndicatorSettingsDialog />
 
       {/* Chart Settings Modal */}
       <ChartSettingsModal
