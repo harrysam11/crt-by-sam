@@ -89,6 +89,7 @@ export default function TradingChart({
   const error = useTerminalStore((s) => s.error);
   const placeOrder = useTerminalStore((s) => s.placeOrder);
   const addAlert = useTerminalStore((s) => s.addAlert);
+  const pinePlots = useTerminalStore((s) => s.pinePlots);
 
   // Psychology and Skins Store
   const zenMode = usePsychologyStore((s) => s.zenMode);
@@ -127,6 +128,7 @@ export default function TradingChart({
   const [magnetConfig, setMagnetConfig] = useState<MagnetConfig>({ enabled: false, mode: 'WEAK' });
   const [isLockedAll, setIsLockedAll] = useState(false);
   const [isHiddenAll, setIsHiddenAll] = useState(false);
+  const pineSeriesRef = useRef<ISeriesApi<'Line'>[]>([]);
 
   // Indicators Modal State
   const [isIndicatorsModalOpen, setIsIndicatorsModalOpen] = useState(false);
@@ -824,6 +826,40 @@ export default function TradingChart({
       });
     }
   }, [chartStyle, chartSettings]);
+
+  // Dynamic Pine Script Indicator Series rendering
+  useEffect(() => {
+    const chart = api.current?.chart;
+    if (!chart) return;
+
+    // Remove existing pine series
+    for (const s of pineSeriesRef.current) {
+      try {
+        chart.removeSeries(s);
+      } catch {}
+    }
+    pineSeriesRef.current = [];
+
+    if (!pinePlots || !pinePlots.length) return;
+
+    for (const plot of pinePlots) {
+      if (!plot.data || !plot.data.length) continue;
+      try {
+        const line = chart.addLineSeries({
+          color: plot.color || '#ffffff',
+          lineWidth: 1,
+          title: plot.title,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          crosshairMarkerVisible: false,
+        });
+        line.setData(plot.data as any);
+        pineSeriesRef.current.push(line);
+      } catch (err) {
+        console.warn('Failed to add Pine Script line series:', err);
+      }
+    }
+  }, [pinePlots]);
 
   // Handler for placing order from Canvas Drag-and-Drop Order lines
   const handleExecuteCanvasOrders = (entry: CanvasOrderLine, sl?: CanvasOrderLine, tp?: CanvasOrderLine) => {

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "lightweight-charts": "4.2.0",
+    "pinets": "^0.13.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "zustand": "4.5.5"

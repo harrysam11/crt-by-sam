@@ -38,7 +38,9 @@ interface TerminalState {
   balance: number; // USD wallet = start + realized PnL
   status: ConnectionStatus;
   error: string | null;
+  pinePlots: Array<{ title: string; color: string; data: Array<{ time: number; value: number }> }>;
 
+  setPinePlots: (plots: Array<{ title: string; color: string; data: Array<{ time: number; value: number }> }>) => void;
   setSymbol: (s: string) => void;
   setTimeframe: (t: Timeframe) => void;
   setCandles: (c: Candle[]) => void;
@@ -205,7 +207,9 @@ export const useTerminalStore = create<TerminalState>()(
         balance: START_BALANCE,
         status: 'closed',
         error: null,
+        pinePlots: [],
 
+        setPinePlots: (pinePlots) => set({ pinePlots }),
         setSymbol: (symbol) => {
           const safe = sanitizeSymbol(symbol);
           set((s) => ({ symbol: safe, candles: [], error: null, currentPrice: s.prices[safe] ?? 0 }));

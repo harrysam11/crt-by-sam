@@ -4,9 +4,10 @@ import { fmtPnl, fmtPrice, fmtQty, fmtTime, labelOf, pnlClass } from '../../util
 import { audioHaptics } from '../../utils/notify';
 import AlertsTab from './AlertsTab';
 import StatsTab from './StatsTab';
+import PineEditor from '../../features/pine/PineEditor';
 
 const TYPE_LABEL = { MARKET: 'Market', LIMIT: 'Limit', STOP_LOSS: 'Stop loss', TAKE_PROFIT: 'Take profit' } as const;
-type Tab = 'positions' | 'orders' | 'journal' | 'alerts';
+type Tab = 'positions' | 'orders' | 'journal' | 'alerts' | 'pine';
 
 export default function PositionsTable() {
   const [tab, setTab] = useState<Tab>('positions');
@@ -17,6 +18,7 @@ export default function PositionsTable() {
   const orders = useTerminalStore((s) => s.orders);
   const trades = useTerminalStore((s) => s.trades);
   const alertCount = useTerminalStore((s) => s.alerts.filter((a) => !a.triggered).length);
+  const setPinePlots = useTerminalStore((s) => s.setPinePlots);
   const close = useTerminalStore((s) => s.closePosition);
   const closePartial = useTerminalStore((s) => s.closePartialPosition);
   const flip = useTerminalStore((s) => s.flipPosition);
@@ -29,7 +31,7 @@ export default function PositionsTable() {
   const list = [...orders].reverse().slice(0, 100);
   const pending = orders.filter((o) => o.status === 'PENDING').length;
   const th = 'px-3 py-1.5 text-left font-normal text-muted text-xs';
-  const tabCls = (on: boolean) => `px-3 py-2 text-xs font-medium transition ${on ? 'border-b-2 border-accent text-white' : 'text-muted hover:text-white'}`;
+  const tabCls = (on: boolean) => `px-3 py-1 text-xs font-semibold rounded-full transition ${on ? 'clay-pill-active font-bold' : 'clay-pill text-muted hover:text-white'}`;
 
   const copyTradesCsv = async () => {
     if (trades.length === 0) {
@@ -50,14 +52,17 @@ export default function PositionsTable() {
   };
 
   return (
-    <div className="flex h-full flex-col bg-panel font-mono">
-      <div className="flex shrink-0 items-center justify-between border-b border-grid px-2">
-        <div className="flex">
+    <div className="flex h-full flex-col bg-panel font-mono select-none">
+      <div className="flex shrink-0 items-center justify-between border-b border-grid/50 px-3 py-2 bg-[#09090d]/60">
+        <div className="flex items-center gap-1.5">
           <button className={tabCls(tab === 'positions')} onClick={() => setTab('positions')}>
             Positions ({open.length})
           </button>
           <button className={tabCls(tab === 'orders')} onClick={() => setTab('orders')}>
             Orders ({pending} open)
+          </button>
+          <button className={tabCls(tab === 'pine')} onClick={() => setTab('pine')}>
+            Pine Editor
           </button>
           <button className={tabCls(tab === 'journal')} onClick={() => setTab('journal')}>
             Journal
@@ -230,6 +235,12 @@ export default function PositionsTable() {
           </table>
         ))}
 
+        {tab === 'pine' && (
+          <PineEditor
+            onApplyPlots={(plots) => setPinePlots(plots)}
+            onClearPlots={() => setPinePlots([])}
+          />
+        )}
         {tab === 'journal' && <StatsTab />}
         {tab === 'alerts' && <AlertsTab />}
       </div>
