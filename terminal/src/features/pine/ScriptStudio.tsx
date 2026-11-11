@@ -193,7 +193,7 @@ export default function ScriptStudio({ onApplyPlots, onClearPlots }: ScriptStudi
           >
             {status === 'COMPILING' ? (
               <>
-                <span className="w-2 h-2 rounded-full bg-black animate-ping" />
+                <span className="w-2.5 h-2.5 rounded-full border border-black border-t-transparent animate-spin shrink-0" />
                 <span>Running...</span>
               </>
             ) : (
@@ -252,7 +252,7 @@ export default function ScriptStudio({ onApplyPlots, onClearPlots }: ScriptStudi
                   : status === 'ERROR'
                   ? 'bg-rose-500'
                   : status === 'COMPILING'
-                  ? 'bg-yellow-400 animate-pulse'
+                  ? 'bg-yellow-400'
                   : 'bg-zinc-600'
               }`}
             />

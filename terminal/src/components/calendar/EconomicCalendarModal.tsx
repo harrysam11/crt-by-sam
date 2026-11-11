@@ -120,16 +120,16 @@ export default function EconomicCalendarModal({ onClose }: EconomicCalendarModal
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md select-none font-mono text-xs">
-      <div className="flex flex-col w-full max-w-5xl h-[85vh] rounded-2xl border border-grid bg-panel p-5 shadow-2xl overflow-hidden">
+      <div className="flex flex-col w-full max-w-5xl h-[85vh] rounded-[10px] border border-white/[0.08] bg-[#0f0f13] p-5 shadow-2xl overflow-hidden">
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between border-b border-grid/60 pb-3 shrink-0">
+        <div className="flex items-center justify-between border-b border-white/[0.08] pb-3 shrink-0">
           <div className="flex items-center gap-3">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
+            <span className="flex h-2 w-2 rounded-full bg-white/80" />
             <div>
-              <h2 className="text-sm font-bold uppercase tracking-wider text-white">
+              <h2 className="text-sm font-semibold text-white">
                 Global Macro Matrix & News Wire
               </h2>
-              <div className="text-[10px] text-slate-400">
+              <div className="text-[10px] text-zinc-400">
                 Weekly Economic Indicators & Financial Market News
               </div>
             </div>

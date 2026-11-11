@@ -32,13 +32,13 @@ export default function JournalModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-      <div className="flex h-[90vh] w-full max-w-6xl flex-col rounded-2xl border border-grid bg-panel shadow-2xl overflow-hidden">
+      <div className="flex h-[90vh] w-full max-w-6xl flex-col rounded-[10px] border border-white/[0.08] bg-panel shadow-2xl overflow-hidden">
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-grid px-6 py-4 bg-bg/50">
           <div className="flex items-center gap-3">
-            <span className="flex h-3 w-3 rounded-full bg-accent" />
-            <h2 className="text-lg font-bold text-white">Trade Psychology Journal & Canvas Archive</h2>
-            <span className="rounded-full bg-grid px-2.5 py-0.5 text-xs text-muted">
+            <span className="flex h-2.5 w-2.5 rounded-full bg-accent" />
+            <h2 className="text-base font-semibold text-white">Trade Psychology Journal & Canvas Archive</h2>
+            <span className="rounded-[4px] bg-white/[0.05] border border-white/[0.08] px-2 py-0.5 text-xs text-muted">
               {entries.length} snapshots recorded
             </span>
           </div>

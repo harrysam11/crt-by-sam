@@ -48,11 +48,11 @@ export default function RiskHUD({ onApplySize, onClose }: RiskHUDProps) {
   };
 
   return (
-    <div className="absolute right-3 top-12 z-20 w-80 rounded-xl border border-grid bg-panel/95 p-4 shadow-2xl backdrop-blur-md">
-      <div className="flex items-center justify-between border-b border-grid pb-2">
+    <div className="absolute right-3 top-12 z-20 w-80 rounded-[8px] border border-white/[0.08] bg-[#0f0f13]/95 p-4 shadow-2xl backdrop-blur-md">
+      <div className="flex items-center justify-between border-b border-white/[0.08] pb-2">
         <div className="flex items-center gap-2">
-          <span className="flex h-2.5 w-2.5 rounded-full bg-accent animate-pulse" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-white">Risk-Bot Position Sizing</h3>
+          <span className="flex h-1.5 w-1.5 rounded-full bg-white" />
+          <h3 className="text-xs font-semibold text-white">Risk-Bot Position Sizing</h3>
         </div>
         {onClose && (
           <button onClick={onClose} className="text-muted hover:text-white" aria-label="Close">

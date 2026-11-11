@@ -141,11 +141,11 @@ export default function PineEditor({ onApplyPlots, onClearPlots }: PineEditorPro
               <span
                 className={`h-2 w-2 rounded-full ${
                   status === 'ACTIVE'
-                    ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]'
+                    ? 'bg-white'
                     : status === 'ERROR'
                     ? 'bg-zinc-500'
                     : status === 'COMPILING'
-                    ? 'bg-zinc-400 animate-pulse'
+                    ? 'bg-zinc-400'
                     : 'bg-zinc-700'
                 }`}
               />

@@ -87,8 +87,8 @@ export default function CreateAlertModal({ isOpen, onClose, initialPrice }: Crea
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-grid/60 pb-3">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
-            <h3 className="font-bold uppercase tracking-wider text-white text-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-white" />
+            <h3 className="font-semibold text-white text-sm">
               Create Alert on {labelOf(symbol)}
             </h3>
           </div>

@@ -52,10 +52,7 @@ export default function ChartLegendHUD({
     <div className="pointer-events-auto absolute left-3 top-2.5 z-20 flex flex-col gap-1 select-none font-mono text-[11px] leading-tight max-w-[85%]">
       {/* Symbol & Market Status Header */}
       <div className="flex flex-wrap items-center gap-1.5 bg-panel/75 backdrop-blur-sm px-2 py-1 rounded border border-grid/60 w-fit">
-        <span className="flex h-1.5 w-1.5 relative">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
-        </span>
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
         <button
           onClick={onOpenSymbolSearch}
           className="font-bold text-slate-100 tracking-wide text-xs hover:text-accent flex items-center gap-1 transition cursor-pointer"

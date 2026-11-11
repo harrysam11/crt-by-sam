@@ -37,7 +37,7 @@ export default function AlertsTab() {
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setFilterType('ALL')}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] transition ${
+            className={`px-2.5 py-0.5 rounded-[4px] text-[11px] transition ${
               filterType === 'ALL' ? 'clay-pill-active font-bold' : 'clay-pill text-muted hover:text-white'
             }`}
           >
@@ -45,7 +45,7 @@ export default function AlertsTab() {
           </button>
           <button
             onClick={() => setFilterType('ACTIVE')}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] transition ${
+            className={`px-2.5 py-0.5 rounded-[4px] text-[11px] transition ${
               filterType === 'ACTIVE' ? 'clay-pill-active font-bold' : 'clay-pill text-muted hover:text-white'
             }`}
           >
@@ -53,7 +53,7 @@ export default function AlertsTab() {
           </button>
           <button
             onClick={() => setFilterType('TRIGGERED')}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] transition ${
+            className={`px-2.5 py-0.5 rounded-[4px] text-[11px] transition ${
               filterType === 'TRIGGERED' ? 'clay-pill-active font-bold' : 'clay-pill text-muted hover:text-white'
             }`}
           >

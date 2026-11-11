@@ -2,28 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =========================================================================
+   PREMIUM UTILITARIAN MINIMALISM & EDITORIAL UI DESIGN SYSTEM
+   Graphite monochrome palette, quiet chrome hairlines, high-contrast typography,
+   crisp 5px micro-radii, tabular numerical precision, and zero neon/slop.
+   ZERO EMOJI POLICY strictly enforced.
+   ========================================================================= */
+
 :root {
-  --color-bg: #050508;
-  --color-panel: #101015;
-  --color-grid: #1e1e26;
-  --color-text: #f4f4f6;
-  --color-muted: #828290;
+  --color-bg: #09090b;
+  --color-panel: #111114;
+  --color-surface: #17171b;
+  --color-grid: rgba(255, 255, 255, 0.07);
+  --color-text: #fafafa;
+  --color-secondary: #a1a1aa;
+  --color-muted: #71717a;
   --color-accent: #ffffff;
-  --color-up: #ffffff;
-  --color-down: #52525c;
+  --color-up: #fafafa;
+  --color-down: #71717a;
 }
 
 html.theme-light, body.theme-light, #root.theme-light {
-  --color-bg: #f4f4f6;
+  --color-bg: #f7f6f3;
   --color-panel: #ffffff;
-  --color-grid: #e4e4e7;
-  --color-text: #09090b;
-  --color-muted: #71717a;
-  --color-accent: #09090b;
-  --color-up: #09090b;
-  --color-down: #a1a1aa;
-  background: #f4f4f6 !important;
-  color: #09090b !important;
+  --color-surface: #f1f0ec;
+  --color-grid: rgba(0, 0, 0, 0.07);
+  --color-text: #111111;
+  --color-secondary: #555555;
+  --color-muted: #888888;
+  --color-accent: #111111;
+  --color-up: #111111;
+  --color-down: #888888;
+  background: #f7f6f3 !important;
+  color: #111111 !important;
 }
 
 html, body, #root {
@@ -35,275 +46,219 @@ html, body, #root {
 }
 
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Geist Sans', 'Helvetica Neue', 'Switzer', system-ui, sans-serif;
   font-size: 12px;
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-.num {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+.num, code, pre, .font-mono {
+  font-family: 'SF Mono', 'Geist Mono', 'JetBrains Mono', Menlo, Consolas, monospace !important;
   font-variant-numeric: tabular-nums;
 }
 
-/* Claymorphism Black & White Custom Scrollbars */
+/* Minimalist Hairline Scrollbars */
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #08080b;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #22222b;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #33333f;
+  background: rgba(255, 255, 255, 0.22);
+}
+html.theme-light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+html.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
 }
 
-/* Claymorphic Focus State */
-input:focus-visible, button:focus-visible {
-  outline: 1px solid rgba(255, 255, 255, 0.4);
+/* Subtle Focus State */
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.3);
   outline-offset: 1px;
+}
+html.theme-light input:focus-visible,
+html.theme-light select:focus-visible,
+html.theme-light textarea:focus-visible,
+html.theme-light button:focus-visible {
+  outline: 1px solid rgba(0, 0, 0, 0.3);
 }
 
 /* =========================================================================
-   CLAYMORPHISM BLACK & WHITE DESIGN SYSTEM
+   UTILITARIAN MINIMALIST COMPONENT SYSTEM (UNSLOP REPLACEMENT)
+   Replaces bulbous clay 3D bloat with crisp 1px hairlines and tactile micro-radii.
    ========================================================================= */
 
-/* 1. Tactile 3D Clay Card */
+/* 1. Flat Crisp Card & Panel */
 .clay-card {
-  background: #111116;
+  background: #111114;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  box-shadow:
-    6px 6px 14px #020204,
-    -3px -3px 8px rgba(255, 255, 255, 0.03),
-    inset 1px 1px 1.5px rgba(255, 255, 255, 0.12),
-    inset -2px -2px 4px rgba(0, 0, 0, 0.65);
-  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-/* 2. Tactile 3D Clay Pill Button */
-.clay-pill {
-  background: #15151c;
+/* 2. Tactile Utilitarian Button */
+.clay-pill, .clay-btn {
+  background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 9999px;
-  box-shadow:
-    4px 4px 10px #020204,
-    -2px -2px 6px rgba(255, 255, 255, 0.03),
-    inset 1px 1px 1px rgba(255, 255, 255, 0.12),
-    inset -1px -1px 2px rgba(0, 0, 0, 0.55);
-  color: #d4d4d8;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 5px;
+  color: #a1a1aa;
+  font-weight: 500;
+  box-shadow: none;
+  transition: all 0.12s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.clay-pill:hover {
-  background: #1c1c24;
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow:
-    5px 5px 12px #020204,
-    -3px -3px 8px rgba(255, 255, 255, 0.05),
-    inset 1px 1px 1.5px rgba(255, 255, 255, 0.18),
-    inset -1px -1px 2px rgba(0, 0, 0, 0.5);
+.clay-pill:hover, .clay-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fafafa;
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
-.clay-pill:active {
-  transform: translateY(1px) scale(0.98);
-  box-shadow:
-    inset 2px 2px 5px rgba(0, 0, 0, 0.8),
-    inset -1px -1px 2px rgba(255, 255, 255, 0.06);
+.clay-pill:active, .clay-btn:active {
+  transform: scale(0.98);
+  background: rgba(255, 255, 255, 0.1);
 }
 
-/* 3. Inverted High-Contrast Clay Active Pill */
-.clay-pill-active {
+/* 3. High-Contrast Active Button */
+.clay-pill-active, .clay-btn-active {
   background: #ffffff !important;
-  color: #000000 !important;
-  font-weight: 700 !important;
+  color: #09090b !important;
+  font-weight: 600 !important;
   border: 1px solid #ffffff !important;
-  border-radius: 9999px !important;
-  box-shadow:
-    0 0 16px rgba(255, 255, 255, 0.35),
-    4px 4px 10px #020204,
-    inset 1px 1px 2px rgba(255, 255, 255, 0.8),
-    inset -2px -2px 3px rgba(0, 0, 0, 0.25) !important;
+  border-radius: 5px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12) !important;
 }
 
-/* 4. Rounded Clay Button (for compact toolbars and icons) */
-.clay-btn {
-  background: #14141a;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 10px;
-  box-shadow:
-    3px 3px 8px #020204,
-    -2px -2px 5px rgba(255, 255, 255, 0.03),
-    inset 1px 1px 1px rgba(255, 255, 255, 0.1),
-    inset -1px -1px 2px rgba(0, 0, 0, 0.5);
-  color: #d4d4d8;
-  transition: all 0.14s ease;
-}
-
-.clay-btn:hover {
-  background: #1b1b22;
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.16);
-  box-shadow:
-    4px 4px 10px #020204,
-    -2px -2px 6px rgba(255, 255, 255, 0.05),
-    inset 1px 1px 1px rgba(255, 255, 255, 0.16);
-}
-
-.clay-btn:active {
-  transform: translateY(1px) scale(0.97);
-  box-shadow:
-    inset 2px 2px 4px rgba(0, 0, 0, 0.8),
-    inset -1px -1px 1.5px rgba(255, 255, 255, 0.06);
-}
-
-.clay-btn-active {
-  background: #ffffff !important;
-  color: #000000 !important;
-  font-weight: 700 !important;
-  border: 1px solid #ffffff !important;
-  box-shadow:
-    0 0 14px rgba(255, 255, 255, 0.3),
-    3px 3px 8px #020204,
-    inset 1px 1px 2px rgba(255, 255, 255, 0.8),
-    inset -1px -1px 2px rgba(0, 0, 0, 0.25) !important;
-}
-
-/* 5. Recessed Inset Clay Surface (Search bars, inputs, chart container) */
+/* 4. Recessed Inset Surface (Inputs, Scrubber bars) */
 .clay-inset {
-  background: #09090d;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
-  box-shadow:
-    inset 3px 3px 8px #020203,
-    inset -2px -2px 6px rgba(255, 255, 255, 0.03);
+  background: #09090c;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 5px;
+  box-shadow: none;
 }
 
-/* 6. Clay Floating Dropdown Popover */
+/* 5. Floating Dropdown Menu & Popover */
 .clay-popover {
-  background: #0f0f14;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  box-shadow:
-    10px 10px 30px #000000,
-    -4px -4px 14px rgba(255, 255, 255, 0.03),
-    inset 1px 1px 2px rgba(255, 255, 255, 0.12),
-    inset -2px -2px 4px rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(12px);
+  background: #121216;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(14px);
 }
 
-/* 7. Fullscreen Clay Modal Dialog */
+/* 6. Modal Dialog Container */
 .clay-modal {
-  background: #0e0e13;
+  background: #111114;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 24px;
-  box-shadow:
-    16px 16px 48px #000000,
-    -8px -8px 24px rgba(255, 255, 255, 0.03),
-    inset 1px 1px 2px rgba(255, 255, 255, 0.15),
-    inset -3px -3px 6px rgba(0, 0, 0, 0.7);
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8);
 }
 
-/* 8. Small Clay Pill Tag / Badge */
+/* 7. Tag / Status Badge */
 .clay-badge {
-  background: #171720;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 9999px;
-  box-shadow:
-    2px 2px 5px #020204,
-    inset 1px 1px 1px rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  color: #a1a1aa;
+  font-weight: 500;
+  box-shadow: none;
 }
 
-/* Light Theme Claymorphic Overrides */
+/* 8. Micro Keystroke Tag */
+kbd, .kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-family: 'SF Mono', 'Geist Mono', monospace;
+  font-weight: 500;
+  line-height: 1;
+  color: #a1a1aa;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* =========================================================================
+   LIGHT THEME REFINED MINIMALIST OVERRIDES
+   ========================================================================= */
+
 html.theme-light .clay-card {
   background: #ffffff;
   border-color: rgba(0, 0, 0, 0.08);
-  box-shadow:
-    5px 5px 12px #d4d4d8,
-    -3px -3px 8px #ffffff,
-    inset 1px 1px 1.5px rgba(255, 255, 255, 0.8),
-    inset -1px -1px 3px rgba(0, 0, 0, 0.08);
-  color: #09090b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  color: #111111;
 }
 
-html.theme-light .clay-pill {
-  background: #f4f4f6;
+html.theme-light .clay-pill,
+html.theme-light .clay-btn {
+  background: #f7f6f3;
   border-color: rgba(0, 0, 0, 0.08);
-  box-shadow:
-    3px 3px 8px #d4d4d8,
-    -2px -2px 6px #ffffff,
-    inset 1px 1px 1px #ffffff,
-    inset -1px -1px 2px rgba(0, 0, 0, 0.06);
-  color: #18181b;
+  border-radius: 5px;
+  color: #555555;
+  box-shadow: none;
 }
 
-html.theme-light .clay-pill:hover {
-  background: #e4e4e7;
-  color: #000000;
+html.theme-light .clay-pill:hover,
+html.theme-light .clay-btn:hover {
+  background: #eeebe6;
+  color: #111111;
   border-color: rgba(0, 0, 0, 0.15);
 }
 
-html.theme-light .clay-pill-active {
-  background: #09090b !important;
-  color: #ffffff !important;
-  border-color: #09090b !important;
-  box-shadow:
-    0 0 12px rgba(0, 0, 0, 0.25),
-    3px 3px 8px #d4d4d8,
-    inset 1px 1px 2px rgba(255, 255, 255, 0.2) !important;
-}
-
-html.theme-light .clay-btn {
-  background: #f4f4f6;
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow:
-    2px 2px 6px #d4d4d8,
-    -1px -1px 4px #ffffff;
-  color: #18181b;
-}
-
-html.theme-light .clay-btn:hover {
-  background: #e4e4e7;
-  color: #000000;
-}
-
+html.theme-light .clay-pill-active,
 html.theme-light .clay-btn-active {
-  background: #09090b !important;
+  background: #111111 !important;
   color: #ffffff !important;
-  border-color: #09090b !important;
+  border-color: #111111 !important;
+  border-radius: 5px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) !important;
 }
 
 html.theme-light .clay-popover {
   background: #ffffff;
-  border-color: rgba(0, 0, 0, 0.12);
-  box-shadow:
-    8px 8px 24px rgba(0, 0, 0, 0.12),
-    -4px -4px 12px #ffffff;
-  color: #09090b;
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  color: #111111;
 }
 
 html.theme-light .clay-inset {
-  background: #f1f5f9;
+  background: #f1f0ec;
   border-color: rgba(0, 0, 0, 0.08);
-  box-shadow:
-    inset 2px 2px 6px #cbd5e1,
-    inset -1px -1px 4px #ffffff;
-  color: #09090b;
+  border-radius: 5px;
+  box-shadow: none;
+  color: #111111;
 }
 
 html.theme-light .clay-modal {
   background: #ffffff;
-  border-color: rgba(0, 0, 0, 0.15);
-  box-shadow:
-    12px 12px 36px rgba(0, 0, 0, 0.2),
-    -6px -6px 18px #ffffff;
-  color: #09090b;
+  border-color: rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
+  color: #111111;
+}
+
+html.theme-light .clay-badge {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  color: #555555;
+}
+
+html.theme-light kbd, html.theme-light .kbd {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #444444;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
 }

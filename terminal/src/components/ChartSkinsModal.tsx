@@ -88,12 +88,12 @@ export default function ChartSkinsModal({ isOpen, onClose }: ChartSkinsModalProp
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md select-none font-mono text-xs">
-      <div className="flex flex-col w-full max-w-2xl max-h-[90vh] rounded-2xl border border-grid bg-panel p-6 shadow-2xl overflow-hidden">
+      <div className="flex flex-col w-full max-w-2xl max-h-[90vh] rounded-[10px] border border-white/[0.08] bg-panel p-6 shadow-2xl overflow-hidden">
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-grid pb-3 shrink-0">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-3 w-3 rounded-full bg-cyan-400" />
-            <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+            <span className="flex h-2 w-2 rounded-full bg-cyan-400" />
+            <h3 className="text-sm font-semibold text-white">
               ChartSkins Background Engine (Image, GIF & Video)
             </h3>
           </div>

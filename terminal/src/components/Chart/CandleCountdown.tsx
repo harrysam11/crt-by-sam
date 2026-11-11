@@ -42,11 +42,11 @@ export default function CandleCountdown({ timeframe }: CandleCountdownProps) {
 
   return (
     <div
-      className="pointer-events-none absolute right-3 top-2 z-20 flex items-center gap-1.5 rounded border border-grid/80 bg-panel/85 px-2 py-0.5 font-mono text-[11px] text-muted shadow-sm backdrop-blur-sm"
+      className="pointer-events-none absolute right-3 top-2 z-20 flex items-center gap-1.5 rounded-[4px] border border-white/[0.08] bg-[#111114]/90 px-2 py-0.5 font-mono text-[11px] text-zinc-400 shadow-sm backdrop-blur-sm"
       title={`Time remaining until current ${timeframe} candle closes`}
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
-      <span className="text-slate-400">{timeframe}:</span>
+      <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+      <span className="text-zinc-500">{timeframe}:</span>
       <span className="font-semibold text-white">{formatted}</span>
     </div>
   );

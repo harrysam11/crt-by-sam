@@ -37,12 +37,12 @@ export default function HotkeyModal({ isOpen, onClose }: HotkeyModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md select-none font-mono text-xs">
-      <div className="w-full max-w-xl rounded-2xl border border-grid bg-panel p-6 shadow-2xl">
+      <div className="w-full max-w-xl rounded-[10px] border border-white/[0.08] bg-panel p-6 shadow-2xl">
         <div className="flex items-center justify-between border-b border-grid pb-3">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-accent" />
-            <h2 className="text-sm font-bold uppercase tracking-wider text-white">
-              Professional Keyboard Hotkeys & Vim Navigation
+            <span className="flex h-2 w-2 rounded-full bg-accent" />
+            <h2 className="text-sm font-semibold text-white">
+              Keyboard Hotkeys & Navigation
             </h2>
           </div>
           <button onClick={onClose} className="text-muted hover:text-white" aria-label="Close">

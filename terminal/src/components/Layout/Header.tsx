@@ -193,11 +193,11 @@ export default function Header({
   const displayPnl = hideDollar ? (open >= 0 ? '+Target Track' : '-Risk Zone') : fmtPnl(open);
 
   return (
-    <header className="relative flex h-12 shrink-0 items-center gap-2.5 border-b border-grid bg-panel px-3 select-none font-mono text-xs overflow-x-auto shadow-clay-card z-20">
-      {/* Daily Drawdown Ambient Progress Bar along top border */}
+    <header className="relative flex h-11 shrink-0 items-center gap-2.5 border-b border-grid bg-panel px-3 select-none font-mono text-xs overflow-x-auto z-20">
+      {/* Daily Drawdown Progress Bar along top border */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-grid/30 overflow-hidden">
         <div
-          className={`h-full transition-all duration-500 ${
+          className={`h-full transition-all duration-300 ${
             drawdownPct > 80 ? 'bg-red-500' : drawdownPct > 50 ? 'bg-zinc-400' : 'bg-white'
           }`}
           style={{ width: `${drawdownPct}%` }}
@@ -206,17 +206,17 @@ export default function Header({
       </div>
 
       <div className="flex items-center gap-2 whitespace-nowrap">
-        <span className="text-sm font-black text-white tracking-wide">{labelOf(symbol)}</span>
-        <span className={`num text-base font-bold ${dir === 'up' ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]' : dir === 'down' ? 'text-zinc-500' : 'text-white'}`}>
+        <span className="text-sm font-bold text-white tracking-wide">{labelOf(symbol)}</span>
+        <span className={`num text-base font-semibold ${dir === 'up' ? 'text-white' : dir === 'down' ? 'text-zinc-500' : 'text-white'}`}>
           {fmtPrice(price, symbol)}
         </span>
         <span className="text-xs text-muted font-medium">{inst?.currency}</span>
-        <span className="num text-xs font-bold text-white bg-white/10 px-1.5 py-0.5 rounded-full border border-white/10">{fmtPct(change)}</span>
+        <span className="num text-xs font-semibold text-white bg-white/5 px-1.5 py-0.5 rounded-[4px] border border-white/10">{fmtPct(change)}</span>
         {marketOpen === false && <span className="clay-badge px-2 py-0.5 text-xs text-zinc-400">Market closed</span>}
 
-        {/* Kill-Switch alert pill */}
+        {/* Kill-Switch alert badge */}
         {killSwitch.isLocked && (
-          <span className="rounded-full bg-red-500/20 border border-red-500/40 px-2 py-0.5 text-[11px] font-bold text-red-400 animate-pulse">
+          <span className="rounded-[4px] bg-red-500/10 border border-red-500/30 px-2 py-0.5 text-[11px] font-semibold text-red-300">
             [Locked]
           </span>
         )}
@@ -480,7 +480,7 @@ export default function Header({
 
         {/* Stale data warning indicator */}
         {(feed === 'closed' || feed === 'reconnecting') && (
-          <span className="rounded-full bg-yellow-500/20 border border-yellow-500/40 px-2 py-0.5 text-[10px] font-bold text-yellow-300 animate-pulse">
+          <span className="rounded-[4px] border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-mono text-amber-400">
             [STALE FEED WARNING]
           </span>
         )}
@@ -520,12 +520,12 @@ export default function Header({
 
 function Stat({ label, value, sub, cls = 'text-white' }: { label: string; value: string; sub?: string; cls?: string }) {
   return (
-    <div className="hidden flex-col leading-tight sm:flex font-mono px-2 py-0.5 rounded-xl border border-white/5 bg-[#14141a]/60 shadow-clay-btn">
+    <div className="hidden flex-col leading-tight sm:flex font-mono px-2 py-0.5 rounded-[5px] border border-white/[0.08] bg-white/[0.03]">
       <div className="flex items-center gap-1">
         <span className="text-[10px] text-muted">{label}</span>
-        {sub && <span className="text-[9px] text-white/50 font-medium">{sub}</span>}
+        {sub && <span className="text-[9px] text-zinc-500 font-medium">{sub}</span>}
       </div>
-      <span className={`text-xs font-bold ${cls}`}>{value}</span>
+      <span className={`text-xs font-semibold ${cls}`}>{value}</span>
     </div>
   );
 }

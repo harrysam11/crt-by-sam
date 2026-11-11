@@ -90,13 +90,13 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md select-none font-mono text-xs">
-      <div className="flex h-[85vh] w-full max-w-2xl flex-col rounded-2xl border border-grid bg-panel shadow-2xl overflow-hidden">
+      <div className="flex h-[85vh] w-full max-w-2xl flex-col rounded-[10px] border border-white/[0.08] bg-panel shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-grid px-6 py-4 bg-bg/50">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-accent" />
-            <h2 className="text-sm font-bold uppercase tracking-wider text-white">
-              Secure Client-Side API Vault & E2EE State Backup
+            <span className="flex h-2 w-2 rounded-full bg-accent" />
+            <h2 className="text-sm font-semibold text-white">
+              Secure Client-Side API Vault & State Backup
             </h2>
           </div>
           <button onClick={onClose} className="text-muted hover:text-white" aria-label="Close">

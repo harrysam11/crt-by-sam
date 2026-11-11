@@ -70,7 +70,7 @@ export default function BarReplayController({
     >
       {/* Replay Mode Badge */}
       <div className="flex items-center gap-1.5 pr-2 border-r border-grid/50">
-        <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
+        <span className="h-1.5 w-1.5 rounded-full bg-white" />
         <span className="clay-badge font-bold text-[10px] tracking-wider text-white">REPLAY</span>
       </div>
 

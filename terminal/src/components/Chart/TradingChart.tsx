@@ -1994,10 +1994,10 @@ export default function TradingChart({
         {/* Right Section: Session, Scale, Timezone, Snapshot, Settings, Fullscreen */}
         <div className="flex items-center gap-1.5 shrink-0 ml-2">
           {/* Market Session Status Badge */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/40 border border-white/5 text-[10px] font-mono shrink-0">
-            <span className={`w-1.5 h-1.5 rounded-full ${provider === 'binance' ? 'bg-emerald-400 animate-pulse' : 'bg-emerald-400'}`} />
-            <span className="text-slate-400 font-semibold">
-              {provider === 'binance' ? '24/7 LIVE' : 'REGULAR'}
+          <div className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] bg-white/[0.03] border border-white/[0.08] text-[10px] font-mono shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span className="text-slate-400 font-medium">
+              {provider === 'binance' ? '24/7 Live' : 'Regular'}
             </span>
           </div>
 
@@ -2327,14 +2327,14 @@ export default function TradingChart({
     </div>
 
       {/* TradingView Bottom Range & Scale Bar */}
-      <div className="h-8 shrink-0 border-t border-grid bg-panel px-3 flex items-center justify-between text-[11px] text-slate-300 select-none font-mono shadow-clay-card">
+      <div className="h-8 shrink-0 border-t border-grid bg-panel px-3 flex items-center justify-between text-[11px] text-slate-300 select-none font-mono">
         {/* Left: Time Range Presets */}
         <div className="flex items-center gap-1.5">
           {(['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', 'ALL'] as const).map((r) => (
             <button
               key={r}
               onClick={() => handleSelectTimeRange(r)}
-              className="px-2 py-0.5 rounded-full clay-btn text-[10px] font-semibold transition"
+              className="px-2 py-0.5 rounded-[4px] clay-btn text-[10px] font-medium transition"
             >
               {r}
             </button>
@@ -2350,7 +2350,7 @@ export default function TradingChart({
               const nextTz = tzs[(tzs.indexOf(timezone) + 1) % tzs.length];
               setTimezone(nextTz);
             }}
-            className="px-2 py-0.5 rounded-full clay-btn font-mono text-slate-300 hover:text-white transition"
+            className="px-2 py-0.5 rounded-[4px] clay-btn font-mono text-slate-300 hover:text-white transition"
             title={`Timezone: ${timezone} (Click to toggle)`}
           >
             {timezone === 'UTC' ? 'UTC' : timezone === 'Asia/Kolkata' ? 'IST' : timezone === 'America/New_York' ? 'EDT' : timezone === 'Europe/London' ? 'GMT' : 'JST'}
@@ -2360,7 +2360,7 @@ export default function TradingChart({
               audioHaptics.tick();
               api.current?.candles.priceScale().applyOptions({ autoScale: true });
             }}
-            className="px-2 py-0.5 rounded-full clay-pill-active text-[10px] font-bold transition"
+            className="px-2 py-0.5 rounded-[4px] clay-pill-active text-[10px] font-semibold transition"
             title="Auto scale (or double-click price scale)"
           >
             auto
@@ -2370,7 +2370,7 @@ export default function TradingChart({
               audioHaptics.tick();
               handleSetScaleMode('NORMAL');
             }}
-            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition ${
+            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-semibold transition ${
               scaleMode === 'NORMAL' ? 'clay-pill-active' : 'clay-pill'
             }`}
             title="Linear / Normal scale"
@@ -2382,7 +2382,7 @@ export default function TradingChart({
               audioHaptics.tick();
               handleSetScaleMode('LOGARITHMIC');
             }}
-            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition ${
+            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-semibold transition ${
               scaleMode === 'LOGARITHMIC' ? 'clay-pill-active' : 'clay-pill'
             }`}
             title="Logarithmic scale"
@@ -2394,7 +2394,7 @@ export default function TradingChart({
               audioHaptics.tick();
               handleSetScaleMode('PERCENTAGE');
             }}
-            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition ${
+            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-semibold transition ${
               scaleMode === 'PERCENTAGE' ? 'clay-pill-active' : 'clay-pill'
             }`}
             title="Percentage scale"

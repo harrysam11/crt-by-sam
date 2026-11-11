@@ -90,7 +90,7 @@ export default function MultiChartGrid() {
               audioHaptics.tick();
               toggleSync('syncSymbol');
             }}
-            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition flex items-center gap-1 ${
+            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold transition flex items-center gap-1 ${
               syncSymbol ? 'clay-pill-active' : 'clay-pill text-muted hover:text-white'
             }`}
             title="Sync Symbol across all charts"
@@ -107,7 +107,7 @@ export default function MultiChartGrid() {
               audioHaptics.tick();
               toggleSync('syncTimeframe');
             }}
-            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition flex items-center gap-1 ${
+            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold transition flex items-center gap-1 ${
               syncTimeframe ? 'clay-pill-active' : 'clay-pill text-muted hover:text-white'
             }`}
             title="Sync Interval / Timeframe across all charts"
@@ -124,7 +124,7 @@ export default function MultiChartGrid() {
               audioHaptics.tick();
               toggleSync('syncCrosshair');
             }}
-            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition flex items-center gap-1 ${
+            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold transition flex items-center gap-1 ${
               syncCrosshair ? 'clay-pill-active' : 'clay-pill text-muted hover:text-white'
             }`}
             title="Sync Crosshair time cursor across all charts"
@@ -141,7 +141,7 @@ export default function MultiChartGrid() {
               audioHaptics.tick();
               toggleSync('syncRange');
             }}
-            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition flex items-center gap-1 ${
+            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold transition flex items-center gap-1 ${
               syncRange ? 'clay-pill-active' : 'clay-pill text-muted hover:text-white'
             }`}
             title="Sync Visible Range / Zoom across all charts"

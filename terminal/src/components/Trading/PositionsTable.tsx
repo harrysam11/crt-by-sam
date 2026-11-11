@@ -31,7 +31,7 @@ export default function PositionsTable() {
   const list = [...orders].reverse().slice(0, 100);
   const pending = orders.filter((o) => o.status === 'PENDING').length;
   const th = 'px-3 py-1.5 text-left font-normal text-muted text-xs';
-  const tabCls = (on: boolean) => `px-3 py-1 text-xs font-semibold rounded-full transition ${on ? 'clay-pill-active font-bold' : 'clay-pill text-muted hover:text-white'}`;
+  const tabCls = (on: boolean) => `px-3 py-1 text-xs font-semibold rounded-[4px] transition ${on ? 'clay-pill-active font-bold' : 'clay-pill text-muted hover:text-white'}`;
 
   const copyTradesCsv = async () => {
     if (trades.length === 0) {

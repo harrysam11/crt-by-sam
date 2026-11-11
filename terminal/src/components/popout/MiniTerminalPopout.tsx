@@ -53,8 +53,8 @@ export default function MiniTerminalPopout({ onClose }: MiniTerminalPopoutProps)
       {/* Mini Header */}
       <div className="flex items-center justify-between border-b border-grid pb-2">
         <div className="flex items-center gap-2">
-          <span className="flex h-2 w-2 rounded-full bg-up animate-pulse" />
-          <span className="font-bold uppercase tracking-wider text-white">CRT Mini Terminal</span>
+          <span className="flex h-2 w-2 rounded-full bg-up" />
+          <span className="font-semibold text-white">CRT Mini Terminal</span>
         </div>
         {onClose && (
           <button onClick={onClose} className="text-muted hover:text-white" aria-label="Close">

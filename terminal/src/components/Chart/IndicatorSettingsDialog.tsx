@@ -49,7 +49,7 @@ export default function IndicatorSettingsDialog() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 select-none font-mono">
-      <div className="clay-popover w-full max-w-md flex flex-col rounded-2xl border border-grid shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="clay-popover w-full max-w-md flex flex-col rounded-[10px] border border-white/[0.08] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-grid px-4 py-3 bg-panel/90">
           <div className="flex items-center gap-2">
