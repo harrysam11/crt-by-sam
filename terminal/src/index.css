@@ -92,6 +92,46 @@ html.theme-light button:focus-visible {
   outline: 1px solid rgba(0, 0, 0, 0.3);
 }
 
+/* Native Select & Dropdown Option Styling */
+select {
+  background-color: #111114;
+  color: #f4f4f5;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+select:focus {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+select option {
+  background-color: #121216;
+  color: #f4f4f5;
+  padding: 6px 10px;
+}
+
+select option:checked {
+  background-color: #27272a;
+  color: #ffffff;
+}
+
+html.theme-light select {
+  background-color: #ffffff;
+  color: #18181b;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+html.theme-light select option {
+  background-color: #ffffff;
+  color: #18181b;
+}
+
+html.theme-light select option:checked {
+  background-color: #f4f4f5;
+  color: #000000;
+}
+
 /* =========================================================================
    UTILITARIAN MINIMALIST COMPONENT SYSTEM (UNSLOP REPLACEMENT)
    Replaces bulbous clay 3D bloat with crisp 1px hairlines and tactile micro-radii.

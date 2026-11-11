@@ -56,8 +56,18 @@ export default function MultiChartGrid() {
         setIsTemplateMenuOpen(false);
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsLayoutMenuOpen(false);
+        setIsTemplateMenuOpen(false);
+      }
+    };
     window.addEventListener('mousedown', handleClickOutside);
-    return () => window.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const handleSaveLayoutSubmit = (e: React.FormEvent) => {

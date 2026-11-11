@@ -94,6 +94,7 @@ export default function ChartContextMenu({
   const menuHeight = 440;
   const clampedX = Math.min(pos.x, window.innerWidth - menuWidth - 10);
   const clampedY = Math.min(pos.y, window.innerHeight - menuHeight - 10);
+  const submenuOnLeft = clampedX + menuWidth + 215 > window.innerWidth;
 
   const formattedPrice = fmtPrice(pos.price, symbol);
 
@@ -101,7 +102,7 @@ export default function ChartContextMenu({
     <div
       ref={menuRef}
       style={{ left: clampedX, top: clampedY }}
-      className="fixed z-50 w-64 rounded-xl border border-grid/90 bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl select-none font-mono text-[11px] text-slate-200"
+      className="fixed z-50 w-64 rounded-[8px] border border-white/[0.08] bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl select-none font-mono text-[11px] text-slate-200"
     >
       {/* Price Header */}
       <div className="border-b border-grid/60 px-3 py-1.5 flex items-center justify-between text-muted text-[10px]">
@@ -184,7 +185,7 @@ export default function ChartContextMenu({
         {activeSubmenu === 'SCALE' && (
           <div
             onMouseLeave={() => setActiveSubmenu(null)}
-            className="absolute left-full top-0 ml-1 w-48 rounded-xl border border-grid/90 bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl"
+            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-48 rounded-[8px] border border-white/[0.08] bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl`}
           >
             {(['NORMAL', 'LOGARITHMIC', 'PERCENTAGE'] as PriceScaleType[]).map((mode) => (
               <button
@@ -228,7 +229,7 @@ export default function ChartContextMenu({
         {activeSubmenu === 'STYLE' && (
           <div
             onMouseLeave={() => setActiveSubmenu(null)}
-            className="absolute left-full top-0 ml-1 w-52 rounded-xl border border-grid/90 bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl"
+            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 rounded-[8px] border border-white/[0.08] bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl`}
           >
             {(
               [
@@ -282,7 +283,7 @@ export default function ChartContextMenu({
         {activeSubmenu === 'TZ' && (
           <div
             onMouseLeave={() => setActiveSubmenu(null)}
-            className="absolute left-full top-0 ml-1 w-52 rounded-xl border border-grid/90 bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl"
+            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 rounded-[8px] border border-white/[0.08] bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl`}
           >
             {(
               [

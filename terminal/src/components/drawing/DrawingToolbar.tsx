@@ -5,7 +5,7 @@
  * ZERO EMOJI POLICY strictly enforced.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { ToolType, MagnetConfig } from './types';
 import { audioHaptics } from '../../utils/notify';
 import { useDrawingStore } from '../../store/useDrawingStore';
@@ -37,10 +37,34 @@ export default function DrawingToolbar({
   onToggleHideAll,
 }: DrawingToolbarProps) {
   const [openDrawer, setOpenDrawer] = useState<string | null>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const favorites = useDrawingStore((s) => s.favorites);
   const toggleFavorite = useDrawingStore((s) => s.toggleFavorite);
   const isFavoritesBarVisible = useDrawingStore((s) => s.isFavoritesBarVisible);
   const toggleFavoritesBar = useDrawingStore((s) => s.toggleFavoritesBar);
+
+  useEffect(() => {
+    if (!openDrawer) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+        setOpenDrawer(null);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpenDrawer(null);
+      }
+    };
+
+    window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [openDrawer]);
 
   const select = (t: ToolType) => {
     audioHaptics.tick();
@@ -51,7 +75,7 @@ export default function DrawingToolbar({
   const isCurrentInGroup = (tools: ToolType[]) => tools.includes(activeTool);
 
   const btnCls = (isActive: boolean) =>
-    `p-2 rounded-xl flex items-center justify-center transition relative group ${
+    `p-2 rounded-[6px] flex items-center justify-center transition relative group ${
       isActive ? 'clay-btn-active' : 'clay-btn text-slate-300'
     }`;
 
@@ -99,7 +123,7 @@ export default function DrawingToolbar({
   };
 
   return (
-    <div className="relative z-30 flex w-12 shrink-0 flex-col items-center gap-1.5 border-r border-grid bg-panel py-2 select-none font-mono text-xs shadow-clay-card">
+    <div ref={toolbarRef} className="relative z-30 flex w-12 shrink-0 flex-col items-center gap-1.5 border-r border-grid bg-panel py-2 select-none font-mono text-xs">
       {/* Drawer 1: Cursors */}
       <div className="relative">
         <button

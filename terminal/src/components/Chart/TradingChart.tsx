@@ -1388,9 +1388,9 @@ export default function TradingChart({
       <ChartSkinsLayer />
 
       {/* Institutional TradingView-Style Chart Top Toolbar */}
-      <div className="relative z-20 flex items-center justify-between border-b border-grid bg-panel px-2.5 py-1.5 select-none text-xs shadow-clay-card">
+      <div className="relative z-30 flex items-center justify-between border-b border-grid bg-panel px-2.5 py-1.5 select-none text-xs">
         {/* Left Section: Symbol, Timeframes, Candle Style, Indicators, Replay, Alert, Undo/Redo, Layers */}
-        <div className="flex items-center gap-2 overflow-x-auto min-w-0">
+        <div className="flex items-center gap-2 overflow-visible min-w-0">
           {/* Symbol Search Trigger */}
           <button
             onClick={() => {
@@ -1641,7 +1641,7 @@ export default function TradingChart({
             </button>
 
             {isColorMenuOpen && (
-              <div className="absolute left-0 top-full mt-2 z-50 w-64 clay-popover p-3 shadow-2xl font-mono text-xs select-none">
+              <div className="absolute left-0 top-full mt-2 z-50 w-64 clay-popover p-3 shadow-2xl font-mono text-xs select-none max-h-[80vh] overflow-y-auto">
                 <div className="px-1 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-2 flex items-center justify-between">
                   <span>Candle Palette</span>
                   <button
@@ -1889,7 +1889,7 @@ export default function TradingChart({
 
             {/* Layers Dropdown Menu */}
             {isLayersMenuOpen && (
-              <div className="absolute left-0 top-full mt-2 z-50 w-72 clay-popover p-2.5 shadow-2xl font-mono text-xs select-none">
+              <div className="absolute left-0 top-full mt-2 z-50 w-72 clay-popover p-2.5 shadow-2xl font-mono text-xs select-none max-h-[80vh] overflow-y-auto">
                 <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1.5">
                   Chart Overlays & Tools
                 </div>

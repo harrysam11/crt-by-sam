@@ -78,10 +78,19 @@ export default function Header({
         setIsInstToolsOpen(false);
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsInstToolsOpen(false);
+      }
+    };
     if (isInstToolsOpen) {
       window.addEventListener('mousedown', handleClickOutside);
+      window.addEventListener('keydown', handleKeyDown);
     }
-    return () => window.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isInstToolsOpen]);
 
   // Colour the price by tick direction
@@ -193,7 +202,7 @@ export default function Header({
   const displayPnl = hideDollar ? (open >= 0 ? '+Target Track' : '-Risk Zone') : fmtPnl(open);
 
   return (
-    <header className="relative flex h-11 shrink-0 items-center gap-2.5 border-b border-grid bg-panel px-3 select-none font-mono text-xs overflow-x-auto z-20">
+    <header className="relative flex h-11 shrink-0 items-center gap-2.5 border-b border-grid bg-panel px-3 select-none font-mono text-xs overflow-visible z-30">
       {/* Daily Drawdown Progress Bar along top border */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-grid/30 overflow-hidden">
         <div

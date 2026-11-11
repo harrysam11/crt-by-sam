@@ -5,7 +5,7 @@
  * ZERO EMOJI POLICY strictly enforced.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { DrawingItem } from './types';
 import { audioHaptics } from '../../utils/notify';
 import { useDrawingStore } from '../../store/useDrawingStore';
@@ -41,6 +41,30 @@ export default function DrawingContextBar({
   const saveTemplate = useDrawingStore((s) => s.saveTemplate);
   const [templateNameInput, setTemplateNameInput] = useState('');
   const [showTemplatesMenu, setShowTemplatesMenu] = useState(false);
+  const templatesMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showTemplatesMenu) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (templatesMenuRef.current && !templatesMenuRef.current.contains(e.target as Node)) {
+        setShowTemplatesMenu(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowTemplatesMenu(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showTemplatesMenu]);
 
   if (!selectedDrawing) return null;
 
@@ -180,7 +204,7 @@ export default function DrawingContextBar({
       </div>
 
       {/* Templates Menu */}
-      <div className="relative pr-2 border-r border-grid/50">
+      <div ref={templatesMenuRef} className="relative pr-2 border-r border-grid/50">
         <button
           onClick={() => setShowTemplatesMenu(!showTemplatesMenu)}
           className="clay-btn px-1.5 py-0.5 text-[10px] text-muted hover:text-white"

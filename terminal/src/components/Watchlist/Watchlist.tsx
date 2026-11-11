@@ -57,6 +57,7 @@ export default function Watchlist() {
 
   const listMenuRef = useRef<HTMLDivElement>(null);
   const flagMenuRef = useRef<HTMLDivElement>(null);
+  const flagPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleOutside = (e: MouseEvent) => {
@@ -67,9 +68,23 @@ export default function Watchlist() {
       if (flagMenuRef.current && !flagMenuRef.current.contains(target)) {
         setIsFlagMenuOpen(false);
       }
+      if (flagPickerRef.current && !flagPickerRef.current.contains(target)) {
+        setFlagPickerSymbol(null);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsListMenuOpen(false);
+        setIsFlagMenuOpen(false);
+        setFlagPickerSymbol(null);
+      }
     };
     window.addEventListener('mousedown', handleOutside);
-    return () => window.removeEventListener('mousedown', handleOutside);
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      window.removeEventListener('mousedown', handleOutside);
+      window.removeEventListener('keydown', handleEscape);
+    };
   }, []);
 
   const activeGroup = lists.find((l) => l.id === activeListId) || lists[0];
@@ -421,7 +436,7 @@ export default function Watchlist() {
 
                 {/* Color Flag Selector Popover */}
                 {flagPickerSymbol === item.id && (
-                  <div className="clay-popover absolute left-2 top-8 z-50 flex items-center gap-1.5 p-1.5 bg-[#14141c] border border-white/10 shadow-2xl rounded-full">
+                  <div ref={flagPickerRef} className="clay-popover absolute left-2 top-8 z-50 flex items-center gap-1.5 p-1.5 bg-[#14141c] border border-white/10 shadow-2xl rounded-full">
                     {FLAG_ORDER.map((fColor) => {
                       const c = FLAG_COLORS[fColor];
                       return (
