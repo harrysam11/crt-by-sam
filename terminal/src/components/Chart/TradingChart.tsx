@@ -40,6 +40,7 @@ import BarReplayController from './BarReplayController';
 import ChartSettingsModal, { DEFAULT_CHART_SETTINGS, type ChartSettingsState } from './ChartSettingsModal';
 import ChartLegendHUD, { type ActiveIndicatorInfo } from './ChartLegendHUD';
 import VolumeProfileOverlay from './VolumeProfileOverlay';
+import DeepStudiesOverlay from './DeepStudiesOverlay';
 import PriceScaleActionFlyout from './PriceScaleActionFlyout';
 import SymbolSearchModal from '../Search/SymbolSearchModal';
 import ChartContextMenu, { type ChartContextMenuPos } from './ChartContextMenu';
@@ -211,6 +212,8 @@ export default function TradingChart({
   const [isLockedAll, setIsLockedAll] = useState(false);
   const [isHiddenAll, setIsHiddenAll] = useState(false);
   const pineSeriesRef = useRef<ISeriesApi<'Line'>[]>([]);
+  const hasFittedSymbolRef = useRef<Record<string, boolean>>({});
+  const [countdownText, setCountdownText] = useState<string>('');
 
   // Indicators Modal State
   const [isIndicatorsModalOpen, setIsIndicatorsModalOpen] = useState(false);
@@ -1155,7 +1158,11 @@ export default function TradingChart({
     );
 
     live.current = { closes, lastTime: displayCandles[n - 1].time, emaPrev: e[n - 2] ?? null, lastEma: e[n - 1] ?? null };
-    a.chart.timeScale().fitContent();
+    const isInitialLoad = !hasFittedSymbolRef.current[symbol];
+    if (isInitialLoad) {
+      hasFittedSymbolRef.current[symbol] = true;
+      a.chart.timeScale().fitContent();
+    }
     const lastBar = displayCandles[n - 1];
     writeOhlc(lastBar);
     setCurrentOhlc({ open: lastBar.open, high: lastBar.high, low: lastBar.low, close: lastBar.close, volume: lastBar.volume });
@@ -1167,6 +1174,43 @@ export default function TradingChart({
       oi: oiBars.length ? oiBars[oiBars.length - 1].totalOI : null,
     });
   }, [effectiveCandles, symbol, chartStyle]);
+
+  // Live Countdown to Bar Close Timer
+  useEffect(() => {
+    if (!chartSettings.showCountdownTimer || !effectiveCandles.length) {
+      setCountdownText('');
+      return;
+    }
+
+    const tfSecondsMap: Record<string, number> = {
+      '1m': 60,
+      '3m': 180,
+      '5m': 300,
+      '15m': 900,
+      '30m': 1800,
+      '1h': 3600,
+      '2h': 7200,
+      '4h': 14400,
+      '1d': 86400,
+      '1w': 604800,
+    };
+    const dur = tfSecondsMap[timeframe] || 60;
+
+    const tickCountdown = () => {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const lastCandle = effectiveCandles[effectiveCandles.length - 1];
+      if (!lastCandle) return;
+      const nextClose = lastCandle.time + dur;
+      const diff = Math.max(0, nextClose - nowSec);
+      const m = Math.floor(diff / 60);
+      const s = diff % 60;
+      setCountdownText(`${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+    };
+
+    tickCountdown();
+    const interval = setInterval(tickCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [timeframe, effectiveCandles, chartSettings.showCountdownTimer]);
 
   // Dynamically compute and sync active overlay indicators on main price chart
   useEffect(() => {
@@ -2216,6 +2260,7 @@ export default function TradingChart({
             currentOhlc={currentOhlc}
             indicators={activeIndicatorsList}
             onOpenSymbolSearch={() => setIsSymbolSearchOpen(true)}
+            countdownText={countdownText}
           />
 
           <div ref={ohlc} className="hidden" />
@@ -2295,6 +2340,17 @@ export default function TradingChart({
 
           {/* Multi-Timeframe Ghost Charts Canvas Layer */}
           <GhostOverlay chartApi={chartApi} seriesApi={seriesApi} />
+
+          {/* Deep Institutional Studies Overlay (Big Trades, GEX, Deep Zones) */}
+          <DeepStudiesOverlay
+            chartApi={chartApi}
+            seriesApi={seriesApi}
+            candles={effectiveCandles}
+            symbol={symbol}
+            currentPrice={currentPrice}
+            containerWidth={boxDimensions.w}
+            containerHeight={boxDimensions.h}
+          />
 
           {/* TradingView-Style SVG Drawing Tools Canvas Layer */}
           <DrawingOverlay

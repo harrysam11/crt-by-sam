@@ -4,7 +4,8 @@ export type IndicatorCategory =
   | 'Moving Averages'
   | 'Oscillators'
   | 'Technicals'
-  | 'Volume & Volatility';
+  | 'Volume & Volatility'
+  | 'Order Flow & Deep Studies';
 
 export interface IndicatorPlotStyle {
   id: string;

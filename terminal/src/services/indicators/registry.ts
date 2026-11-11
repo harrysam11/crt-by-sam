@@ -1,5 +1,6 @@
 import type { IndicatorDefinition } from './types';
 import * as Calc from './calculations';
+import { DeepStudiesEngine } from '../orderflow/deepStudies';
 
 export const INDICATOR_REGISTRY: IndicatorDefinition[] = [
   // 1. SMA
@@ -1189,6 +1190,108 @@ export const INDICATOR_REGISTRY: IndicatorDefinition[] = [
               color: isBullish ? '#22c55e' : '#ef4444',
             };
           }),
+        },
+      };
+    },
+  },
+
+  // 26. Cumulative Volume Delta (CVD)
+  {
+    id: 'cvd',
+    name: 'Cumulative Volume Delta',
+    shortName: 'CVD',
+    category: 'Order Flow & Deep Studies',
+    overlay: false,
+    description: 'Tracks running cumulative volume delta and highlights aggressive market buyer vs seller divergences.',
+    inputs: [],
+    defaultStyles: {
+      cvd: {
+        id: 'cvd',
+        label: 'CVD Line',
+        color: '#38bdf8',
+        lineWidth: 2,
+        lineStyle: 'solid',
+        plotType: 'line',
+        visible: true,
+      },
+    },
+    calculate: (candles) => {
+      const cvdPoints = DeepStudiesEngine.calculateCvdSeries(candles);
+      return {
+        plots: {
+          cvd: cvdPoints.map((p) => ({
+            time: p.time,
+            value: p.cvd,
+            color: p.divergence === 'BULLISH' ? '#22c55e' : p.divergence === 'BEARISH' ? '#ef4444' : '#38bdf8',
+          })),
+        },
+      };
+    },
+  },
+
+  // 27. Deep NQ Effort vs Result (Fabervaale VSA)
+  {
+    id: 'deep_effort',
+    name: 'Deep NQ Effort vs Result',
+    shortName: 'EFFORT',
+    category: 'Order Flow & Deep Studies',
+    overlay: false,
+    description: 'Fabervaale Volume Spread Analysis comparing volume effort against candle price displacement.',
+    inputs: [],
+    defaultStyles: {
+      effort: {
+        id: 'effort',
+        label: 'Effort Ratio',
+        color: '#f59e0b',
+        lineWidth: 2,
+        lineStyle: 'solid',
+        plotType: 'histogram',
+        visible: true,
+      },
+    },
+    calculate: (candles) => {
+      const pts = DeepStudiesEngine.calculateEffortResult(candles);
+      return {
+        plots: {
+          effort: pts.map((p) => ({
+            time: p.time,
+            value: p.effort,
+            color: p.anomaly === 'EFFORT_NO_RESULT' ? '#ef4444' : p.anomaly === 'RESULT_NO_EFFORT' ? '#22c55e' : '#71717a',
+          })),
+        },
+      };
+    },
+  },
+
+  // 28. Deep Flow (Net Delta Oscillator)
+  {
+    id: 'deep_flow',
+    name: 'Deep Flow (Order Flow Delta)',
+    shortName: 'FLOW',
+    category: 'Order Flow & Deep Studies',
+    overlay: false,
+    description: 'Institutional net delta oscillator measuring instant buying vs selling aggression.',
+    inputs: [],
+    defaultStyles: {
+      flow: {
+        id: 'flow',
+        label: 'Net Flow',
+        color: '#c084fc',
+        lineWidth: 2,
+        lineStyle: 'solid',
+        plotType: 'histogram',
+        visible: true,
+      },
+    },
+    calculate: (candles) => {
+      const cvdPoints = DeepStudiesEngine.calculateCvdSeries(candles);
+      return {
+        plots: {
+          flow: cvdPoints.map((p) => ({
+            time: p.time,
+            value: p.delta,
+            color: p.delta >= 0 ? '#22c55e' : '#ef4444',
+          })),
         },
       };
     },

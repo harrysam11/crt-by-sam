@@ -31,6 +31,7 @@ export interface ChartLegendHUDProps {
   } | null;
   indicators: ActiveIndicatorInfo[];
   onOpenSymbolSearch?: () => void;
+  countdownText?: string;
 }
 
 export default function ChartLegendHUD({
@@ -39,6 +40,7 @@ export default function ChartLegendHUD({
   currentOhlc,
   indicators,
   onOpenSymbolSearch,
+  countdownText,
 }: ChartLegendHUDProps) {
   const [isIndicatorsCollapsed, setIsIndicatorsCollapsed] = useState(false);
 
@@ -64,6 +66,11 @@ export default function ChartLegendHUD({
           </svg>
         </button>
         <span className="text-slate-400 font-semibold">{timeframe}</span>
+        {countdownText && (
+          <span className="text-[10px] text-amber-300 font-mono px-1.5 py-0.2 rounded bg-amber-950/60 border border-amber-800/40" title="Countdown to bar close">
+            {countdownText}
+          </span>
+        )}
         <span className="text-[10px] text-slate-400 px-1 py-0.2 rounded bg-slate-800/80 border border-grid">BINANCE</span>
 
         {/* OHLC Bar Metrics */}

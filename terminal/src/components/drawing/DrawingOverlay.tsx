@@ -3,6 +3,13 @@
  * Powered by BaseDrawingTool framework: anchor points, hit-testing, drag/resize,
  * magnet snapping, select/lock/hide/delete, z-ordering, undo/redo stack,
  * per-tool style panel, templates, multi-selection marquee, and per-symbol persistence.
+ * Features:
+ * - Shift + Drag: Instant Measure Ruler (distance, %, bars, time)
+ * - Alt + Drag: Temporary Demonstration Line with live price & pip badge
+ * - Alt Hotkeys: Alt+T (Trendline), Alt+H (Horizontal), Alt+V (Vertical), Alt+F (Fib), Alt+R (Rect), Alt+P (Long), Alt+S (Short), Alt+C (Crosshair)
+ * - Shift Angle Lock: Snaps lines to 0°, 45°, 90°
+ * - Ctrl + Drag: Instant Duplicate / Clone of selected drawing
+ * - Auto-revert to Crosshair on completion
  * ZERO EMOJI POLICY strictly enforced.
  */
 
@@ -68,6 +75,17 @@ export default function DrawingOverlay({
   const [activeDrawing, setActiveDrawing] = useState<DrawingItem | null>(null);
   const [creationStep, setCreationStep] = useState<number>(0);
 
+  // Modifier Key States
+  const [isCtrlHeld, setIsCtrlHeld] = useState(false);
+  const [isShiftHeld, setIsShiftHeld] = useState(false);
+  const [isAltHeld, setIsAltHeld] = useState(false);
+
+  // Demonstration Line State (Alt + Hold)
+  const [demonstrationDrawing, setDemonstrationDrawing] = useState<{
+    start: Point2D;
+    current: Point2D;
+  } | null>(null);
+
   // Marquee Selection Box State
   const [selectionBox, setSelectionBox] = useState<{
     startX: number;
@@ -75,7 +93,6 @@ export default function DrawingOverlay({
     currentX: number;
     currentY: number;
   } | null>(null);
-  const [isCtrlHeld, setIsCtrlHeld] = useState(false);
   const rightClickDragRef = useRef<{ startX: number; startY: number; didMove: boolean } | null>(null);
 
   // Dragging state
@@ -142,32 +159,62 @@ export default function DrawingOverlay({
     }
   }, [stayInDrawingMode, setActiveTool, onSelectTool]);
 
-  // Track Ctrl / Meta key state for marquee selection
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Control' || e.key === 'Meta') {
-        setIsCtrlHeld(true);
-      }
-    };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Control' || e.key === 'Meta') {
-        setIsCtrlHeld(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, []);
-
-  // Global hotkeys (Ctrl+Z, Ctrl+Y, Delete/Backspace, Escape)
+  // Track modifier keys & TradingView keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
 
+      if (e.key === 'Control' || e.key === 'Meta') setIsCtrlHeld(true);
+      if (e.key === 'Shift') setIsShiftHeld(true);
+      if (e.key === 'Alt') setIsAltHeld(true);
+
+      // TradingView Alt Shortcuts
+      if (e.altKey) {
+        if (e.key === 't' || e.key === 'T') {
+          e.preventDefault();
+          audioHaptics.tick();
+          setActiveTool('TRENDLINE');
+          onSelectTool?.('TRENDLINE');
+        } else if (e.key === 'h' || e.key === 'H') {
+          e.preventDefault();
+          audioHaptics.tick();
+          setActiveTool('HORIZONTAL_LINE');
+          onSelectTool?.('HORIZONTAL_LINE');
+        } else if (e.key === 'v' || e.key === 'V') {
+          e.preventDefault();
+          audioHaptics.tick();
+          setActiveTool('VERTICAL_LINE');
+          onSelectTool?.('VERTICAL_LINE');
+        } else if (e.key === 'f' || e.key === 'F') {
+          e.preventDefault();
+          audioHaptics.tick();
+          setActiveTool('FIBONACCI');
+          onSelectTool?.('FIBONACCI');
+        } else if (e.key === 'r' || e.key === 'R') {
+          e.preventDefault();
+          audioHaptics.tick();
+          setActiveTool('RECTANGLE');
+          onSelectTool?.('RECTANGLE');
+        } else if (e.key === 'p' || e.key === 'P') {
+          e.preventDefault();
+          audioHaptics.tick();
+          setActiveTool('POSITION_LONG');
+          onSelectTool?.('POSITION_LONG');
+        } else if (e.key === 's' || e.key === 'S') {
+          e.preventDefault();
+          audioHaptics.tick();
+          setActiveTool('POSITION_SHORT');
+          onSelectTool?.('POSITION_SHORT');
+        } else if (e.key === 'c' || e.key === 'C') {
+          e.preventDefault();
+          audioHaptics.tick();
+          setActiveTool('CURSOR_CROSSHAIR');
+          onSelectTool?.('CURSOR_CROSSHAIR');
+        }
+      }
+
+      // History & Deletion
       if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -189,12 +236,27 @@ export default function DrawingOverlay({
         setActiveDrawing(null);
         setCreationStep(0);
         setSelectionBox(null);
+        setDemonstrationDrawing(null);
+        autoRevertToCrosshair();
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') setIsCtrlHeld(false);
+      if (e.key === 'Shift') setIsShiftHeld(false);
+      if (e.key === 'Alt') {
+        setIsAltHeld(false);
+        setDemonstrationDrawing(null);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedDrawingIds, drawings, undo, redo, pushState, setSelectedDrawingIds]);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [selectedDrawingIds, drawings, undo, redo, pushState, setSelectedDrawingIds, setActiveTool, onSelectTool, autoRevertToCrosshair]);
 
   // Persist drawings per symbol to localStorage
   useEffect(() => {
@@ -427,7 +489,30 @@ export default function DrawingOverlay({
     const rawY = e.clientY - rect.top;
     const point = snapToCandle(rawX, rawY);
 
-    // Eraser mode deletes on click
+    // 1. Shift + Drag: Instant TradingView Measure Ruler
+    if (e.shiftKey && e.button === 0) {
+      audioHaptics.tick();
+      const measureDrawing: DrawingItem = {
+        id: `measure_${Date.now()}`,
+        type: 'MEASURE_RULER',
+        p1: point,
+        p2: point,
+        color: '#22c55e',
+        lineWidth: 1.5,
+      };
+      setActiveDrawing(measureDrawing);
+      setCreationStep(1);
+      return;
+    }
+
+    // 2. Alt + Drag: Temporary Demonstration Line
+    if (e.altKey && e.button === 0) {
+      audioHaptics.tick();
+      setDemonstrationDrawing({ start: point, current: point });
+      return;
+    }
+
+    // 3. Eraser mode deletes on click
     if (activeTool === 'CURSOR_ERASER' && e.button === 0) {
       for (let i = drawings.length - 1; i >= 0; i--) {
         const tool = ToolFactory.create(drawings[i]);
@@ -439,7 +524,7 @@ export default function DrawingOverlay({
       return;
     }
 
-    // Ctrl + drag or Left-drag Marquee selection
+    // 4. Ctrl + drag Marquee selection
     if (isCtrlHeld && e.button === 0) {
       setSelectionBox({
         startX: rawX,
@@ -468,13 +553,40 @@ export default function DrawingOverlay({
         }
       }
 
-      // Check if clicking inside body of any selected drawing to translate all selected drawings
+      // Check if clicking inside body of any selected drawing
       for (const selId of selectedDrawingIds) {
         const selected = drawings.find((d) => d.id === selId);
         if (selected && !selected.locked && !isLockedAll) {
           const tool = ToolFactory.create(selected);
           if (tool.hitTest(rawX, rawY, coordHelper)) {
             audioHaptics.tick();
+
+            // Ctrl + Drag: Instant Duplicate
+            if (e.ctrlKey || e.metaKey) {
+              const clonedId = `draw_${Date.now()}`;
+              const cloned: DrawingItem = {
+                ...selected,
+                id: clonedId,
+                p1: { ...selected.p1 },
+                p2: selected.p2 ? { ...selected.p2 } : undefined,
+                p3: selected.p3 ? { ...selected.p3 } : undefined,
+              };
+              const next = [...drawings, cloned];
+              setDrawings(next);
+              pushState(next);
+              setSelectedDrawingIds([clonedId]);
+              setDraggingBody({
+                startPoint: point,
+                items: [{
+                  drawingId: clonedId,
+                  initialP1: { ...cloned.p1 },
+                  initialP2: cloned.p2 ? { ...cloned.p2 } : undefined,
+                  initialP3: cloned.p3 ? { ...cloned.p3 } : undefined,
+                }],
+              });
+              return;
+            }
+
             const items = selectedDrawingIds.map((id) => {
               const d = drawings.find((x) => x.id === id)!;
               return {
@@ -623,7 +735,32 @@ export default function DrawingOverlay({
     const rect = containerRef.current.getBoundingClientRect();
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
-    const point = snapToCandle(rawX, rawY);
+    let point = snapToCandle(rawX, rawY);
+
+    // Demonstration line update
+    if (demonstrationDrawing) {
+      setDemonstrationDrawing({ ...demonstrationDrawing, current: point });
+      return;
+    }
+
+    // Shift Angle Lock (snap to nearest 45 degrees)
+    if (e.shiftKey && activeDrawing && creationStep === 1) {
+      const p1XY = coordHelper.pointToXY(activeDrawing.p1);
+      const dx = rawX - p1XY.x;
+      const dy = rawY - p1XY.y;
+      const angle = Math.atan2(dy, dx);
+      const snapStep = Math.PI / 4;
+      const snappedAngle = Math.round(angle / snapStep) * snapStep;
+      const dist = Math.hypot(dx, dy);
+      const snapX = p1XY.x + dist * Math.cos(snappedAngle);
+      const snapY = p1XY.y + dist * Math.sin(snappedAngle);
+      point = {
+        x: snapX,
+        y: snapY,
+        price: coordHelper.yToPrice(snapY),
+        time: coordHelper.xToTime(snapX),
+      };
+    }
 
     // Marquee selection box dragging
     if (selectionBox) {
@@ -701,6 +838,11 @@ export default function DrawingOverlay({
   };
 
   const handlePointerUp = () => {
+    // Clear demonstration drawing
+    if (demonstrationDrawing) {
+      setDemonstrationDrawing(null);
+    }
+
     // Finalize marquee selection box
     if (selectionBox) {
       const minX = Math.min(selectionBox.startX, selectionBox.currentX);
@@ -842,12 +984,10 @@ export default function DrawingOverlay({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       className={`absolute inset-0 z-10 ${
-        isDrawingTool
+        isDrawingTool || isCtrlHeld || isShiftHeld || isAltHeld
           ? 'cursor-crosshair pointer-events-auto'
           : activeTool === 'CURSOR_ERASER'
           ? 'cursor-not-allowed pointer-events-auto'
-          : isCtrlHeld
-          ? 'cursor-crosshair pointer-events-auto'
           : 'pointer-events-none'
       }`}
     >
@@ -864,6 +1004,42 @@ export default function DrawingOverlay({
             strokeWidth={1}
             strokeDasharray="4 4"
           />
+        )}
+
+        {/* Temporary Demonstration Drawing (Alt + Hold) */}
+        {demonstrationDrawing && (
+          <g>
+            <line
+              x1={demonstrationDrawing.start.x}
+              y1={demonstrationDrawing.start.y}
+              x2={demonstrationDrawing.current.x}
+              y2={demonstrationDrawing.current.y}
+              stroke="#38bdf8"
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
+            />
+            <circle cx={demonstrationDrawing.start.x} cy={demonstrationDrawing.start.y} r={3} fill="#38bdf8" />
+            <circle cx={demonstrationDrawing.current.x} cy={demonstrationDrawing.current.y} r={3} fill="#38bdf8" />
+            <rect
+              x={demonstrationDrawing.current.x + 8}
+              y={demonstrationDrawing.current.y - 12}
+              width={120}
+              height={20}
+              rx={3}
+              fill="#090a0f"
+              stroke="#38bdf8"
+              strokeWidth={1}
+            />
+            <text
+              x={demonstrationDrawing.current.x + 14}
+              y={demonstrationDrawing.current.y + 2}
+              fill="#ffffff"
+              fontSize={10}
+              fontFamily="monospace"
+            >
+              ${demonstrationDrawing.current.price.toFixed(2)} ({((demonstrationDrawing.current.price - demonstrationDrawing.start.price) / demonstrationDrawing.start.price * 100).toFixed(2)}%)
+            </text>
+          </g>
         )}
 
         {/* Render all drawings via BaseDrawingTool instances */}

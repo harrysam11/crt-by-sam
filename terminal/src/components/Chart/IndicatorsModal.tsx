@@ -28,6 +28,7 @@ const CATEGORIES = [
   'Oscillators',
   'Technicals',
   'Volume & Volatility',
+  'Order Flow & Deep Studies',
   'Pine Script',
 ] as const;
 
