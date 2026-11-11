@@ -2,23 +2,25 @@
  * TradingView-Style Drawing Overlay Layer.
  * Powered by BaseDrawingTool framework: anchor points, hit-testing, drag/resize,
  * magnet snapping, select/lock/hide/delete, z-ordering, undo/redo stack,
- * per-tool style panel, templates, and per-symbol persistence.
+ * per-tool style panel, templates, multi-selection marquee, and per-symbol persistence.
  * ZERO EMOJI POLICY strictly enforced.
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { IChartApi, ISeriesApi, SeriesType } from 'lightweight-charts';
-import type { ToolType, DrawingItem, Point2D, MagnetConfig, DrawingHandle } from './types';
+import type { ToolType, DrawingItem, Point2D, MagnetConfig } from './types';
 import type { Candle } from '../../types/terminal';
 import { audioHaptics } from '../../utils/notify';
 import DrawingContextBar from './DrawingContextBar';
 import { CoordinateHelper } from './framework/CoordinateHelper';
 import { ToolFactory } from './framework/ToolFactory';
 import { drawingEvents } from './framework/DrawingEvents';
+import { useDrawingStore } from '../../store/useDrawingStore';
 
 interface DrawingOverlayProps {
   symbol: string;
   activeTool: ToolType;
+  onSelectTool?: (tool: ToolType) => void;
   seriesApi: ISeriesApi<SeriesType> | null;
   chartApi: IChartApi | null;
   candles?: Candle[];
@@ -33,6 +35,7 @@ interface DrawingOverlayProps {
 export default function DrawingOverlay({
   symbol,
   activeTool,
+  onSelectTool,
   seriesApi,
   chartApi,
   candles = [],
@@ -44,6 +47,13 @@ export default function DrawingOverlay({
   externalLineTrigger,
 }: DrawingOverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Drawing Store Integration
+  const setActiveTool = useDrawingStore((s) => s.setActiveTool);
+  const stayInDrawingMode = useDrawingStore((s) => s.stayInDrawingMode);
+  const selectedDrawingIds = useDrawingStore((s) => s.selectedDrawingIds);
+  const setSelectedDrawingIds = useDrawingStore((s) => s.setSelectedDrawingIds);
+  const toggleSelectDrawingId = useDrawingStore((s) => s.toggleSelectDrawingId);
 
   // Load symbol-persisted drawings
   const [drawings, setDrawings] = useState<DrawingItem[]>(() => {
@@ -57,7 +67,16 @@ export default function DrawingOverlay({
 
   const [activeDrawing, setActiveDrawing] = useState<DrawingItem | null>(null);
   const [creationStep, setCreationStep] = useState<number>(0);
-  const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
+
+  // Marquee Selection Box State
+  const [selectionBox, setSelectionBox] = useState<{
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
+  const [isCtrlHeld, setIsCtrlHeld] = useState(false);
+  const rightClickDragRef = useRef<{ startX: number; startY: number; didMove: boolean } | null>(null);
 
   // Dragging state
   const [draggingHandle, setDraggingHandle] = useState<{
@@ -66,11 +85,14 @@ export default function DrawingOverlay({
   } | null>(null);
 
   const [draggingBody, setDraggingBody] = useState<{
-    drawingId: string;
     startPoint: Point2D;
-    initialP1: Point2D;
-    initialP2?: Point2D;
-    initialP3?: Point2D;
+    items: Array<{
+      drawingId: string;
+      initialP1: Point2D;
+      initialP2?: Point2D;
+      initialP3?: Point2D;
+      initialPoints?: Point2D[];
+    }>;
   } | null>(null);
 
   // Undo / Redo history stack
@@ -88,9 +110,9 @@ export default function DrawingOverlay({
       const prev = history[historyIdx - 1];
       setHistoryIdx((idx) => idx - 1);
       setDrawings(prev);
-      setSelectedDrawingId(null);
+      setSelectedDrawingIds([]);
     }
-  }, [historyIdx, history]);
+  }, [historyIdx, history, setSelectedDrawingIds]);
 
   const redo = useCallback(() => {
     if (historyIdx < history.length - 1) {
@@ -98,9 +120,9 @@ export default function DrawingOverlay({
       const next = history[historyIdx + 1];
       setHistoryIdx((idx) => idx + 1);
       setDrawings(next);
-      setSelectedDrawingId(null);
+      setSelectedDrawingIds([]);
     }
-  }, [historyIdx, history]);
+  }, [historyIdx, history, setSelectedDrawingIds]);
 
   // Hook into drawingEvents event bus
   useEffect(() => {
@@ -112,7 +134,35 @@ export default function DrawingOverlay({
     };
   }, [undo, redo]);
 
-  // Global hotkeys (Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z, Delete/Backspace)
+  // Auto revert to crosshair helper
+  const autoRevertToCrosshair = useCallback(() => {
+    if (!stayInDrawingMode) {
+      setActiveTool('CURSOR_CROSSHAIR');
+      onSelectTool?.('CURSOR_CROSSHAIR');
+    }
+  }, [stayInDrawingMode, setActiveTool, onSelectTool]);
+
+  // Track Ctrl / Meta key state for marquee selection
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        setIsCtrlHeld(true);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        setIsCtrlHeld(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // Global hotkeys (Ctrl+Z, Ctrl+Y, Delete/Backspace, Escape)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -125,19 +175,26 @@ export default function DrawingOverlay({
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
         e.preventDefault();
         redo();
-      } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedDrawingId) {
-        e.preventDefault();
-        deleteDrawing(selectedDrawingId);
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedDrawingIds.length > 0) {
+          e.preventDefault();
+          audioHaptics.tick();
+          const next = drawings.filter((d) => !selectedDrawingIds.includes(d.id));
+          setDrawings(next);
+          pushState(next);
+          setSelectedDrawingIds([]);
+        }
       } else if (e.key === 'Escape') {
-        setSelectedDrawingId(null);
+        setSelectedDrawingIds([]);
         setActiveDrawing(null);
         setCreationStep(0);
+        setSelectionBox(null);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedDrawingId, undo, redo]);
+  }, [selectedDrawingIds, drawings, undo, redo, pushState, setSelectedDrawingIds]);
 
   // Persist drawings per symbol to localStorage
   useEffect(() => {
@@ -155,23 +212,23 @@ export default function DrawingOverlay({
       setDrawings(loaded);
       setHistory([loaded]);
       setHistoryIdx(0);
-      setSelectedDrawingId(null);
+      setSelectedDrawingIds([]);
       setActiveDrawing(null);
       setCreationStep(0);
     } catch {
       setDrawings([]);
     }
-  }, [symbol]);
+  }, [symbol, setSelectedDrawingIds]);
 
   // Handle clear trigger
   useEffect(() => {
     if (clearTrigger) {
       setDrawings([]);
       pushState([]);
-      setSelectedDrawingId(null);
+      setSelectedDrawingIds([]);
       setActiveDrawing(null);
     }
-  }, [clearTrigger]);
+  }, [clearTrigger, pushState, setSelectedDrawingIds]);
 
   // Coordinate helper
   const coordHelper = useMemo(() => {
@@ -190,7 +247,6 @@ export default function DrawingOverlay({
         return { x: rawX, y: rawY, price: rawPrice, time: rawTime };
       }
 
-      // Find closest candle by pixel X
       let closestIdx = 0;
       let minXDist = Infinity;
 
@@ -210,7 +266,6 @@ export default function DrawingOverlay({
 
       const candleX = coordHelper.timeToX(closestCandle.time, rawX);
 
-      // Snap candidates: Open, High, Low, Close
       const candidates = [
         { price: closestCandle.high, y: coordHelper.priceToY(closestCandle.high) },
         { price: closestCandle.low, y: coordHelper.priceToY(closestCandle.low) },
@@ -218,22 +273,23 @@ export default function DrawingOverlay({
         { price: closestCandle.close, y: coordHelper.priceToY(closestCandle.close) },
       ];
 
-      let bestCand = candidates[0];
+      let closestCandidate = candidates[0];
       let minYDist = Infinity;
+
       for (const cand of candidates) {
-        const d = Math.abs(rawY - cand.y);
-        if (d < minYDist) {
-          minYDist = d;
-          bestCand = cand;
+        const dist = Math.abs(rawY - cand.y);
+        if (dist < minYDist) {
+          minYDist = dist;
+          closestCandidate = cand;
         }
       }
 
-      // Strong mode snaps always; Weak mode snaps within 20px
-      if (magnetConfig.mode === 'STRONG' || minYDist <= 20) {
+      const threshold = magnetConfig.mode === 'STRONG' ? 60 : 25;
+      if (minXDist <= threshold && minYDist <= threshold) {
         return {
           x: candleX,
-          y: bestCand.y,
-          price: bestCand.price,
+          y: closestCandidate.y,
+          price: closestCandidate.price,
           time: closestCandle.time,
         };
       }
@@ -243,7 +299,7 @@ export default function DrawingOverlay({
     [magnetConfig, candles, chartApi, seriesApi, coordHelper]
   );
 
-  // External line trigger from Price Scale hover actions
+  // Handle external line triggers (from PriceScaleActionFlyout)
   useEffect(() => {
     if (!externalLineTrigger || !seriesApi) return;
     const { price, type } = externalLineTrigger;
@@ -260,7 +316,8 @@ export default function DrawingOverlay({
     const next = [...drawings, newDrawing];
     setDrawings(next);
     pushState(next);
-    setSelectedDrawingId(newDrawing.id);
+    setSelectedDrawingIds([newDrawing.id]);
+    autoRevertToCrosshair();
   }, [externalLineTrigger, seriesApi]);
 
   // Pointer interactions
@@ -270,15 +327,108 @@ export default function DrawingOverlay({
     activeTool !== 'CURSOR_DOT' &&
     activeTool !== 'CURSOR_ERASER';
 
+  // Native chart container listener for right-click drag selection
+  useEffect(() => {
+    const parent = containerRef.current?.parentElement;
+    if (!parent) return;
+
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button === 2) {
+        const rect = parent.getBoundingClientRect();
+        rightClickDragRef.current = {
+          startX: e.clientX - rect.left,
+          startY: e.clientY - rect.top,
+          didMove: false,
+        };
+      }
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!rightClickDragRef.current) return;
+      const rect = parent.getBoundingClientRect();
+      const currentX = e.clientX - rect.left;
+      const currentY = e.clientY - rect.top;
+      const dx = Math.abs(currentX - rightClickDragRef.current.startX);
+      const dy = Math.abs(currentY - rightClickDragRef.current.startY);
+
+      if (dx > 4 || dy > 4) {
+        rightClickDragRef.current.didMove = true;
+        setSelectionBox({
+          startX: rightClickDragRef.current.startX,
+          startY: rightClickDragRef.current.startY,
+          currentX,
+          currentY,
+        });
+      }
+    };
+
+    const onMouseUp = (e: MouseEvent) => {
+      if (rightClickDragRef.current && rightClickDragRef.current.didMove) {
+        const rect = parent.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+        const minX = Math.min(rightClickDragRef.current.startX, currentX);
+        const maxX = Math.max(rightClickDragRef.current.startX, currentX);
+        const minY = Math.min(rightClickDragRef.current.startY, currentY);
+        const maxY = Math.max(rightClickDragRef.current.startY, currentY);
+
+        if (maxX - minX > 5 || maxY - minY > 5) {
+          const matchedIds: string[] = [];
+          for (const d of drawings) {
+            const tool = ToolFactory.create(d);
+            const handles = tool.getHandles(coordHelper);
+            const handleMatch = handles.some((h) => h.x >= minX && h.x <= maxX && h.y >= minY && h.y <= maxY);
+            if (handleMatch) {
+              matchedIds.push(d.id);
+            } else {
+              const p1X = coordHelper.timeToX(d.p1.time, d.p1.x);
+              const p1Y = coordHelper.priceToY(d.p1.price, d.p1.y);
+              if (p1X >= minX && p1X <= maxX && p1Y >= minY && p1Y <= maxY) {
+                matchedIds.push(d.id);
+              }
+            }
+          }
+          if (matchedIds.length > 0) {
+            audioHaptics.tick();
+            setSelectedDrawingIds(matchedIds);
+          }
+        }
+        setSelectionBox(null);
+      }
+      setTimeout(() => {
+        rightClickDragRef.current = null;
+      }, 50);
+    };
+
+    const onContextMenu = (e: MouseEvent) => {
+      if (rightClickDragRef.current?.didMove) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    parent.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    parent.addEventListener('contextmenu', onContextMenu, true);
+
+    return () => {
+      parent.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      parent.removeEventListener('contextmenu', onContextMenu, true);
+    };
+  }, [drawings, coordHelper, setSelectedDrawingIds]);
+
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || !containerRef.current) return;
+    if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
     const point = snapToCandle(rawX, rawY);
 
     // Eraser mode deletes on click
-    if (activeTool === 'CURSOR_ERASER') {
+    if (activeTool === 'CURSOR_ERASER' && e.button === 0) {
       for (let i = drawings.length - 1; i >= 0; i--) {
         const tool = ToolFactory.create(drawings[i]);
         if (tool.hitTest(rawX, rawY, coordHelper)) {
@@ -289,47 +439,77 @@ export default function DrawingOverlay({
       return;
     }
 
-    // Check handle hit testing on currently selected drawing
-    if (selectedDrawingId) {
-      const selected = drawings.find((d) => d.id === selectedDrawingId);
-      if (selected && !selected.locked && !isLockedAll) {
-        const tool = ToolFactory.create(selected);
-        const handles = tool.getHandles(coordHelper);
-        const hitHandle = handles.find(
-          (h) => Math.hypot(rawX - h.x, rawY - h.y) <= 8
-        );
-        if (hitHandle) {
-          audioHaptics.tick();
-          setDraggingHandle({ drawingId: selected.id, handleId: hitHandle.id });
-          return;
-        }
+    // Ctrl + drag or Left-drag Marquee selection
+    if (isCtrlHeld && e.button === 0) {
+      setSelectionBox({
+        startX: rawX,
+        startY: rawY,
+        currentX: rawX,
+        currentY: rawY,
+      });
+      return;
+    }
 
-        // If clicked inside body of selected drawing, start translating it
-        if (tool.hitTest(rawX, rawY, coordHelper)) {
-          audioHaptics.tick();
-          setDraggingBody({
-            drawingId: selected.id,
-            startPoint: point,
-            initialP1: { ...selected.p1 },
-            initialP2: selected.p2 ? { ...selected.p2 } : undefined,
-            initialP3: selected.p3 ? { ...selected.p3 } : undefined,
-          });
-          return;
+    if (e.button !== 0) return;
+
+    // Check handle hit testing on currently selected drawings
+    if (selectedDrawingIds.length > 0) {
+      for (const selId of selectedDrawingIds) {
+        const selected = drawings.find((d) => d.id === selId);
+        if (selected && !selected.locked && !isLockedAll) {
+          const tool = ToolFactory.create(selected);
+          const handles = tool.getHandles(coordHelper);
+          const hitHandle = handles.find((h) => Math.hypot(rawX - h.x, rawY - h.y) <= 8);
+          if (hitHandle) {
+            audioHaptics.tick();
+            setDraggingHandle({ drawingId: selected.id, handleId: hitHandle.id });
+            return;
+          }
+        }
+      }
+
+      // Check if clicking inside body of any selected drawing to translate all selected drawings
+      for (const selId of selectedDrawingIds) {
+        const selected = drawings.find((d) => d.id === selId);
+        if (selected && !selected.locked && !isLockedAll) {
+          const tool = ToolFactory.create(selected);
+          if (tool.hitTest(rawX, rawY, coordHelper)) {
+            audioHaptics.tick();
+            const items = selectedDrawingIds.map((id) => {
+              const d = drawings.find((x) => x.id === id)!;
+              return {
+                drawingId: id,
+                initialP1: { ...d.p1 },
+                initialP2: d.p2 ? { ...d.p2 } : undefined,
+                initialP3: d.p3 ? { ...d.p3 } : undefined,
+                initialPoints: d.points ? d.points.map((p) => ({ ...p })) : undefined,
+              };
+            });
+            setDraggingBody({ startPoint: point, items });
+            return;
+          }
         }
       }
     }
 
-    // Check hit testing on any existing drawing to select it
+    // Hit testing on any existing drawing to select it
     if (!isDrawingTool) {
       for (let i = drawings.length - 1; i >= 0; i--) {
         const tool = ToolFactory.create(drawings[i]);
         if (tool.hitTest(rawX, rawY, coordHelper)) {
           audioHaptics.tick();
-          setSelectedDrawingId(drawings[i].id);
+          if (e.ctrlKey || e.metaKey) {
+            toggleSelectDrawingId(drawings[i].id, true);
+          } else {
+            setSelectedDrawingIds([drawings[i].id]);
+          }
           return;
         }
       }
-      setSelectedDrawingId(null);
+      // Clicked empty space
+      if (!e.ctrlKey && !e.metaKey) {
+        setSelectedDrawingIds([]);
+      }
       return;
     }
 
@@ -351,7 +531,8 @@ export default function DrawingOverlay({
           const next = [...drawings, newDrawing];
           setDrawings(next);
           pushState(next);
-          setSelectedDrawingId(newDrawing.id);
+          setSelectedDrawingIds([newDrawing.id]);
+          autoRevertToCrosshair();
           return;
         }
 
@@ -369,7 +550,8 @@ export default function DrawingOverlay({
           const next = [...drawings, newDrawing];
           setDrawings(next);
           pushState(next);
-          setSelectedDrawingId(newDrawing.id);
+          setSelectedDrawingIds([newDrawing.id]);
+          autoRevertToCrosshair();
           return;
         }
 
@@ -416,9 +598,10 @@ export default function DrawingOverlay({
         const next = [...drawings, finalized];
         setDrawings(next);
         pushState(next);
-        setSelectedDrawingId(finalized.id);
+        setSelectedDrawingIds([finalized.id]);
         setActiveDrawing(null);
         setCreationStep(0);
+        autoRevertToCrosshair();
       } else if (creationStep === 2) {
         // Finalize 3-point tool
         if (!activeDrawing) return;
@@ -427,9 +610,10 @@ export default function DrawingOverlay({
         const next = [...drawings, finalized];
         setDrawings(next);
         pushState(next);
-        setSelectedDrawingId(finalized.id);
+        setSelectedDrawingIds([finalized.id]);
         setActiveDrawing(null);
         setCreationStep(0);
+        autoRevertToCrosshair();
       }
     }
   };
@@ -440,6 +624,12 @@ export default function DrawingOverlay({
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
     const point = snapToCandle(rawX, rawY);
+
+    // Marquee selection box dragging
+    if (selectionBox) {
+      setSelectionBox({ ...selectionBox, currentX: rawX, currentY: rawY });
+      return;
+    }
 
     // Dragging an anchor handle
     if (draggingHandle) {
@@ -454,33 +644,42 @@ export default function DrawingOverlay({
       return;
     }
 
-    // Translating an entire drawing body
+    // Translating entire drawing bodies together
     if (draggingBody) {
       const deltaPrice = point.price - draggingBody.startPoint.price;
       const deltaTime = point.time && draggingBody.startPoint.time ? point.time - draggingBody.startPoint.time : 0;
 
       setDrawings((prev) =>
         prev.map((d) => {
-          if (d.id !== draggingBody.drawingId) return d;
+          const item = draggingBody.items.find((x) => x.drawingId === d.id);
+          if (!item) return d;
+
           const tool = ToolFactory.create(d);
           tool.p1 = {
-            ...draggingBody.initialP1,
-            price: draggingBody.initialP1.price + deltaPrice,
-            time: draggingBody.initialP1.time !== undefined ? draggingBody.initialP1.time + deltaTime : undefined,
+            ...item.initialP1,
+            price: item.initialP1.price + deltaPrice,
+            time: item.initialP1.time !== undefined ? item.initialP1.time + deltaTime : undefined,
           };
-          if (draggingBody.initialP2) {
+          if (item.initialP2) {
             tool.p2 = {
-              ...draggingBody.initialP2,
-              price: draggingBody.initialP2.price + deltaPrice,
-              time: draggingBody.initialP2.time !== undefined ? draggingBody.initialP2.time + deltaTime : undefined,
+              ...item.initialP2,
+              price: item.initialP2.price + deltaPrice,
+              time: item.initialP2.time !== undefined ? item.initialP2.time + deltaTime : undefined,
             };
           }
-          if (draggingBody.initialP3) {
+          if (item.initialP3) {
             tool.p3 = {
-              ...draggingBody.initialP3,
-              price: draggingBody.initialP3.price + deltaPrice,
-              time: draggingBody.initialP3.time !== undefined ? draggingBody.initialP3.time + deltaTime : undefined,
+              ...item.initialP3,
+              price: item.initialP3.price + deltaPrice,
+              time: item.initialP3.time !== undefined ? item.initialP3.time + deltaTime : undefined,
             };
+          }
+          if (item.initialPoints) {
+            (tool as any).points = item.initialPoints.map((pt) => ({
+              ...pt,
+              price: pt.price + deltaPrice,
+              time: pt.time !== undefined ? pt.time + deltaTime : undefined,
+            }));
           }
           return tool.toJSON();
         })
@@ -502,22 +701,57 @@ export default function DrawingOverlay({
   };
 
   const handlePointerUp = () => {
+    // Finalize marquee selection box
+    if (selectionBox) {
+      const minX = Math.min(selectionBox.startX, selectionBox.currentX);
+      const maxX = Math.max(selectionBox.startX, selectionBox.currentX);
+      const minY = Math.min(selectionBox.startY, selectionBox.currentY);
+      const maxY = Math.max(selectionBox.startY, selectionBox.currentY);
+
+      if (maxX - minX > 5 || maxY - minY > 5) {
+        const matchedIds: string[] = [];
+        for (const d of drawings) {
+          const tool = ToolFactory.create(d);
+          const handles = tool.getHandles(coordHelper);
+          const handleMatch = handles.some((h) => h.x >= minX && h.x <= maxX && h.y >= minY && h.y <= maxY);
+          if (handleMatch) {
+            matchedIds.push(d.id);
+          } else {
+            const p1X = coordHelper.timeToX(d.p1.time, d.p1.x);
+            const p1Y = coordHelper.priceToY(d.p1.price, d.p1.y);
+            if (p1X >= minX && p1X <= maxX && p1Y >= minY && p1Y <= maxY) {
+              matchedIds.push(d.id);
+            }
+          }
+        }
+        if (matchedIds.length > 0) {
+          audioHaptics.tick();
+          setSelectedDrawingIds(matchedIds);
+        }
+      }
+      setSelectionBox(null);
+      return;
+    }
+
     if (draggingHandle) {
       setDraggingHandle(null);
       pushState(drawings);
+      autoRevertToCrosshair();
     }
     if (draggingBody) {
       setDraggingBody(null);
       pushState(drawings);
+      autoRevertToCrosshair();
     }
     if (activeDrawing && activeDrawing.type === 'BRUSH') {
       audioHaptics.tick();
       const next = [...drawings, activeDrawing];
       setDrawings(next);
       pushState(next);
-      setSelectedDrawingId(activeDrawing.id);
+      setSelectedDrawingIds([activeDrawing.id]);
       setActiveDrawing(null);
       setCreationStep(0);
+      autoRevertToCrosshair();
     }
   };
 
@@ -535,7 +769,7 @@ export default function DrawingOverlay({
     const next = drawings.filter((d) => d.id !== id);
     setDrawings(next);
     pushState(next);
-    if (selectedDrawingId === id) setSelectedDrawingId(null);
+    setSelectedDrawingIds(selectedDrawingIds.filter((selId) => selId !== id));
   };
 
   const bringToFront = (id: string) => {
@@ -560,8 +794,46 @@ export default function DrawingOverlay({
     });
   };
 
-  const selectedDrawing = drawings.find((d) => d.id === selectedDrawingId) ?? null;
-  const allDrawings = isHiddenAll ? [] : activeDrawing ? [...drawings, activeDrawing] : drawings;
+  // Bulk actions on multiple selected drawings
+  const handleBulkDelete = () => {
+    if (selectedDrawingIds.length === 0) return;
+    audioHaptics.tick();
+    const next = drawings.filter((d) => !selectedDrawingIds.includes(d.id));
+    setDrawings(next);
+    pushState(next);
+    setSelectedDrawingIds([]);
+  };
+
+  const handleBulkToggleLock = () => {
+    if (selectedDrawingIds.length === 0) return;
+    audioHaptics.tick();
+    const anyUnlocked = drawings.some((d) => selectedDrawingIds.includes(d.id) && !d.locked);
+    const next = drawings.map((d) =>
+      selectedDrawingIds.includes(d.id) ? { ...d, locked: anyUnlocked } : d
+    );
+    setDrawings(next);
+    pushState(next);
+  };
+
+  const handleBulkToggleHide = () => {
+    if (selectedDrawingIds.length === 0) return;
+    audioHaptics.tick();
+    const anyVisible = drawings.some((d) => selectedDrawingIds.includes(d.id) && !d.hidden);
+    const next = drawings.map((d) =>
+      selectedDrawingIds.includes(d.id) ? { ...d, hidden: anyVisible } : d
+    );
+    setDrawings(next);
+    pushState(next);
+  };
+
+  const singleSelectedDrawing =
+    selectedDrawingIds.length === 1 ? drawings.find((d) => d.id === selectedDrawingIds[0]) ?? null : null;
+
+  const allDrawings = isHiddenAll
+    ? []
+    : activeDrawing
+    ? [...drawings.filter((d) => !d.hidden), activeDrawing]
+    : drawings.filter((d) => !d.hidden);
 
   return (
     <div
@@ -574,13 +846,29 @@ export default function DrawingOverlay({
           ? 'cursor-crosshair pointer-events-auto'
           : activeTool === 'CURSOR_ERASER'
           ? 'cursor-not-allowed pointer-events-auto'
+          : isCtrlHeld
+          ? 'cursor-crosshair pointer-events-auto'
           : 'pointer-events-none'
       }`}
     >
       <svg className="h-full w-full pointer-events-none">
+        {/* Selection Marquee Box */}
+        {selectionBox && (
+          <rect
+            x={Math.min(selectionBox.startX, selectionBox.currentX)}
+            y={Math.min(selectionBox.startY, selectionBox.currentY)}
+            width={Math.abs(selectionBox.currentX - selectionBox.startX)}
+            height={Math.abs(selectionBox.currentY - selectionBox.startY)}
+            fill="rgba(56, 189, 248, 0.12)"
+            stroke="#38bdf8"
+            strokeWidth={1}
+            strokeDasharray="4 4"
+          />
+        )}
+
         {/* Render all drawings via BaseDrawingTool instances */}
         {allDrawings.map((item) => {
-          const isSelected = selectedDrawingId === item.id;
+          const isSelected = selectedDrawingIds.includes(item.id);
           const isHovered = false;
           const tool = ToolFactory.create(item);
 
@@ -588,7 +876,7 @@ export default function DrawingOverlay({
             <g key={item.id} className="pointer-events-auto">
               {tool.renderSVG(isSelected, isHovered, coordHelper, symbol)}
 
-              {/* Render anchor handles for selected drawing */}
+              {/* Render anchor handles for selected drawings */}
               {isSelected &&
                 !item.locked &&
                 !isLockedAll &&
@@ -614,13 +902,49 @@ export default function DrawingOverlay({
         })}
       </svg>
 
-      {/* Floating style panel for selected drawing */}
-      {selectedDrawing && !isHiddenAll && (
+      {/* Multi-Selection Action Bar (when > 1 drawing selected) */}
+      {selectedDrawingIds.length > 1 && !isHiddenAll && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-[#101015]/95 border border-[#272730] px-3 py-1.5 rounded-lg shadow-xl text-xs backdrop-blur font-mono pointer-events-auto">
+          <span className="text-[#38bdf8] font-semibold">{selectedDrawingIds.length} drawings selected</span>
+          <span className="text-[#3a3e52]">|</span>
+          <button
+            onClick={handleBulkToggleLock}
+            className="px-2 py-0.5 rounded hover:bg-[#202028] text-[#a0a5b5] hover:text-[#f0f2f8] transition-colors"
+            title="Lock / Unlock selected"
+          >
+            Lock/Unlock
+          </button>
+          <button
+            onClick={handleBulkToggleHide}
+            className="px-2 py-0.5 rounded hover:bg-[#202028] text-[#a0a5b5] hover:text-[#f0f2f8] transition-colors"
+            title="Hide / Unhide selected"
+          >
+            Hide/Show
+          </button>
+          <button
+            onClick={handleBulkDelete}
+            className="px-2 py-0.5 rounded hover:bg-rose-900/40 text-rose-400 hover:text-rose-300 transition-colors"
+            title="Delete selected (Del)"
+          >
+            Delete ({selectedDrawingIds.length})
+          </button>
+          <button
+            onClick={() => setSelectedDrawingIds([])}
+            className="px-1.5 py-0.5 rounded hover:bg-[#202028] text-[#6b7280] hover:text-[#f0f2f8] transition-colors"
+            title="Deselect all (Esc)"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Floating style panel for single selected drawing */}
+      {singleSelectedDrawing && !isHiddenAll && (
         <DrawingContextBar
-          selectedDrawing={selectedDrawing}
+          selectedDrawing={singleSelectedDrawing}
           onUpdateDrawing={updateDrawing}
           onDeleteDrawing={deleteDrawing}
-          onClose={() => setSelectedDrawingId(null)}
+          onClose={() => setSelectedDrawingIds([])}
           onBringToFront={bringToFront}
           onSendToBack={sendToBack}
         />

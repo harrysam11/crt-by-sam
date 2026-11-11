@@ -6,6 +6,17 @@ interface DrawingState {
   activeTool: ToolType;
   setActiveTool: (tool: ToolType) => void;
 
+  stayInDrawingMode: boolean;
+  toggleStayInDrawingMode: () => void;
+  setStayInDrawingMode: (v: boolean) => void;
+
+  floatingToolbarPos: { x: number; y: number };
+  setFloatingToolbarPos: (pos: { x: number; y: number }) => void;
+
+  selectedDrawingIds: string[];
+  setSelectedDrawingIds: (ids: string[]) => void;
+  toggleSelectDrawingId: (id: string, multi?: boolean) => void;
+
   favorites: ToolType[];
   toggleFavorite: (tool: ToolType) => void;
   isFavorite: (tool: ToolType) => boolean;
@@ -46,6 +57,28 @@ export const useDrawingStore = create<DrawingState>()(
     (set, get) => ({
       activeTool: 'CURSOR_CROSSHAIR',
       setActiveTool: (tool) => set({ activeTool: tool }),
+
+      stayInDrawingMode: false,
+      toggleStayInDrawingMode: () => set((s) => ({ stayInDrawingMode: !s.stayInDrawingMode })),
+      setStayInDrawingMode: (v) => set({ stayInDrawingMode: v }),
+
+      floatingToolbarPos: { x: 72, y: 520 },
+      setFloatingToolbarPos: (pos) => set({ floatingToolbarPos: pos }),
+
+      selectedDrawingIds: [],
+      setSelectedDrawingIds: (ids) => set({ selectedDrawingIds: ids }),
+      toggleSelectDrawingId: (id, multi = false) =>
+        set((s) => {
+          if (!multi) {
+            return { selectedDrawingIds: s.selectedDrawingIds.includes(id) ? [] : [id] };
+          }
+          const exists = s.selectedDrawingIds.includes(id);
+          return {
+            selectedDrawingIds: exists
+              ? s.selectedDrawingIds.filter((item) => item !== id)
+              : [...s.selectedDrawingIds, id],
+          };
+        }),
 
       favorites: DEFAULT_FAVORITES,
       toggleFavorite: (tool) => {
@@ -95,6 +128,8 @@ export const useDrawingStore = create<DrawingState>()(
       partialize: (state) => ({
         favorites: state.favorites,
         isFavoritesBarVisible: state.isFavoritesBarVisible,
+        floatingToolbarPos: state.floatingToolbarPos,
+        stayInDrawingMode: state.stayInDrawingMode,
         magnetConfig: state.magnetConfig,
         templates: state.templates,
       }),

@@ -28,6 +28,8 @@ import StickyNotesOverlay from './StickyNotesOverlay';
 import DrawingToolbar from '../drawing/DrawingToolbar';
 import DrawingOverlay from '../drawing/DrawingOverlay';
 import FavoritesBar from '../drawing/FavoritesBar';
+import ManageDrawingsModal from '../drawing/ManageDrawingsModal';
+import { useDrawingStore } from '../../store/useDrawingStore';
 import { drawingEvents } from '../drawing/framework/DrawingEvents';
 import IndicatorsModal from './IndicatorsModal';
 import IndicatorSettingsDialog from './IndicatorSettingsDialog';
@@ -105,6 +107,7 @@ export default function TradingChart({
   const placeOrder = useTerminalStore((s) => s.placeOrder);
   const addAlert = useTerminalStore((s) => s.addAlert);
   const pinePlots = useTerminalStore((s) => s.pinePlots);
+  const trades = useTerminalStore((s) => s.trades);
 
   // Layout & Multi-Chart Store
   const activePaneId = useLayoutStore((s) => s.activePaneId);
@@ -199,7 +202,9 @@ export default function TradingChart({
   const [isNotesOpen, setIsNotesOpen] = useState(false);
 
   // Drawing Tools & Magnet State
-  const [activeTool, setActiveTool] = useState<ToolType>('CURSOR_CROSSHAIR');
+  const activeTool = useDrawingStore((s) => s.activeTool);
+  const setActiveTool = useDrawingStore((s) => s.setActiveTool);
+  const [isObjectTreeOpen, setIsObjectTreeOpen] = useState(false);
   const [drawingsCount, setDrawingsCount] = useState(0);
   const [clearDrawingTrigger, setClearDrawingTrigger] = useState(0);
   const [magnetConfig, setMagnetConfig] = useState<MagnetConfig>({ enabled: false, mode: 'WEAK' });
@@ -1000,19 +1005,32 @@ export default function TradingChart({
     if (!a) return;
     if (chartStyle !== 'FOOTPRINT') {
       const isDark = chartSettings.candleDownColor === '#101015' || chartSettings.candleDownColor === '#050508';
-      const borderDown = isDark ? '#71717a' : chartSettings.candleDownColor;
+      const borderDown = chartSettings.borderDownColor || (isDark ? '#71717a' : chartSettings.candleDownColor);
+      const borderUp = chartSettings.borderUpColor || chartSettings.candleUpColor;
+      const wickDown = chartSettings.wickDownColor || borderDown;
+      const wickUp = chartSettings.wickUpColor || chartSettings.candleUpColor;
+
       a.candles.applyOptions({
-        upColor: chartSettings.candleUpColor,
-        downColor: chartSettings.candleDownColor,
-        borderVisible: true,
-        borderUpColor: chartSettings.candleUpColor,
+        upColor: chartSettings.candleBodyVisible !== false ? chartSettings.candleUpColor : 'transparent',
+        downColor: chartSettings.candleBodyVisible !== false ? chartSettings.candleDownColor : 'transparent',
+        borderVisible: chartSettings.candleBorderVisible !== false,
+        borderUpColor: borderUp,
         borderDownColor: borderDown,
-        wickVisible: true,
-        wickUpColor: chartSettings.candleUpColor,
-        wickDownColor: borderDown,
+        wickVisible: chartSettings.candleWickVisible !== false,
+        wickUpColor: wickUp,
+        wickDownColor: wickDown,
         lastValueVisible: chartSettings.showLastPriceLine,
         priceLineVisible: chartSettings.showLastPriceLine,
       });
+
+      if (chartSettings.topMarginPercent !== undefined && chartSettings.bottomMarginPercent !== undefined) {
+        a.candles.priceScale().applyOptions({
+          scaleMargins: {
+            top: chartSettings.topMarginPercent / 100,
+            bottom: chartSettings.bottomMarginPercent / 100,
+          },
+        });
+      }
     }
     a.chart.applyOptions({
       grid: {
@@ -1026,7 +1044,49 @@ export default function TradingChart({
         },
       },
     });
-  }, [chartSettings]);
+
+    if (chartSettings.timezone && chartSettings.timezone !== timezone) {
+      setTimezone(chartSettings.timezone as ChartTimezone);
+    }
+  }, [chartSettings, timezone]);
+
+  // Trade Execution & Order Fill Markers on Candlestick Series
+  useEffect(() => {
+    const a = api.current;
+    if (!a || !effectiveCandles.length) return;
+
+    if (!chartSettings.showExecutionsOnChart) {
+      try {
+        a.candles.setMarkers([]);
+      } catch {}
+      return;
+    }
+
+    const symbolTrades = trades.filter((t) => t.symbol === symbol);
+    if (!symbolTrades.length) {
+      try {
+        a.candles.setMarkers([]);
+      } catch {}
+      return;
+    }
+
+    const markers = symbolTrades
+      .map((t) => {
+        const tradeSec = t.time > 1e11 ? Math.floor(t.time / 1000) : t.time;
+        return {
+          time: tradeSec as UTCTimestamp,
+          position: t.side === 'LONG' ? ('belowBar' as const) : ('aboveBar' as const),
+          color: t.side === 'LONG' ? '#22c55e' : '#ef4444',
+          shape: t.side === 'LONG' ? ('arrowUp' as const) : ('arrowDown' as const),
+          text: `${t.side} ${t.qty} @ ${t.entry.toFixed(2)}`,
+        };
+      })
+      .sort((m1, m2) => (m1.time as number) - (m2.time as number));
+
+    try {
+      a.candles.setMarkers(markers);
+    } catch {}
+  }, [trades, symbol, chartSettings.showExecutionsOnChart, effectiveCandles.length]);
 
   // History load / symbol / timeframe / Bar Replay switch.
   useEffect(() => {
@@ -2123,6 +2183,7 @@ export default function TradingChart({
           onToggleLockAll={() => setIsLockedAll((v) => !v)}
           isHiddenAll={isHiddenAll}
           onToggleHideAll={() => setIsHiddenAll((v) => !v)}
+          onOpenObjectTree={() => setIsObjectTreeOpen(true)}
         />
 
         {/* Main Chart Canvas & Overlays Container */}
@@ -2239,6 +2300,7 @@ export default function TradingChart({
           <DrawingOverlay
             symbol={symbol}
             activeTool={activeTool}
+            onSelectTool={setActiveTool}
             seriesApi={seriesApi}
             chartApi={chartApi}
             candles={effectiveCandles}
@@ -2432,6 +2494,13 @@ export default function TradingChart({
         onResetDefaults={resetChartSettings}
       />
 
+      {/* Object Tree & Manage Drawings Inspector Modal */}
+      <ManageDrawingsModal
+        isOpen={isObjectTreeOpen}
+        onClose={() => setIsObjectTreeOpen(false)}
+        symbol={symbol}
+      />
+
       {/* Skins Customization Modal */}
       <ChartSkinsModal isOpen={showSkinsModal} onClose={() => setShowSkinsModal(false)} />
 
@@ -2493,6 +2562,7 @@ export default function TradingChart({
         onOpenIndicators={() => setIsIndicatorsModalOpen(true)}
         onOpenSettings={() => setIsChartSettingsOpen(true)}
         onClearDrawings={() => setClearDrawingTrigger(Date.now())}
+        onOpenObjectTree={() => setIsObjectTreeOpen(true)}
       />
 
       {/* TradingView-Style Institutional Create Alert Dialog */}

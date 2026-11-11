@@ -37,6 +37,7 @@ interface ChartContextMenuProps {
   onOpenIndicators: () => void;
   onOpenSettings: () => void;
   onClearDrawings?: () => void;
+  onOpenObjectTree?: () => void;
 }
 
 export default function ChartContextMenu({
@@ -59,6 +60,7 @@ export default function ChartContextMenu({
   onOpenIndicators,
   onOpenSettings,
   onClearDrawings,
+  onOpenObjectTree,
 }: ChartContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<'STYLE' | 'SCALE' | 'TZ' | null>(null);
@@ -415,6 +417,22 @@ export default function ChartContextMenu({
           <span className="font-bold text-accent text-[12px] w-3.5 text-center">fx</span>
           <span>Indicators & metrics...</span>
         </button>
+
+        {onOpenObjectTree && (
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              onOpenObjectTree();
+              onClose();
+            }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+          >
+            <svg className="h-3.5 w-3.5 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </svg>
+            <span>Object tree & drawings...</span>
+          </button>
+        )}
 
         <button
           onClick={() => {

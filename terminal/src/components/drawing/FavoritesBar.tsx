@@ -225,22 +225,65 @@ export default function FavoritesBar() {
   const setActiveTool = useDrawingStore((s) => s.setActiveTool);
   const isFavoritesBarVisible = useDrawingStore((s) => s.isFavoritesBarVisible);
   const toggleFavoritesBar = useDrawingStore((s) => s.toggleFavoritesBar);
+  const pos = useDrawingStore((s) => s.floatingToolbarPos);
+  const setPos = useDrawingStore((s) => s.setFloatingToolbarPos);
+  const stayInDrawingMode = useDrawingStore((s) => s.stayInDrawingMode);
+  const toggleStayInDrawingMode = useDrawingStore((s) => s.toggleStayInDrawingMode);
+
+  const isDraggingRef = React.useRef(false);
+
+  const handleGripPointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    const startMouseX = e.clientX;
+    const startMouseY = e.clientY;
+    const startPosX = pos.x;
+    const startPosY = pos.y;
+
+    const handlePointerMove = (moveEv: PointerEvent) => {
+      if (!isDraggingRef.current) return;
+      const dx = moveEv.clientX - startMouseX;
+      const dy = moveEv.clientY - startMouseY;
+      const newX = Math.max(10, Math.min(window.innerWidth - 300, startPosX + dx));
+      const newY = Math.max(45, Math.min(window.innerHeight - 50, startPosY + dy));
+      setPos({ x: newX, y: newY });
+    };
+
+    const handlePointerUp = () => {
+      isDraggingRef.current = false;
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+  };
 
   if (!isFavoritesBarVisible || favorites.length === 0) return null;
 
   return (
     <div
-      className="clay-popover absolute bottom-6 left-16 z-30 flex items-center gap-1 px-2 py-1 select-none font-mono text-xs shadow-2xl backdrop-blur-md"
-      title="Favorites Toolbar (TradingView style)"
+      style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
+      className="clay-popover fixed z-40 flex items-center gap-1 px-2 py-1 select-none font-mono text-xs shadow-2xl backdrop-blur-md border border-white/[0.08]"
+      title="In-Chart Drawing Toolbar (Drag to reposition)"
     >
-      {/* Drag grip indicator */}
-      <div className="flex flex-col gap-0.5 px-1 cursor-grab opacity-40 hover:opacity-75">
-        <span className="h-1 w-1 rounded-full bg-white" />
-        <span className="h-1 w-1 rounded-full bg-white" />
-        <span className="h-1 w-1 rounded-full bg-white" />
+      {/* Movable Drag Grip Handle */}
+      <div
+        onPointerDown={handleGripPointerDown}
+        className="flex items-center gap-0.5 px-1 py-1.5 cursor-grab active:cursor-grabbing text-zinc-500 hover:text-zinc-200 transition"
+        title="Drag toolbar to reposition (sticks to last place)"
+      >
+        <svg className="h-3.5 w-2.5" viewBox="0 0 6 12" fill="currentColor">
+          <circle cx="1.5" cy="2" r="1" />
+          <circle cx="4.5" cy="2" r="1" />
+          <circle cx="1.5" cy="6" r="1" />
+          <circle cx="4.5" cy="6" r="1" />
+          <circle cx="1.5" cy="10" r="1" />
+          <circle cx="4.5" cy="10" r="1" />
+        </svg>
       </div>
 
-      <div className="h-4 w-px bg-grid/60 mx-0.5" />
+      <div className="h-4 w-px bg-white/[0.08] mx-0.5" />
 
       {/* Favorite Tool Icons */}
       {favorites.map((tool) => {
@@ -255,10 +298,10 @@ export default function FavoritesBar() {
               audioHaptics.tick();
               setActiveTool(tool);
             }}
-            className={`p-1.5 rounded-lg transition relative group ${
+            className={`p-1.5 rounded-[4px] transition relative group ${
               isActive
-                ? 'clay-btn-active text-accent'
-                : 'clay-btn text-slate-300 hover:text-white'
+                ? 'clay-btn-active text-white'
+                : 'clay-btn text-zinc-400 hover:text-white'
             }`}
             title={`${meta.label}`}
           >
@@ -267,7 +310,29 @@ export default function FavoritesBar() {
         );
       })}
 
-      <div className="h-4 w-px bg-grid/60 mx-0.5" />
+      <div className="h-4 w-px bg-white/[0.08] mx-0.5" />
+
+      {/* Stay in Drawing Mode Pin Toggle */}
+      <button
+        onClick={() => {
+          audioHaptics.tick();
+          toggleStayInDrawingMode();
+        }}
+        className={`p-1.5 rounded-[4px] transition text-[10px] ${
+          stayInDrawingMode
+            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+            : 'text-zinc-500 hover:text-zinc-300'
+        }`}
+        title={
+          stayInDrawingMode
+            ? 'Stay in Drawing Mode: ON (Will not auto-return to crosshair)'
+            : 'Stay in Drawing Mode: OFF (Auto-returns to crosshair after draw)'
+        }
+      >
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+        </svg>
+      </button>
 
       {/* Close button */}
       <button
@@ -275,7 +340,7 @@ export default function FavoritesBar() {
           audioHaptics.tick();
           toggleFavoritesBar();
         }}
-        className="p-1 rounded text-slate-500 hover:text-slate-300 transition text-[10px]"
+        className="p-1 rounded text-zinc-500 hover:text-zinc-300 transition text-[10px]"
         title="Hide Favorites Bar"
       >
         x
