@@ -692,14 +692,6 @@ export default function TradingChart({
     return () => ro.disconnect();
   }, []);
 
-  // Primitive signature of everything drawn as a price line
-  const lineKey = useTerminalStore((s) => {
-    const p = s.positions[s.symbol];
-    const o = s.orders.filter((x) => x.status === 'PENDING' && x.symbol === s.symbol).map((x) => `${x.type}:${x.side}:${x.triggerPrice ?? x.price}`).join('|');
-    const a = s.alerts.filter((x) => !x.triggered && x.symbol === s.symbol).map((x) => x.price).join('|');
-    return `${s.symbol}#${p ? `${p.side}:${p.entryPrice}:${p.size}` : ''}#${o}#${a}#${showSessionOHL}`;
-  });
-
   const writeOhlc = (c?: { open: number; high: number; low: number; close: number; volume?: number }) => {
     const sym = useTerminalStore.getState().symbol;
     const tf = useTerminalStore.getState().timeframe;
@@ -1340,30 +1332,13 @@ export default function TradingChart({
     setOverlayValues(latestOverlayValues);
   }, [effectiveCandles, activeInstances]);
 
-  // Price lines for positions, orders, alerts, and Session OHL Laser Lines
+  // Technical Price lines: Session OHL Laser Lines (Positions and Orders handled cleanly via ChartTradingOverlay)
   useEffect(() => {
     const a = api.current;
     if (!a) return;
-    const s = useTerminalStore.getState();
     const lines: IPriceLine[] = [];
-    const add = (price: number, color: string, title: string, solid = false) =>
-      lines.push(a.candles.createPriceLine({ price, color, lineWidth: 1, lineStyle: solid ? LineStyle.Solid : LineStyle.Dashed, axisLabelVisible: true, title }));
 
-    // Active position line
-    const p = s.positions[s.symbol];
-    if (p) add(p.entryPrice, p.side === 'LONG' ? '#089981' : '#f23645', `${p.side} ${fmtQty(p.size)}`, true);
-
-    // Orders
-    for (const o of s.orders) {
-      if (o.status !== 'PENDING' || o.symbol !== s.symbol) continue;
-      if (o.type === 'LIMIT') add(o.price, '#4c8dff', `${o.side} limit`);
-      else add(o.triggerPrice ?? 0, o.type === 'STOP_LOSS' ? '#f23645' : '#089981', o.type === 'STOP_LOSS' ? 'SL' : 'TP');
-    }
-
-    // Alerts
-    for (const al of s.alerts) if (!al.triggered && al.symbol === s.symbol) add(al.price, '#f0b90b', 'Alert');
-
-    // Session OHL Laser Lines
+    // Session OHL Laser Lines (without cluttering price scale axis)
     if (showSessionOHL && candles.length > 0) {
       const todaySec = Math.floor(new Date().setHours(0, 0, 0, 0) / 1000);
       const todayCandles = candles.filter((c) => c.time >= todaySec);
@@ -1372,14 +1347,14 @@ export default function TradingChart({
         const sOpen = refCandles[0].open;
         const sHigh = Math.max(...refCandles.map((c) => c.high));
         const sLow = Math.min(...refCandles.map((c) => c.low));
-        add(sOpen, '#38bdf8', 'Session Open');
-        add(sHigh, '#089981', 'Session High');
-        add(sLow, '#f23645', 'Session Low');
+        lines.push(a.candles.createPriceLine({ price: sOpen, color: '#38bdf8', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: 'Session Open' }));
+        lines.push(a.candles.createPriceLine({ price: sHigh, color: '#089981', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: 'Session High' }));
+        lines.push(a.candles.createPriceLine({ price: sLow, color: '#f23645', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: 'Session Low' }));
       }
     }
 
     return () => { try { lines.forEach((l) => a.candles.removePriceLine(l)); } catch { /* ignore */ } };
-  }, [lineKey, showSessionOHL, candles]);
+  }, [showSessionOHL, candles]);
 
   // Indicator visibility toggles
   useEffect(() => { api.current?.sma.applyOptions({ visible: showSma }); }, [showSma]);
@@ -2612,6 +2587,7 @@ export default function TradingChart({
           {/* Drag-and-Drop Canvas Order Lines */}
           <CanvasOrderOverlay
             seriesApi={seriesApi}
+            chartApi={chartApi}
             onExecuteOrders={handleExecuteCanvasOrders}
           />
 
@@ -2619,6 +2595,7 @@ export default function TradingChart({
           <ChartTradingOverlay
             symbol={symbol}
             seriesApi={seriesApi}
+            chartApi={chartApi}
           />
 
           {/* Risk Sizing HUD Widget */}

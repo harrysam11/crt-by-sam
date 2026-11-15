@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import type { ISeriesApi, SeriesType } from 'lightweight-charts';
+import type { ISeriesApi, SeriesType, IChartApi } from 'lightweight-charts';
 import { useTerminalStore, positionPnlUsd } from '../../store/useTerminalStore';
 import { fmtPrice, fmtQty, fmtUsd, labelOf } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
@@ -20,6 +20,7 @@ import type { Order } from '../../types/terminal';
 interface ChartTradingOverlayProps {
   symbol: string;
   seriesApi: ISeriesApi<SeriesType> | null;
+  chartApi?: IChartApi | null;
 }
 
 type DragTarget =
@@ -28,11 +29,29 @@ type DragTarget =
   | { type: 'SL'; symbol: string; initialPrice: number }
   | { type: 'TP'; symbol: string; initialPrice: number };
 
-export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingOverlayProps) {
+export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: ChartTradingOverlayProps) {
   const currentPrice = useTerminalStore((s) => s.currentPrice);
   const position = useTerminalStore((s) => s.positions[symbol]);
   const orders = useTerminalStore((s) => s.orders.filter((o) => o.status === 'PENDING' && o.symbol === symbol));
   const alerts = useTerminalStore((s) => s.alerts.filter((a) => !a.triggered && a.active !== false && a.symbol === symbol));
+
+  // Dynamic price scale width to keep chart order lines and badges cleanly separated from the price scale axis
+  const [priceScaleWidth, setPriceScaleWidth] = useState(68);
+
+  useEffect(() => {
+    if (!chartApi) return;
+    const updateWidth = () => {
+      try {
+        const w = chartApi.priceScale('right')?.width();
+        if (w && w > 0) setPriceScaleWidth(w);
+      } catch {
+        // fallback
+      }
+    };
+    updateWidth();
+    const interval = setInterval(updateWidth, 500);
+    return () => clearInterval(interval);
+  }, [chartApi]);
 
   const closePosition = useTerminalStore((s) => s.closePosition);
   const flipPosition = useTerminalStore((s) => s.flipPosition);
@@ -186,8 +205,8 @@ export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingO
 
         return (
           <div
-            style={{ top: `${y}px` }}
-            className="absolute left-0 right-0 flex items-center"
+            style={{ top: `${y}px`, right: `${priceScaleWidth}px` }}
+            className="absolute left-0 flex items-center"
           >
             {/* Position Horizontal Line */}
             <div
@@ -292,8 +311,8 @@ export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingO
 
         return (
           <div
-            style={{ top: `${y}px` }}
-            className="absolute left-0 right-0 flex items-center"
+            style={{ top: `${y}px`, right: `${priceScaleWidth}px` }}
+            className="absolute left-0 flex items-center"
           >
             <div className={`h-[1px] flex-1 border-t ${isDragging ? 'border-solid border-red-400' : 'border-dashed border-red-500'}`} />
             
@@ -353,8 +372,8 @@ export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingO
 
         return (
           <div
-            style={{ top: `${y}px` }}
-            className="absolute left-0 right-0 flex items-center"
+            style={{ top: `${y}px`, right: `${priceScaleWidth}px` }}
+            className="absolute left-0 flex items-center"
           >
             <div className={`h-[1px] flex-1 border-t ${isDragging ? 'border-solid border-emerald-400' : 'border-dashed border-emerald-500'}`} />
             
@@ -411,8 +430,8 @@ export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingO
         return (
           <div
             key={o.id}
-            style={{ top: `${y}px` }}
-            className="absolute left-0 right-0 flex items-center"
+            style={{ top: `${y}px`, right: `${priceScaleWidth}px` }}
+            className="absolute left-0 flex items-center"
           >
             <div
               className={`h-[1px] flex-1 border-t ${isDragging ? 'border-solid' : 'border-dashed'}`}
@@ -460,8 +479,8 @@ export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingO
         return (
           <div
             key={a.id}
-            style={{ top: `${y}px` }}
-            className="absolute left-0 right-0 flex items-center"
+            style={{ top: `${y}px`, right: `${priceScaleWidth}px` }}
+            className="absolute left-0 flex items-center"
           >
             <div className={`h-[1px] flex-1 border-t border-dashed ${isDragging ? 'border-amber-300 border-solid' : 'border-amber-400/80'}`} />
             <div

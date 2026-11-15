@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { ISeriesApi, SeriesType } from 'lightweight-charts';
+import type { ISeriesApi, SeriesType, IChartApi } from 'lightweight-charts';
 import { useDerivativesStore } from '../../store/useDerivativesStore';
 import { useTerminalStore } from '../../store/useTerminalStore';
 import { toUsd } from '../../services/instruments';
@@ -9,10 +9,11 @@ import type { CanvasOrderLine } from '../../types/derivatives';
 
 interface CanvasOrderOverlayProps {
   seriesApi: ISeriesApi<SeriesType> | null;
+  chartApi?: IChartApi | null;
   onExecuteOrders?: (entry: CanvasOrderLine, sl?: CanvasOrderLine, tp?: CanvasOrderLine) => void;
 }
 
-export default function CanvasOrderOverlay({ seriesApi, onExecuteOrders }: CanvasOrderOverlayProps) {
+export default function CanvasOrderOverlay({ seriesApi, chartApi, onExecuteOrders }: CanvasOrderOverlayProps) {
   const symbol = useTerminalStore((s) => s.symbol);
   const currentPrice = useTerminalStore((s) => s.currentPrice);
   const canvasOrderLines = useDerivativesStore((s) => s.canvasOrderLines);
@@ -23,6 +24,22 @@ export default function CanvasOrderOverlay({ seriesApi, onExecuteOrders }: Canva
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [dragLineId, setDragLineId] = useState<string | null>(null);
+  const [priceScaleWidth, setPriceScaleWidth] = useState(68);
+
+  useEffect(() => {
+    if (!chartApi) return;
+    const updateWidth = () => {
+      try {
+        const w = chartApi.priceScale('right')?.width();
+        if (w && w > 0) setPriceScaleWidth(w);
+      } catch {
+        // fallback
+      }
+    };
+    updateWidth();
+    const interval = setInterval(updateWidth, 500);
+    return () => clearInterval(interval);
+  }, [chartApi]);
 
   const fx = toUsd(symbol);
 
@@ -131,8 +148,8 @@ export default function CanvasOrderOverlay({ seriesApi, onExecuteOrders }: Canva
         return (
           <div
             key={line.id}
-            style={{ top: `${y}px` }}
-            className="absolute left-0 right-0 flex items-center select-none"
+            style={{ top: `${y}px`, right: `${priceScaleWidth}px` }}
+            className="absolute left-0 flex items-center select-none"
           >
             {/* Horizontal Guide Line */}
             <div
