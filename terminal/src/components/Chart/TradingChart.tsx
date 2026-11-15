@@ -802,7 +802,7 @@ export default function TradingChart({
     });
     vs.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
 
-    const lineOpts = { lineWidth: 1 as const, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false };
+    const lineOpts = { lineWidth: 1 as const, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, visible: false };
     const smaS = chart.addLineSeries({ ...lineOpts, color: '#f0b90b' });
     const emaS = chart.addLineSeries({ ...lineOpts, color: '#4c8dff' });
     const vwapS = chart.addLineSeries({ ...lineOpts, color: '#ec4899' });
@@ -818,6 +818,7 @@ export default function TradingChart({
       color: '#c084fc',
       lineWidth: 1,
       title: 'RSI 14',
+      visible: false,
     });
     rsiS.priceScale().applyOptions({
       scaleMargins: { top: 0.76, bottom: 0 },
@@ -2333,7 +2334,12 @@ export default function TradingChart({
           />
 
           {/* Candle-Close Countdown Floating Timer */}
-          {chartSettings.showCountdownTimer && <CandleCountdown timeframe={timeframe} />}
+          {chartSettings.showCountdownTimer && (
+            <CandleCountdown
+              timeframe={timeframe}
+              lastCandleTime={effectiveCandles[effectiveCandles.length - 1]?.time}
+            />
+          )}
 
           {/* Lightweight Charts mounting container */}
           <div

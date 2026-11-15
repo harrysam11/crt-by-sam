@@ -179,6 +179,36 @@ export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingO
                 {isPosProfit ? `+${fmtUsd(posPnl)}` : `-${fmtUsd(Math.abs(posPnl))}`}
               </span>
 
+              {/* + SL Button if no SL order exists */}
+              {!slOrder && (
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    const defaultSl = isLong ? position.entryPrice * 0.99 : position.entryPrice * 1.01;
+                    updatePositionBrackets(symbol, +defaultSl.toFixed(4), undefined);
+                  }}
+                  className="bg-red-950/90 hover:bg-red-600 border border-red-500/60 px-1.5 py-0.5 rounded text-[9px] text-red-200 hover:text-white transition font-bold"
+                  title="Add Stop Loss (drag line on chart to adjust)"
+                >
+                  + SL
+                </button>
+              )}
+
+              {/* + TP Button if no TP order exists */}
+              {!tpOrder && (
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    const defaultTp = isLong ? position.entryPrice * 1.02 : position.entryPrice * 0.98;
+                    updatePositionBrackets(symbol, undefined, +defaultTp.toFixed(4));
+                  }}
+                  className="bg-emerald-950/90 hover:bg-emerald-600 border border-emerald-500/60 px-1.5 py-0.5 rounded text-[9px] text-emerald-200 hover:text-white transition font-bold"
+                  title="Add Take Profit (drag line on chart to adjust)"
+                >
+                  + TP
+                </button>
+              )}
+
               {/* Snap Break-Even Button */}
               <button
                 onClick={() => {
@@ -231,6 +261,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingO
         const isDragging = dragTarget?.type === 'SL';
         const dist = position ? Math.abs(position.entryPrice - displayPrice) : 0;
         const riskUsd = position ? dist * position.size * toUsd(symbol) : 0;
+        const pctDist = position && position.entryPrice ? ((dist / position.entryPrice) * 100).toFixed(2) : '0.00';
 
         return (
           <div
@@ -238,6 +269,15 @@ export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingO
             className="absolute left-0 right-0 flex items-center"
           >
             <div className={`h-[1px] flex-1 border-t ${isDragging ? 'border-solid border-red-400' : 'border-dashed border-red-500'}`} />
+            
+            {/* Live Drag Risk Floating Badge */}
+            {isDragging && (
+              <div className="absolute right-36 -top-8 rounded bg-black/95 px-2 py-1 text-[10px] font-mono text-white shadow-2xl border border-red-400 z-50">
+                <div className="text-red-300 font-bold">SL: {fmtPrice(displayPrice, symbol)}</div>
+                <div className="text-slate-300">Risk: -${fmtUsd(riskUsd)} (-{pctDist}%)</div>
+              </div>
+            )}
+
             <div
               onMouseDown={(e) => {
                 e.preventDefault();
@@ -249,7 +289,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingO
               className={`pointer-events-auto flex cursor-ns-resize items-center gap-1.5 rounded-l-lg px-2 py-0.5 text-[10px] font-bold text-white shadow-lg bg-red-600 transition-transform ${
                 isDragging ? 'scale-105 ring-2 ring-white' : 'hover:brightness-110'
               }`}
-              title="Drag to change Stop Loss"
+              title="Drag to adjust Stop Loss price"
             >
               <span>SL</span>
               <span className="font-mono">{fmtPrice(displayPrice, symbol)}</span>
@@ -282,6 +322,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingO
         const isDragging = dragTarget?.type === 'TP';
         const dist = position ? Math.abs(displayPrice - position.entryPrice) : 0;
         const rewardUsd = position ? dist * position.size * toUsd(symbol) : 0;
+        const pctDist = position && position.entryPrice ? ((dist / position.entryPrice) * 100).toFixed(2) : '0.00';
 
         return (
           <div
@@ -289,6 +330,15 @@ export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingO
             className="absolute left-0 right-0 flex items-center"
           >
             <div className={`h-[1px] flex-1 border-t ${isDragging ? 'border-solid border-emerald-400' : 'border-dashed border-emerald-500'}`} />
+            
+            {/* Live Drag Reward Floating Badge */}
+            {isDragging && (
+              <div className="absolute right-36 -top-8 rounded bg-black/95 px-2 py-1 text-[10px] font-mono text-white shadow-2xl border border-emerald-400 z-50">
+                <div className="text-emerald-300 font-bold">TP: {fmtPrice(displayPrice, symbol)}</div>
+                <div className="text-slate-300">Reward: +${fmtUsd(rewardUsd)} (+{pctDist}%)</div>
+              </div>
+            )}
+
             <div
               onMouseDown={(e) => {
                 e.preventDefault();
@@ -300,7 +350,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingO
               className={`pointer-events-auto flex cursor-ns-resize items-center gap-1.5 rounded-l-lg px-2 py-0.5 text-[10px] font-bold text-white shadow-lg bg-emerald-600 transition-transform ${
                 isDragging ? 'scale-105 ring-2 ring-white' : 'hover:brightness-110'
               }`}
-              title="Drag to change Take Profit"
+              title="Drag to adjust Take Profit price"
             >
               <span>TP</span>
               <span className="font-mono">{fmtPrice(displayPrice, symbol)}</span>

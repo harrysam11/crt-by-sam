@@ -9,9 +9,22 @@ import ScriptStudio from '../../features/pine/ScriptStudio';
 const TYPE_LABEL = { MARKET: 'Market', LIMIT: 'Limit', STOP_LOSS: 'Stop loss', TAKE_PROFIT: 'Take profit' } as const;
 type Tab = 'positions' | 'orders' | 'journal' | 'alerts' | 'pine';
 
-export default function PositionsTable() {
+export interface PositionsTableProps {
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+export default function PositionsTable({ isCollapsed, onToggleCollapse }: PositionsTableProps = {}) {
   const [tab, setTab] = useState<Tab>('positions');
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+
+  const handleTabClick = (t: Tab) => {
+    audioHaptics.tick();
+    setTab(t);
+    if (isCollapsed && onToggleCollapse) {
+      onToggleCollapse();
+    }
+  };
 
   const positions = useTerminalStore((s) => s.positions);
   const prices = useTerminalStore((s) => s.prices);
@@ -53,21 +66,21 @@ export default function PositionsTable() {
 
   return (
     <div className="flex h-full flex-col bg-panel font-mono select-none">
-      <div className="flex shrink-0 items-center justify-between border-b border-grid/50 px-3 py-2 bg-[#09090d]/60">
+      <div className="flex shrink-0 items-center justify-between border-b border-grid/50 px-3 py-1.5 bg-[#09090d]/60">
         <div className="flex items-center gap-1.5">
-          <button className={tabCls(tab === 'positions')} onClick={() => setTab('positions')}>
+          <button className={tabCls(tab === 'positions')} onClick={() => handleTabClick('positions')}>
             Positions ({open.length})
           </button>
-          <button className={tabCls(tab === 'orders')} onClick={() => setTab('orders')}>
+          <button className={tabCls(tab === 'orders')} onClick={() => handleTabClick('orders')}>
             Orders ({pending} open)
           </button>
-          <button className={tabCls(tab === 'pine')} onClick={() => setTab('pine')}>
+          <button className={tabCls(tab === 'pine')} onClick={() => handleTabClick('pine')}>
             Script Studio
           </button>
-          <button className={tabCls(tab === 'journal')} onClick={() => setTab('journal')}>
+          <button className={tabCls(tab === 'journal')} onClick={() => handleTabClick('journal')}>
             Journal
           </button>
-          <button className={tabCls(tab === 'alerts')} onClick={() => setTab('alerts')}>
+          <button className={tabCls(tab === 'alerts')} onClick={() => handleTabClick('alerts')}>
             Alerts ({alertCount})
           </button>
         </div>
@@ -94,6 +107,21 @@ export default function PositionsTable() {
               title="Emergency Flatten All Open Positions"
             >
               [Flatten All]
+            </button>
+          )}
+
+          {onToggleCollapse && (
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                onToggleCollapse();
+              }}
+              className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/10 transition"
+              title={isCollapsed ? 'Expand Bottom Panel' : 'Collapse Bottom Panel'}
+            >
+              <svg className={`h-3.5 w-3.5 transition-transform duration-150 ${isCollapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
           )}
         </div>

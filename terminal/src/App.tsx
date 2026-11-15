@@ -43,7 +43,8 @@ export default function App() {
   const isChartMaximized = useLayoutStore((s) => s.isChartMaximized);
 
   const [rightW, setRightW] = useState(300);
-  const [bottomH, setBottomH] = useState(240);
+  const [bottomH, setBottomH] = useState(160);
+  const [isBottomCollapsed, setIsBottomCollapsed] = useState(false);
   const [activeRightDrawer, setActiveRightDrawer] = useState<'WATCHLIST' | 'DOM' | 'TRADE' | 'ANALYTICS' | null>('WATCHLIST');
 
   // Modal visibility states
@@ -213,9 +214,17 @@ export default function App() {
           </div>
           {!isChartMaximized && (
             <>
-              <Splitter dir="h" onDrag={(d) => setBottomH((h) => clamp(h - d, 120, 500))} />
-              <div style={{ height: bottomH }} className="shrink-0 overflow-hidden">
-                <PositionsTable />
+              {!isBottomCollapsed && (
+                <Splitter dir="h" onDrag={(d) => setBottomH((h) => clamp(h - d, 100, 420))} />
+              )}
+              <div
+                style={{ height: isBottomCollapsed ? 34 : bottomH }}
+                className="shrink-0 overflow-hidden transition-all duration-150"
+              >
+                <PositionsTable
+                  isCollapsed={isBottomCollapsed}
+                  onToggleCollapse={() => setIsBottomCollapsed((v) => !v)}
+                />
               </div>
             </>
           )}
