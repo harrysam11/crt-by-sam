@@ -48,6 +48,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingO
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
   const [dragCurrentPrice, setDragCurrentPrice] = useState<number | null>(null);
   const [quickQty, setQuickQty] = useState('0.1');
+  const [isQuickTradeCollapsed, setIsQuickTradeCollapsed] = useState(false);
 
   // Mouse drag tracking listener
   useEffect(() => {
@@ -120,33 +121,59 @@ export default function ChartTradingOverlay({ symbol, seriesApi }: ChartTradingO
       className="pointer-events-none absolute inset-0 z-20 overflow-hidden font-mono select-none"
     >
       {/* 1. In-Chart 1-Click Quick Trade Buttons (Top Left) */}
-      <div className="pointer-events-auto absolute top-12 left-3 z-30 flex items-center gap-1 clay-card px-2 py-1 bg-[#09090d]/80 backdrop-blur-md">
-        {/* Instant SELL Button */}
-        <button
-          onClick={() => handleQuickTrade('SELL')}
-          className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500 hover:text-white transition"
-          title="Instant Market SELL"
-        >
-          SELL {currentPrice ? fmtPrice(currentPrice, symbol) : ''}
-        </button>
+      <div className="pointer-events-auto absolute top-14 left-3 z-30 flex items-center gap-1 clay-card px-2 py-1 bg-[#09090d]/85 backdrop-blur-md border border-white/5 shadow-lg">
+        {isQuickTradeCollapsed ? (
+          <button
+            onClick={() => setIsQuickTradeCollapsed(false)}
+            className="flex items-center gap-1 text-[10px] text-slate-300 hover:text-white px-1.5 py-0.5 rounded transition"
+            title="Expand Quick Trade"
+          >
+            <span className="font-bold text-emerald-400">B</span>
+            <span className="text-slate-500">/</span>
+            <span className="font-bold text-rose-400">S</span>
+            <svg className="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        ) : (
+          <>
+            {/* Instant SELL Button */}
+            <button
+              onClick={() => handleQuickTrade('SELL')}
+              className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500 hover:text-white transition"
+              title="Instant Market SELL"
+            >
+              SELL {currentPrice ? fmtPrice(currentPrice, symbol) : ''}
+            </button>
 
-        {/* Quantity Input */}
-        <input
-          type="text"
-          value={quickQty}
-          onChange={(e) => setQuickQty(e.target.value)}
-          className="clay-inset w-12 px-1 py-0.5 text-center text-[10px] text-white focus:outline-none"
-          title="Order Quantity"
-        />
+            {/* Quantity Input */}
+            <input
+              type="text"
+              value={quickQty}
+              onChange={(e) => setQuickQty(e.target.value)}
+              className="clay-inset w-12 px-1 py-0.5 text-center text-[10px] text-white focus:outline-none"
+              title="Order Quantity"
+            />
 
-        {/* Instant BUY Button */}
-        <button
-          onClick={() => handleQuickTrade('BUY')}
-          className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500 hover:text-white transition"
-          title="Instant Market BUY"
-        >
-          BUY {currentPrice ? fmtPrice(currentPrice, symbol) : ''}
-        </button>
+            {/* Instant BUY Button */}
+            <button
+              onClick={() => handleQuickTrade('BUY')}
+              className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500 hover:text-white transition"
+              title="Instant Market BUY"
+            >
+              BUY {currentPrice ? fmtPrice(currentPrice, symbol) : ''}
+            </button>
+
+            {/* Collapse toggle */}
+            <button
+              onClick={() => setIsQuickTradeCollapsed(true)}
+              className="text-slate-500 hover:text-slate-300 px-1 py-0.5 text-[10px] ml-0.5 transition"
+              title="Minimize Quick Trade"
+            >
+              x
+            </button>
+          </>
+        )}
       </div>
 
       {/* 2. Active Position Line & Action Pill */}

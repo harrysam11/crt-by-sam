@@ -44,7 +44,15 @@ import DeepStudiesOverlay from './DeepStudiesOverlay';
 import PriceScaleActionFlyout from './PriceScaleActionFlyout';
 import SymbolSearchModal from '../Search/SymbolSearchModal';
 import CustomIntervalModal from './CustomIntervalModal';
-import { parseTimeframeToSeconds, formatCountdownTimer, loadStoredCustomTimeframes } from '../../utils/timeframe';
+import {
+  parseTimeframeToSeconds,
+  formatCountdownTimer,
+  loadStoredCustomTimeframes,
+  saveStoredCustomTimeframe,
+  removeStoredCustomTimeframe,
+  validateCustomInterval,
+  type IntervalUnit,
+} from '../../utils/timeframe';
 import ChartContextMenu, { type ChartContextMenuPos } from './ChartContextMenu';
 import ShareChartModal from '../share/ShareChartModal';
 import RiskHUD from '../RiskHUD';
@@ -187,15 +195,21 @@ export default function TradingChart({
 
   const provider = getInstrument(symbol)?.provider ?? 'binance';
 
-  // Indicators & Chart Styles
+  // Indicators & Chart Styles (Default ALL indicators OFF for clean institutional startup)
   const [chartStyle, setChartStyle] = useState<ChartStyle>('CANDLE');
-  const [showSma, setShowSma] = useState(true);
-  const [showEma, setShowEma] = useState(true);
-  const [showVwap, setShowVwap] = useState(true);
+  const [showSma, setShowSma] = useState(false);
+  const [showEma, setShowEma] = useState(false);
+  const [showVwap, setShowVwap] = useState(false);
   const [showBbands, setShowBbands] = useState(false);
   const [showRsi, setShowRsi] = useState(false);
   const [showOI, setShowOI] = useState(false);
-  const [showSessionOHL, setShowSessionOHL] = useState(true);
+  const [showSessionOHL, setShowSessionOHL] = useState(false);
+
+  // Custom Interval Direct Input State
+  const [customVal, setCustomVal] = useState<number>(2);
+  const [customUnit, setCustomUnit] = useState<IntervalUnit>('m');
+  const [customInputError, setCustomInputError] = useState<string | null>(null);
+  const [customIntervalList, setCustomIntervalList] = useState<string[]>([]);
 
   // Modals & Tools
   const [showRiskHUD, setShowRiskHUD] = useState(false);
@@ -279,6 +293,7 @@ export default function TradingChart({
   const activeInstances = useIndicatorsStore((s) => s.activeInstances);
   const toggleInstanceVisibility = useIndicatorsStore((s) => s.toggleVisibility);
   const removeInstance = useIndicatorsStore((s) => s.removeInstance);
+  const clearAllInstances = useIndicatorsStore((s) => s.clearAllInstances);
   const openSettings = useIndicatorsStore((s) => s.openSettings);
   const [overlayValues, setOverlayValues] = useState<Record<string, number | null>>({});
   const overlaySeriesMap = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
@@ -612,6 +627,42 @@ export default function TradingChart({
     else if (key === 'rsi') setShowRsi((v) => !v);
     else if (key === 'oi') setShowOI((v) => !v);
     else if (key === 'sessionOhl') setShowSessionOHL((v) => !v);
+  };
+
+  const handleClearAllIndicators = () => {
+    audioHaptics.tick();
+    setShowSma(false);
+    setShowEma(false);
+    setShowVwap(false);
+    setShowBbands(false);
+    setShowRsi(false);
+    setShowOI(false);
+    setShowSessionOHL(false);
+    api.current?.sma.applyOptions({ visible: false });
+    api.current?.ema.applyOptions({ visible: false });
+    api.current?.vwap.applyOptions({ visible: false });
+    api.current?.bbUpper.applyOptions({ visible: false });
+    api.current?.bbLower.applyOptions({ visible: false });
+    api.current?.rsi.applyOptions({ visible: false });
+    api.current?.oi.applyOptions({ visible: false });
+    clearAllInstances();
+  };
+
+  const handleApplyCustomInterval = (valToApply?: number, unitToApply?: IntervalUnit) => {
+    const v = valToApply ?? customVal;
+    const u = unitToApply ?? customUnit;
+    const res = validateCustomInterval(v, u);
+    if (!res.ok) {
+      setCustomInputError(res.error || 'Invalid interval');
+      return;
+    }
+    setCustomInputError(null);
+    audioHaptics.tick();
+    const tfStr = `${v}${u}` as Timeframe;
+    saveStoredCustomTimeframe(tfStr);
+    setTimeframe(tfStr);
+    setPaneTimeframe(paneId, tfStr);
+    setIsTfMenuOpen(false);
   };
 
   const box = useRef<HTMLDivElement>(null);
@@ -1195,8 +1246,14 @@ export default function TradingChart({
     const tickCountdown = () => {
       const nowSec = Math.floor(Date.now() / 1000);
       const lastCandle = effectiveCandles[effectiveCandles.length - 1];
-      if (!lastCandle) return;
-      const nextClose = lastCandle.time + dur;
+      if (!lastCandle || dur <= 0) {
+        setCountdownText('');
+        return;
+      }
+      let nextClose = lastCandle.time + dur;
+      if (nextClose <= nowSec) {
+        nextClose = Math.ceil((nowSec + 1) / dur) * dur;
+      }
       const diff = Math.max(0, nextClose - nowSec);
       setCountdownText(formatCountdownTimer(diff));
     };
@@ -1486,16 +1543,16 @@ export default function TradingChart({
       <ChartSkinsLayer />
 
       {/* Institutional TradingView-Style Chart Top Toolbar */}
-      <div className="relative z-30 flex items-center justify-between border-b border-grid bg-panel px-2.5 py-1.5 select-none text-xs">
+      <div className="relative z-30 flex items-center justify-between border-b border-grid bg-panel px-2.5 py-1 select-none text-xs gap-2 overflow-hidden">
         {/* Left Section: Symbol, Timeframes, Candle Style, Indicators, Replay, Alert, Undo/Redo, Layers */}
-        <div className="flex items-center gap-2 overflow-visible min-w-0">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none min-w-0 flex-1 py-0.5">
           {/* Symbol Search Trigger */}
           <button
             onClick={() => {
               audioHaptics.tick();
               setIsSymbolSearchOpen(true);
             }}
-            className="flex items-center gap-1.5 clay-pill px-3 py-1 text-xs font-bold text-white transition cursor-pointer shrink-0"
+            className="flex items-center gap-1.5 clay-pill px-2.5 py-1 text-xs font-bold text-white transition cursor-pointer shrink-0"
             title="Search symbols (/ or Ctrl+K)"
           >
             <span>{labelOf(symbol)}</span>
@@ -1508,14 +1565,14 @@ export default function TradingChart({
 
           {/* Timeframe Favorites & Dropdown */}
           <div className="relative flex items-center shrink-0" ref={tfMenuRef}>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5">
               {favoriteTimeframes.map((t) => (
                 <button
                   key={t}
-                  className={`px-2.5 py-0.5 text-xs transition ${
+                  className={`px-2 py-0.5 text-xs transition rounded ${
                     t === timeframe
-                      ? 'clay-pill-active'
-                      : 'clay-pill'
+                      ? 'clay-pill-active font-bold'
+                      : 'clay-pill text-slate-300 hover:text-white'
                   }`}
                   onClick={() => {
                     audioHaptics.tick();
@@ -1532,12 +1589,23 @@ export default function TradingChart({
                     audioHaptics.tick();
                     setIsCustomIntervalModalOpen(true);
                   }}
-                  className="px-2.5 py-0.5 text-xs clay-pill-active font-bold"
+                  className="px-2 py-0.5 text-xs clay-pill-active font-bold rounded"
                   title="Active Custom Timeframe (Click to manage)"
                 >
                   {timeframe}
                 </button>
               )}
+              {/* Quick + Custom Interval Button */}
+              <button
+                onClick={() => {
+                  audioHaptics.tick();
+                  setIsTfMenuOpen((v) => !v);
+                }}
+                className="px-1.5 py-0.5 text-xs clay-pill text-[#38bdf8] hover:text-white hover:bg-[#38bdf8]/20 transition rounded font-bold"
+                title="Add Custom Interval"
+              >
+                +
+              </button>
             </div>
 
             {/* Timeframe Dropdown Toggle */}
@@ -1546,7 +1614,7 @@ export default function TradingChart({
                 audioHaptics.tick();
                 toggleTfMenu();
               }}
-              className="p-1 rounded-full clay-btn transition ml-1"
+              className="p-1 rounded-full clay-btn transition ml-0.5"
               title="All Timeframes"
             >
               <svg className={`h-3 w-3 transition-transform ${isTfMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1554,66 +1622,161 @@ export default function TradingChart({
               </svg>
             </button>
 
-            {/* Timeframe Dropdown Menu */}
+            {/* Timeframe Dropdown Menu with Direct User Input */}
             {isTfMenuOpen && (
-              <div className="absolute left-0 top-full mt-2 z-50 w-48 clay-popover p-2 shadow-2xl font-mono text-xs">
+              <div className="absolute left-0 top-full mt-2 z-50 w-72 clay-popover p-2.5 shadow-2xl font-mono text-xs max-h-[85vh] overflow-y-auto">
+                {/* Direct User Input Form for Custom Interval */}
+                <div className="p-2 border border-[#2d2d3e] bg-black/60 rounded-xl mb-2.5">
+                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#38bdf8] mb-1.5">
+                    <span>Direct Custom Interval</span>
+                    {customInputError && <span className="text-rose-400 text-[9px] lowercase">{customInputError}</span>}
+                  </div>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <input
+                      type="number"
+                      min="1"
+                      max="1440"
+                      value={customVal}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        setCustomVal(isNaN(v) ? 1 : Math.max(1, v));
+                        setCustomInputError(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleApplyCustomInterval();
+                        }
+                      }}
+                      className="w-16 rounded-lg bg-[#181824] px-2 py-1 text-center text-xs font-mono text-white border border-[#2d2d3e] focus:border-[#38bdf8] focus:outline-none"
+                      placeholder="e.g. 2"
+                      autoFocus
+                    />
+                    <select
+                      value={customUnit}
+                      onChange={(e) => {
+                        setCustomUnit(e.target.value as IntervalUnit);
+                        setCustomInputError(null);
+                      }}
+                      className="rounded-lg bg-[#181824] px-1.5 py-1 text-xs font-mono text-white border border-[#2d2d3e] focus:border-[#38bdf8] focus:outline-none flex-1 cursor-pointer"
+                    >
+                      <option value="m">Minutes (m)</option>
+                      <option value="h">Hours (h)</option>
+                      <option value="d">Days (d)</option>
+                      <option value="s">Seconds (s)</option>
+                    </select>
+                    <button
+                      onClick={() => handleApplyCustomInterval()}
+                      className="px-2.5 py-1 rounded-lg bg-[#38bdf8] text-black font-bold text-xs hover:bg-[#38bdf8]/90 transition"
+                      title="Apply & Save Custom Interval (Enter)"
+                    >
+                      Apply
+                    </button>
+                  </div>
+
+                  {/* Fast One-Click Presets */}
+                  <div className="flex flex-wrap items-center gap-1 pt-1.5 border-t border-white/5">
+                    <span className="text-[9px] text-slate-400 font-medium">Quick:</span>
+                    {['2m', '3m', '7m', '10m', '12m', '45m', '2h', '8h', '2d'].map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => {
+                          const num = parseInt(p, 10);
+                          const u = p.replace(/\d+/g, '') as IntervalUnit;
+                          handleApplyCustomInterval(num, u);
+                        }}
+                        className={`text-[9.5px] px-1.5 py-0.5 rounded transition ${
+                          timeframe === p
+                            ? 'bg-[#38bdf8] text-black font-bold'
+                            : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Saved Custom Intervals */}
+                {storedCustomTfs.length > 0 && (
+                  <div className="mb-2 border-b border-grid/60 pb-2">
+                    <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-[#38bdf8] mb-1">
+                      Saved Custom Intervals
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      {storedCustomTfs.map((t) => (
+                        <div
+                          key={t}
+                          className={`flex w-full items-center justify-between px-2.5 py-1 rounded-lg transition group ${
+                            t === timeframe
+                              ? 'clay-btn-active font-bold'
+                              : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                          }`}
+                        >
+                          <button
+                            onClick={() => {
+                              audioHaptics.tick();
+                              setTimeframe(t as Timeframe);
+                              setPaneTimeframe(paneId, t as Timeframe);
+                              setIsTfMenuOpen(false);
+                            }}
+                            className="flex-1 text-left flex items-center gap-1.5"
+                          >
+                            <span>{t}</span>
+                            {t === timeframe && (
+                              <svg className="h-3.5 w-3.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              audioHaptics.tick();
+                              removeStoredCustomTimeframe(t);
+                              setIsTfMenuOpen(false);
+                              setTimeout(() => setIsTfMenuOpen(true), 10);
+                            }}
+                            className="text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 p-0.5 text-xs transition"
+                            title={`Delete ${t}`}
+                          >
+                            x
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Standard Timeframes */}
                 <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1">
                   Standard Timeframes
                 </div>
-                {TIMEFRAMES[provider].map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => {
-                      audioHaptics.tick();
-                      setTimeframe(t);
-                      setPaneTimeframe(paneId, t);
-                      setIsTfMenuOpen(false);
-                    }}
-                    className={`flex w-full items-center justify-between px-2.5 py-1.5 rounded-lg transition ${
-                      t === timeframe
-                        ? 'clay-btn-active font-bold'
-                        : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                    }`}
-                  >
-                    <span>{t}</span>
-                    {t === timeframe && (
-                      <svg className="h-3.5 w-3.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </button>
-                ))}
-
-                {storedCustomTfs.length > 0 && (
-                  <>
-                    <div className="px-2 py-1 mt-2 text-[10px] font-bold uppercase tracking-wider text-[#38bdf8] border-b border-grid/60 mb-1">
-                      Custom Intervals
-                    </div>
-                    {storedCustomTfs.map((t) => (
-                      <button
-                        key={t}
-                        onClick={() => {
-                          audioHaptics.tick();
-                          setTimeframe(t as Timeframe);
-                          setPaneTimeframe(paneId, t as Timeframe);
-                          setIsTfMenuOpen(false);
-                        }}
-                        className={`flex w-full items-center justify-between px-2.5 py-1.5 rounded-lg transition ${
-                          t === timeframe
-                            ? 'clay-btn-active font-bold'
-                            : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                        }`}
-                      >
-                        <span>{t}</span>
-                        {t === timeframe && (
-                          <svg className="h-3.5 w-3.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </button>
-                    ))}
-                  </>
-                )}
+                <div className="grid grid-cols-2 gap-0.5">
+                  {TIMEFRAMES[provider].map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => {
+                        audioHaptics.tick();
+                        setTimeframe(t);
+                        setPaneTimeframe(paneId, t);
+                        setIsTfMenuOpen(false);
+                      }}
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg transition ${
+                        t === timeframe
+                          ? 'clay-btn-active font-bold'
+                          : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      <span>{t}</span>
+                      {t === timeframe && (
+                        <svg className="h-3.5 w-3.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  ))}
+                </div>
 
                 <button
                   onClick={() => {
@@ -1627,7 +1790,7 @@ export default function TradingChart({
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
-                  <span>Custom Interval...</span>
+                  <span>Advanced Interval Dialog...</span>
                 </button>
               </div>
             )}
@@ -1894,11 +2057,11 @@ export default function TradingChart({
               audioHaptics.tick();
               setIsIndicatorsModalOpen(true);
             }}
-            className="flex items-center gap-1.5 clay-pill px-3 py-1 text-xs font-semibold text-white transition shrink-0"
+            className="flex items-center gap-1.5 clay-pill px-2.5 py-0.5 text-xs font-semibold text-white transition shrink-0"
             title="Indicators, Metrics & Strategies (fx)"
           >
-            <span className="font-bold text-white">fx</span>
-            <span>Indicators</span>
+            <span className="font-bold text-[#38bdf8]">fx</span>
+            <span className="hidden sm:inline">Indicators</span>
             {activeIndicatorsList.length > 0 && (
               <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-white text-black text-[10px] font-bold">
                 {activeIndicatorsList.length}
@@ -1914,7 +2077,7 @@ export default function TradingChart({
               setShowVolume(next);
               api.current?.volume.applyOptions({ visible: next });
             }}
-            className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold transition shrink-0 ${
+            className={`flex items-center gap-1 px-2 py-0.5 text-xs font-semibold transition shrink-0 rounded ${
               showVolume ? 'clay-pill-active' : 'clay-pill text-slate-400 hover:text-white'
             }`}
             title="Toggle Bottom Volume Bars"
@@ -1931,7 +2094,7 @@ export default function TradingChart({
               audioHaptics.tick();
               setShowVolumeProfile((v) => !v);
             }}
-            className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold transition shrink-0 ${
+            className={`flex items-center gap-1 px-2 py-0.5 text-xs font-semibold transition shrink-0 rounded ${
               showVolumeProfile ? 'clay-pill-active' : 'clay-pill text-slate-400 hover:text-white'
             }`}
             title="Toggle Visible Range Volume Profile (VPVR & POC/VAH/VAL lines)"
@@ -1949,7 +2112,7 @@ export default function TradingChart({
               if (isReplayActive) exitReplay();
               else startReplay();
             }}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold transition shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold transition shrink-0 rounded ${
               isReplayActive
                 ? 'clay-pill-active'
                 : 'clay-pill'
@@ -1959,7 +2122,7 @@ export default function TradingChart({
             <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
             </svg>
-            <span>Replay</span>
+            <span className="hidden md:inline">Replay</span>
           </button>
 
           {/* Create Alert Dialog Trigger Button */}
@@ -1969,13 +2132,13 @@ export default function TradingChart({
               setAlertInitialPrice(currentPrice);
               setIsCreateAlertOpen(true);
             }}
-            className="flex items-center gap-1.5 clay-pill px-3 py-1 text-xs font-semibold text-white transition shrink-0"
+            className="flex items-center gap-1.5 clay-pill px-2.5 py-0.5 text-xs font-semibold text-white transition shrink-0"
             title="Create Institutional Alert (Alt+A)"
           >
             <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            <span>Alert</span>
+            <span className="hidden lg:inline">Alert</span>
           </button>
 
           {/* Undo / Redo Controls */}
@@ -2141,9 +2304,9 @@ export default function TradingChart({
         </div>
 
         {/* Right Section: Session, Scale, Timezone, Snapshot, Settings, Fullscreen */}
-        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+        <div className="flex items-center gap-1 shrink-0 ml-auto">
           {/* Market Session Status Badge */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] bg-white/[0.03] border border-white/[0.08] text-[10px] font-mono shrink-0">
+          <div className="hidden xl:flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] bg-white/[0.03] border border-white/[0.08] text-[10px] font-mono shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             <span className="text-slate-400 font-medium">
               {provider === 'binance' ? '24/7 Live' : 'Regular'}
@@ -2158,7 +2321,7 @@ export default function TradingChart({
                 scaleMode === 'NORMAL' ? 'LOGARITHMIC' : scaleMode === 'LOGARITHMIC' ? 'PERCENTAGE' : 'NORMAL';
               handleSetScaleMode(nextMode);
             }}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold clay-pill text-slate-300 hover:text-white transition shrink-0"
+            className="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold clay-pill text-slate-300 hover:text-white transition shrink-0 rounded"
             title={`Price Scale Mode: ${scaleMode} (Click to toggle Normal / Log / %)`}
           >
             <span className="text-[10px] text-slate-400 font-normal">Scale:</span>
@@ -2173,7 +2336,7 @@ export default function TradingChart({
               const nextTz = tzs[(tzs.indexOf(timezone) + 1) % tzs.length];
               setTimezone(nextTz);
             }}
-            className="flex items-center gap-1 px-2 py-1 text-xs font-semibold clay-pill text-slate-400 hover:text-white transition shrink-0"
+            className="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold clay-pill text-slate-400 hover:text-white transition shrink-0 rounded"
             title={`Chart Timezone: ${timezone} (Click to cycle UTC / IST / EDT / GMT / JST)`}
           >
             <span className="text-[10px] font-mono text-slate-300">
@@ -2186,7 +2349,7 @@ export default function TradingChart({
               audioHaptics.tick();
               setIsShareModalOpen(true);
             }}
-            className="flex items-center gap-1.5 clay-pill-active px-3 py-1 text-xs font-semibold transition"
+            className="flex items-center gap-1 clay-pill-active px-2.5 py-0.5 text-xs font-semibold transition shrink-0 rounded"
             title="Export Watermarked Snapshot or Copy Chart Link"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2306,6 +2469,7 @@ export default function TradingChart({
             indicators={activeIndicatorsList}
             onOpenSymbolSearch={() => setIsSymbolSearchOpen(true)}
             countdownText={countdownText}
+            onClearAllIndicators={handleClearAllIndicators}
           />
 
           <div ref={ohlc} className="hidden" />

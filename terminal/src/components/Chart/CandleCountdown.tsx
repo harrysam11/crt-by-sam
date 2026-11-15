@@ -21,16 +21,16 @@ export default function CandleCountdown({ timeframe, lastCandleTime }: CandleCou
     const updateCountdown = () => {
       const nowSec = Math.floor(Date.now() / 1000);
       const intervalSec = parseTimeframeToSeconds(timeframe);
-
-      let diffSec = 0;
-      if (lastCandleTime && lastCandleTime > 0) {
-        const nextCloseSec = lastCandleTime + intervalSec;
-        diffSec = Math.max(0, nextCloseSec - nowSec);
-      } else {
-        const nextCandleSec = Math.ceil(nowSec / intervalSec) * intervalSec;
-        diffSec = Math.max(0, nextCandleSec - nowSec);
+      if (intervalSec <= 0) {
+        setFormattedText('00:00');
+        return;
       }
 
+      let nextCloseSec = lastCandleTime && lastCandleTime > 0 ? lastCandleTime + intervalSec : 0;
+      if (nextCloseSec <= nowSec) {
+        nextCloseSec = Math.ceil((nowSec + 1) / intervalSec) * intervalSec;
+      }
+      const diffSec = Math.max(0, nextCloseSec - nowSec);
       setFormattedText(formatCountdownTimer(diffSec));
     };
 

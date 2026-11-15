@@ -32,6 +32,7 @@ export interface ChartLegendHUDProps {
   indicators: ActiveIndicatorInfo[];
   onOpenSymbolSearch?: () => void;
   countdownText?: string;
+  onClearAllIndicators?: () => void;
 }
 
 export default function ChartLegendHUD({
@@ -41,6 +42,7 @@ export default function ChartLegendHUD({
   indicators,
   onOpenSymbolSearch,
   countdownText,
+  onClearAllIndicators,
 }: ChartLegendHUDProps) {
   const [isIndicatorsCollapsed, setIsIndicatorsCollapsed] = useState(false);
 
@@ -67,8 +69,9 @@ export default function ChartLegendHUD({
         </button>
         <span className="text-slate-400 font-semibold">{timeframe}</span>
         {countdownText && (
-          <span className="text-[10px] text-amber-300 font-mono px-1.5 py-0.2 rounded bg-amber-950/60 border border-amber-800/40" title="Countdown to bar close">
-            {countdownText}
+          <span className="flex items-center gap-1 text-[10.5px] text-[#38bdf8] font-mono px-2 py-0.5 rounded bg-[#38bdf8]/10 border border-[#38bdf8]/30 font-semibold" title="Time remaining until bar close">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#38bdf8] animate-pulse" />
+            <span>{countdownText}</span>
           </span>
         )}
         <span className="text-[10px] text-slate-400 px-1 py-0.2 rounded bg-slate-800/80 border border-grid">BINANCE</span>
@@ -105,7 +108,7 @@ export default function ChartLegendHUD({
       {/* Interactive Indicators List */}
       {indicators.length > 0 && (
         <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setIsIndicatorsCollapsed((v) => !v)}
               className="text-slate-400 hover:text-slate-200 transition p-0.5"
@@ -123,6 +126,15 @@ export default function ChartLegendHUD({
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
               Indicators ({indicators.filter((i) => i.visible).length})
             </span>
+            {onClearAllIndicators && (
+              <button
+                onClick={onClearAllIndicators}
+                className="text-[9px] text-slate-400 hover:text-rose-400 ml-1 px-1.5 py-0.2 rounded bg-white/5 hover:bg-rose-500/10 border border-white/5 transition"
+                title="Remove all indicators"
+              >
+                Clear All
+              </button>
+            )}
           </div>
 
           {!isIndicatorsCollapsed && (

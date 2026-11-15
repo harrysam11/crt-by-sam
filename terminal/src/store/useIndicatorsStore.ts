@@ -14,6 +14,7 @@ interface IndicatorsState {
 
   addInstance: (indicatorId: string) => ActiveIndicatorInstance | null;
   removeInstance: (instanceId: string) => void;
+  clearAllInstances: () => void;
   toggleVisibility: (instanceId: string) => void;
   updateInstanceInputs: (instanceId: string, inputs: Record<string, InputValueType>) => void;
   updateInstanceStyles: (instanceId: string, styles: Record<string, IndicatorPlotStyle>) => void;
@@ -75,6 +76,12 @@ export const useIndicatorsStore = create<IndicatorsState>()(
             s.selectedInstanceForSettings?.instanceId === instanceId
               ? null
               : s.selectedInstanceForSettings,
+        })),
+
+      clearAllInstances: () =>
+        set(() => ({
+          activeInstances: [],
+          selectedInstanceForSettings: null,
         })),
 
       toggleVisibility: (instanceId: string) =>
