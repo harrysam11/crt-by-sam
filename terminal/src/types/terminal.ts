@@ -48,6 +48,7 @@ export interface Position {
   unrealizedPnl: number; // USD
   realizedPnl: number; // USD
   leverage: number;
+  entryTime?: number; // ms
 }
 
 export interface Instrument {
@@ -103,5 +104,6 @@ export interface Trade {
   entry: number;
   exit: number;
   pnl: number;
-  time: number;
+  time: number; // exit time in ms
+  entryTime?: number; // entry time in ms
 }

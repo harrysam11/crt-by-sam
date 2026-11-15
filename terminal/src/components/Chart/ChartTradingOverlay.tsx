@@ -68,6 +68,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
   const [dragCurrentPrice, setDragCurrentPrice] = useState<number | null>(null);
   const [quickQty, setQuickQty] = useState('0.1');
   const [isQuickTradeCollapsed, setIsQuickTradeCollapsed] = useState(false);
+  const [isPosActionsOpen, setIsPosActionsOpen] = useState(false);
 
   // Mouse drag tracking listener
   useEffect(() => {
@@ -214,82 +215,158 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
               style={{ borderColor: color }}
             />
 
-            {/* Position Control Badge */}
-            <div
-              className="pointer-events-auto flex items-center gap-1.5 rounded-l-lg px-2.5 py-1 text-[10px] font-bold text-white shadow-xl"
-              style={{ backgroundColor: color }}
-            >
-              <span>{position.side} {fmtQty(position.size)}</span>
-              <span className="font-mono">@{fmtPrice(position.entryPrice, symbol)}</span>
-              <span className="bg-black/40 px-1.5 py-0.2 rounded font-mono">
-                {isPosProfit ? `+${fmtUsd(posPnl)}` : `-${fmtUsd(Math.abs(posPnl))}`}
-              </span>
+            {/* Position Control Badge (Compact with Action Menu) */}
+            <div className="relative pointer-events-auto">
+              <div
+                className="flex items-center gap-1.5 rounded-l-lg px-2.5 py-1 text-[10px] font-bold text-white shadow-xl select-none"
+                style={{ backgroundColor: color }}
+              >
+                <span>{position.side} {fmtQty(position.size)}</span>
+                <span className="font-mono">@{fmtPrice(position.entryPrice, symbol)}</span>
+                <span className="bg-black/40 px-1.5 py-0.2 rounded font-mono">
+                  {isPosProfit ? `+${fmtUsd(posPnl)}` : `-${fmtUsd(Math.abs(posPnl))}`}
+                </span>
 
-              {/* + SL Button if no SL order exists */}
-              {!slOrder && (
+                {/* Actions Menu Trigger */}
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     audioHaptics.tick();
-                    const defaultSl = isLong ? position.entryPrice * 0.99 : position.entryPrice * 1.01;
-                    updatePositionBrackets(symbol, +defaultSl.toFixed(4), undefined);
+                    setIsPosActionsOpen(!isPosActionsOpen);
                   }}
-                  className="bg-red-950/90 hover:bg-red-600 border border-red-500/60 px-1.5 py-0.5 rounded text-[9px] text-red-200 hover:text-white transition font-bold"
-                  title="Add Stop Loss (drag line on chart to adjust)"
+                  className={`px-1.5 py-0.2 rounded text-[10px] font-bold transition ${
+                    isPosActionsOpen ? 'bg-white text-black' : 'bg-black/30 hover:bg-black/60 text-white'
+                  }`}
+                  title="Position Commands (SL, TP, BE, Rev, Close)"
                 >
-                  + SL
+                  ...
                 </button>
-              )}
 
-              {/* + TP Button if no TP order exists */}
-              {!tpOrder && (
+                {/* Quick Close button */}
                 <button
-                  onClick={() => {
-                    audioHaptics.tick();
-                    const defaultTp = isLong ? position.entryPrice * 1.02 : position.entryPrice * 0.98;
-                    updatePositionBrackets(symbol, undefined, +defaultTp.toFixed(4));
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    audioHaptics.error();
+                    closePosition(symbol);
                   }}
-                  className="bg-emerald-950/90 hover:bg-emerald-600 border border-emerald-500/60 px-1.5 py-0.5 rounded text-[9px] text-emerald-200 hover:text-white transition font-bold"
-                  title="Add Take Profit (drag line on chart to adjust)"
+                  className="bg-black/40 hover:bg-black/80 px-1.5 py-0.2 rounded font-bold text-white transition ml-0.5"
+                  title="Close Position at Market"
                 >
-                  + TP
+                  x
                 </button>
+              </div>
+
+              {/* Floating Position Action Menu Popover */}
+              {isPosActionsOpen && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute right-0 top-full mt-1.5 flex flex-col gap-1 rounded-lg border border-white/10 bg-[#0c0d14]/95 p-2 shadow-2xl backdrop-blur-md z-50 text-[10px] font-mono whitespace-nowrap min-w-[170px]"
+                >
+                  <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider pb-1 border-b border-white/10 flex items-center justify-between">
+                    <span>Position Commands</span>
+                    <button
+                      onClick={() => setIsPosActionsOpen(false)}
+                      className="text-slate-400 hover:text-white px-1"
+                    >
+                      x
+                    </button>
+                  </div>
+
+                  {/* + SL */}
+                  {!slOrder ? (
+                    <button
+                      onClick={() => {
+                        audioHaptics.tick();
+                        const defaultSl = isLong ? position.entryPrice * 0.99 : position.entryPrice * 1.01;
+                        updatePositionBrackets(symbol, +defaultSl.toFixed(4), undefined);
+                        setIsPosActionsOpen(false);
+                      }}
+                      className="flex items-center justify-between px-2 py-1 rounded bg-red-950/70 hover:bg-red-800/80 border border-red-500/40 text-red-200 transition text-left"
+                    >
+                      <span>+ Stop Loss (SL)</span>
+                      <span className="text-[9px] text-red-400 font-bold ml-2">-1.0%</span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center justify-between px-2 py-1 rounded bg-slate-800/40 text-slate-400 text-[9px]">
+                      <span>SL Active:</span>
+                      <span className="font-mono text-red-300 ml-2">{fmtPrice(slOrder.triggerPrice ?? slOrder.price, symbol)}</span>
+                    </div>
+                  )}
+
+                  {/* + TP */}
+                  {!tpOrder ? (
+                    <button
+                      onClick={() => {
+                        audioHaptics.tick();
+                        const defaultTp = isLong ? position.entryPrice * 1.02 : position.entryPrice * 0.98;
+                        updatePositionBrackets(symbol, undefined, +defaultTp.toFixed(4));
+                        setIsPosActionsOpen(false);
+                      }}
+                      className="flex items-center justify-between px-2 py-1 rounded bg-emerald-950/70 hover:bg-emerald-800/80 border border-emerald-500/40 text-emerald-200 transition text-left"
+                    >
+                      <span>+ Take Profit (TP)</span>
+                      <span className="text-[9px] text-emerald-400 font-bold ml-2">+2.0%</span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center justify-between px-2 py-1 rounded bg-slate-800/40 text-slate-400 text-[9px]">
+                      <span>TP Active:</span>
+                      <span className="font-mono text-emerald-300 ml-2">{fmtPrice(tpOrder.triggerPrice ?? tpOrder.price, symbol)}</span>
+                    </div>
+                  )}
+
+                  {/* Snap Break-Even */}
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      snapBreakEven(symbol);
+                      setIsPosActionsOpen(false);
+                    }}
+                    className="flex items-center justify-between px-2 py-1 rounded bg-slate-800/60 hover:bg-slate-700/80 text-white transition text-left"
+                  >
+                    <span>Snap Break-Even</span>
+                    <span className="text-[9px] text-slate-400 ml-2">BE</span>
+                  </button>
+
+                  {/* Reverse Position */}
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      flipPosition(symbol);
+                      setIsPosActionsOpen(false);
+                    }}
+                    className="flex items-center justify-between px-2 py-1 rounded bg-amber-950/70 hover:bg-amber-800/80 border border-amber-500/40 text-amber-200 transition text-left"
+                  >
+                    <span>Reverse Direction</span>
+                    <span className="text-[9px] text-amber-400 font-bold ml-2">Rev</span>
+                  </button>
+
+                  {/* Close Partial 50% */}
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      useTerminalStore.getState().closePartialPosition(symbol, 0.5);
+                      setIsPosActionsOpen(false);
+                    }}
+                    className="flex items-center justify-between px-2 py-1 rounded bg-slate-800/60 hover:bg-slate-700/80 text-slate-300 transition text-left"
+                  >
+                    <span>Close 50%</span>
+                    <span className="text-[9px] text-slate-400 ml-2">Half</span>
+                  </button>
+
+                  {/* Close All Market */}
+                  <button
+                    onClick={() => {
+                      audioHaptics.error();
+                      closePosition(symbol);
+                      setIsPosActionsOpen(false);
+                    }}
+                    className="flex items-center justify-between px-2 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold transition text-left mt-0.5"
+                  >
+                    <span>Close All Market</span>
+                    <span>x</span>
+                  </button>
+                </div>
               )}
-
-              {/* Snap Break-Even Button */}
-              <button
-                onClick={() => {
-                  audioHaptics.tick();
-                  snapBreakEven(symbol);
-                }}
-                className="bg-black/30 hover:bg-black/60 px-1 py-0.2 rounded text-[9px] text-white transition"
-                title="Move Stop Loss to Entry (Break-Even)"
-              >
-                BE
-              </button>
-
-              {/* Flip Direction Button */}
-              <button
-                onClick={() => {
-                  audioHaptics.tick();
-                  flipPosition(symbol);
-                }}
-                className="bg-black/30 hover:bg-black/60 px-1 py-0.2 rounded text-[9px] text-white transition"
-                title="Reverse Position Direction at Market"
-              >
-                Rev
-              </button>
-
-              {/* Close Position Button */}
-              <button
-                onClick={() => {
-                  audioHaptics.error();
-                  closePosition(symbol);
-                }}
-                className="bg-black/40 hover:bg-black/80 px-1.5 py-0.2 rounded font-bold text-white transition"
-                title="Close Position at Market"
-              >
-                x
-              </button>
             </div>
           </div>
         );

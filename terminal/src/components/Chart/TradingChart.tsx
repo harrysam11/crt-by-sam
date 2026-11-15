@@ -10,7 +10,7 @@ import { liveCandleBus } from '../../hooks/useMarketFeed';
 import { getInstrument, TIMEFRAMES } from '../../services/instruments';
 import { ema, sma, rsi, bollingerBands, heikinAshi } from '../../services/indicatorMath';
 import { generateOIHistory } from '../../services/nseOptionChain';
-import { decimalsFor, fmtPrice, fmtQty, labelOf } from '../../utils/formatters';
+import { decimalsFor, fmtPrice, fmtQty, fmtUsd, labelOf } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
 import type { Candle, ChartStyle, ChartTimezone, PriceScaleType, Timeframe } from '../../types/terminal';
 import type { CanvasOrderLine } from '../../types/derivatives';
@@ -676,6 +676,20 @@ export default function TradingChart({
   const [seriesApi, setSeriesApi] = useState<ISeriesApi<SeriesType> | null>(null);
   const [boxDimensions, setBoxDimensions] = useState<{ w: number; h: number }>({ w: 800, h: 500 });
 
+  // Trade Execution Hover Details Tooltip State & Cache
+  interface HoveredExecution {
+    type: 'ENTRY' | 'EXIT';
+    side: 'BUY' | 'SELL';
+    price: number;
+    qty: number;
+    pnl?: number;
+    time: number;
+    x: number;
+    y: number;
+  }
+  const [hoveredExecution, setHoveredExecution] = useState<HoveredExecution | null>(null);
+  const executionMarkersRef = useRef<Map<number, Omit<HoveredExecution, 'x' | 'y'>[]>>(new Map());
+
   useEffect(() => {
     if (!box.current) return;
     const updateSize = () => {
@@ -906,6 +920,24 @@ export default function TradingChart({
     chart.subscribeCrosshairMove((p) => {
       const d = p.seriesData.get(cs) as CandlestickData | undefined;
       hovering.current = !!d;
+
+      // Check if hovering over a trade execution candle (entry or exit arrow)
+      if (p.time && p.point) {
+        const cTime = p.time as number;
+        const execs = executionMarkersRef.current.get(cTime);
+        if (execs && execs.length > 0) {
+          setHoveredExecution({
+            ...execs[0],
+            x: p.point.x,
+            y: p.point.y,
+          });
+        } else {
+          setHoveredExecution(null);
+        }
+      } else {
+        setHoveredExecution(null);
+      }
+
       if (d) {
         const v = p.seriesData.get(vs) as { value?: number } | undefined;
         const sVal = p.seriesData.get(smaS) as { value?: number } | undefined;
@@ -1104,7 +1136,7 @@ export default function TradingChart({
     }
   }, [chartSettings, timezone]);
 
-  // Trade Execution & Order Fill Markers on Candlestick Series
+  // Trade Execution & Order Fill Markers on Candlestick Series (Clean TradingView arrows without text watermark)
   useEffect(() => {
     const a = api.current;
     if (!a || !effectiveCandles.length) return;
@@ -1112,30 +1144,113 @@ export default function TradingChart({
     if (!chartSettings.showExecutionsOnChart) {
       try {
         a.candles.setMarkers([]);
+        executionMarkersRef.current.clear();
       } catch {}
       return;
     }
 
-    const symbolTrades = trades.filter((t) => t.symbol === symbol);
-    if (!symbolTrades.length) {
+    const s = useTerminalStore.getState();
+    const symbolTrades = s.trades.filter((t) => t.symbol === symbol);
+    const pos = s.positions[symbol];
+
+    executionMarkersRef.current.clear();
+
+    if (!symbolTrades.length && !pos) {
       try {
         a.candles.setMarkers([]);
       } catch {}
       return;
     }
 
-    const markers = symbolTrades
-      .map((t) => {
-        const tradeSec = t.time > 1e11 ? Math.floor(t.time / 1000) : t.time;
-        return {
-          time: tradeSec as UTCTimestamp,
-          position: t.side === 'LONG' ? ('belowBar' as const) : ('aboveBar' as const),
+    // Helper to snap a timestamp to the closest candle time
+    const snapToCandleTime = (tsMs: number): UTCTimestamp | null => {
+      const sec = tsMs > 1e11 ? Math.floor(tsMs / 1000) : tsMs;
+      if (!effectiveCandles.length) return null;
+      let closest = effectiveCandles[0].time;
+      let minDiff = Infinity;
+      for (let i = 0; i < effectiveCandles.length; i++) {
+        const ct = effectiveCandles[i].time;
+        const diff = Math.abs(ct - sec);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closest = ct;
+        }
+      }
+      return closest as UTCTimestamp;
+    };
+
+    const markers: any[] = [];
+
+    const recordExecution = (cTime: number, exec: Omit<HoveredExecution, 'x' | 'y'>) => {
+      const list = executionMarkersRef.current.get(cTime) || [];
+      list.push(exec);
+      executionMarkersRef.current.set(cTime, list);
+    };
+
+    // 1. Closed historical trades (Entry arrow + Exit opposite arrow)
+    for (const t of symbolTrades) {
+      // Entry marker (clean arrow without text watermark)
+      const entryTime = snapToCandleTime(t.entryTime || t.time);
+      if (entryTime) {
+        markers.push({
+          time: entryTime,
+          position: t.side === 'LONG' ? 'belowBar' : 'aboveBar',
           color: t.side === 'LONG' ? '#22c55e' : '#ef4444',
-          shape: t.side === 'LONG' ? ('arrowUp' as const) : ('arrowDown' as const),
-          text: `${t.side} ${t.qty} @ ${t.entry.toFixed(2)}`,
-        };
-      })
-      .sort((m1, m2) => (m1.time as number) - (m2.time as number));
+          shape: t.side === 'LONG' ? 'arrowUp' : 'arrowDown',
+          id: `entry_${t.id}`,
+        });
+        recordExecution(entryTime as number, {
+          type: 'ENTRY',
+          side: t.side === 'LONG' ? 'BUY' : 'SELL',
+          price: t.entry,
+          qty: t.qty,
+          time: t.entryTime || t.time,
+        });
+      }
+
+      // Exit marker (opposite arrow at exit candle)
+      const exitTime = snapToCandleTime(t.time);
+      if (exitTime) {
+        markers.push({
+          time: exitTime,
+          position: t.side === 'LONG' ? 'aboveBar' : 'belowBar',
+          color: t.side === 'LONG' ? '#f43f5e' : '#10b981',
+          shape: t.side === 'LONG' ? 'arrowDown' : 'arrowUp',
+          id: `exit_${t.id}`,
+        });
+        recordExecution(exitTime as number, {
+          type: 'EXIT',
+          side: t.side === 'LONG' ? 'SELL' : 'BUY',
+          price: t.exit,
+          qty: t.qty,
+          pnl: t.pnl,
+          time: t.time,
+        });
+      }
+    }
+
+    // 2. Currently active open position entry marker
+    if (pos && pos.entryTime) {
+      const activeTime = snapToCandleTime(pos.entryTime);
+      if (activeTime) {
+        markers.push({
+          time: activeTime,
+          position: pos.side === 'LONG' ? 'belowBar' : 'aboveBar',
+          color: pos.side === 'LONG' ? '#22c55e' : '#ef4444',
+          shape: pos.side === 'LONG' ? 'arrowUp' : 'arrowDown',
+          id: `active_${symbol}`,
+        });
+        recordExecution(activeTime as number, {
+          type: 'ENTRY',
+          side: pos.side === 'LONG' ? 'BUY' : 'SELL',
+          price: pos.entryPrice,
+          qty: pos.size,
+          time: pos.entryTime,
+        });
+      }
+    }
+
+    markers.sort((m1, m2) => (m1.time as number) - (m2.time as number));
 
     try {
       a.candles.setMarkers(markers);
@@ -2609,6 +2724,50 @@ export default function TradingChart({
                 setShowRiskHUD(false);
               }}
             />
+          )}
+
+          {/* Trade Execution Arrow Hover Details Tooltip */}
+          {hoveredExecution && (
+            <div
+              style={{
+                left: `${Math.min(hoveredExecution.x + 16, (boxDimensions.w || 800) - 220)}px`,
+                top: `${Math.max(hoveredExecution.y - 75, 15)}px`,
+              }}
+              className="pointer-events-none absolute z-40 flex flex-col gap-1 rounded-lg border border-white/10 bg-[#0c0d14]/95 p-2.5 shadow-2xl backdrop-blur-md font-mono text-[11px]"
+            >
+              <div className="flex items-center gap-1.5 font-bold">
+                <span
+                  className={`px-1.5 py-0.2 rounded text-[9px] uppercase font-bold ${
+                    hoveredExecution.side === 'BUY'
+                      ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-500/50'
+                      : 'bg-rose-950/90 text-rose-300 border border-rose-500/50'
+                  }`}
+                >
+                  {hoveredExecution.type === 'ENTRY' ? `${hoveredExecution.side} ENTRY` : `${hoveredExecution.side} EXIT`}
+                </span>
+                <span className="text-white font-bold">{symbol}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 text-slate-300 text-[10px]">
+                <span className="text-slate-500">Price:</span>
+                <span className="font-bold text-white font-mono">${fmtPrice(hoveredExecution.price, symbol)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 text-slate-300 text-[10px]">
+                <span className="text-slate-500">Size:</span>
+                <span className="font-mono text-slate-200">{fmtQty(hoveredExecution.qty)}</span>
+              </div>
+              {hoveredExecution.pnl !== undefined && (
+                <div className="flex items-center justify-between gap-3 text-[10px]">
+                  <span className="text-slate-500">Realized PnL:</span>
+                  <span className={`font-bold font-mono ${hoveredExecution.pnl >= 0 ? 'text-up' : 'text-down'}`}>
+                    {hoveredExecution.pnl >= 0 ? `+${fmtUsd(hoveredExecution.pnl)}` : `-${fmtUsd(Math.abs(hoveredExecution.pnl))}`}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-3 text-[9px] text-slate-500 pt-0.5 border-t border-white/10">
+                <span>Time:</span>
+                <span>{new Date(hoveredExecution.time).toLocaleTimeString()}</span>
+              </div>
+            </div>
           )}
 
           {/* Loading overlay */}

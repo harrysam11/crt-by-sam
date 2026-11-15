@@ -55,6 +55,24 @@ export default function DrawingOverlay({
 }: DrawingOverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Dynamic price scale offset so price scale and bottom time scale are never blocked by drawing overlay
+  const [priceScaleWidth, setPriceScaleWidth] = useState(68);
+
+  useEffect(() => {
+    if (!chartApi) return;
+    const updateWidth = () => {
+      try {
+        const w = chartApi.priceScale('right')?.width();
+        if (w && w > 0) setPriceScaleWidth(w);
+      } catch {
+        // fallback
+      }
+    };
+    updateWidth();
+    const interval = setInterval(updateWidth, 500);
+    return () => clearInterval(interval);
+  }, [chartApi]);
+
   // Drawing Store Integration
   const setActiveTool = useDrawingStore((s) => s.setActiveTool);
   const stayInDrawingMode = useDrawingStore((s) => s.stayInDrawingMode);
@@ -395,7 +413,8 @@ export default function DrawingOverlay({
     if (!parent) return;
 
     const onMouseDown = (e: MouseEvent) => {
-      if (e.button === 2) {
+      // Marquee selector only activates when Ctrl (or Cmd) is held AND right mouse button is dragged
+      if ((e.ctrlKey || e.metaKey) && e.button === 2) {
         const rect = parent.getBoundingClientRect();
         rightClickDragRef.current = {
           startX: e.clientX - rect.left,
@@ -983,8 +1002,9 @@ export default function DrawingOverlay({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      className={`absolute inset-0 z-10 ${
-        isDrawingTool || isCtrlHeld || isShiftHeld || isAltHeld
+      style={{ right: `${priceScaleWidth}px`, bottom: '26px' }}
+      className={`absolute left-0 top-0 z-10 ${
+        isDrawingTool || activeDrawing || selectionBox || draggingHandle || draggingBody
           ? 'cursor-crosshair pointer-events-auto'
           : activeTool === 'CURSOR_ERASER'
           ? 'cursor-not-allowed pointer-events-auto'

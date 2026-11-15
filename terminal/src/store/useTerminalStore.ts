@@ -99,19 +99,20 @@ function applyFill(positions: Record<string, Position>, balance: number, symbol:
   const dir: Position['side'] = side === 'BUY' ? 'LONG' : 'SHORT';
   const pos = next[symbol];
   let trade: Trade | undefined;
+  const now = Date.now();
   if (!pos) {
-    next[symbol] = { symbol, side: dir, entryPrice: price, size: qty, unrealizedPnl: 0, realizedPnl: 0, leverage };
+    next[symbol] = { symbol, side: dir, entryPrice: price, size: qty, unrealizedPnl: 0, realizedPnl: 0, leverage, entryTime: now };
   } else if (pos.side === dir) {
     const size = pos.size + qty;
-    next[symbol] = { ...pos, size, entryPrice: (pos.entryPrice * pos.size + price * qty) / size };
+    next[symbol] = { ...pos, size, entryPrice: (pos.entryPrice * pos.size + price * qty) / size, entryTime: pos.entryTime || now };
   } else {
     const closed = Math.min(pos.size, qty);
     const pnl = (price - pos.entryPrice) * closed * (pos.side === 'LONG' ? 1 : -1) * toUsd(symbol);
     balance += pnl;
-    trade = { id: uid(), symbol, side: pos.side, qty: closed, entry: pos.entryPrice, exit: price, pnl, time: Date.now() };
+    trade = { id: uid(), symbol, side: pos.side, qty: closed, entry: pos.entryPrice, exit: price, pnl, time: now, entryTime: pos.entryTime || (now - 60000) };
     const rest = qty - closed;
     if (closed < pos.size) next[symbol] = { ...pos, size: pos.size - closed, realizedPnl: pos.realizedPnl + pnl };
-    else if (rest > 0) next[symbol] = { symbol, side: dir, entryPrice: price, size: rest, unrealizedPnl: 0, realizedPnl: 0, leverage };
+    else if (rest > 0) next[symbol] = { symbol, side: dir, entryPrice: price, size: rest, unrealizedPnl: 0, realizedPnl: 0, leverage, entryTime: now };
     else delete next[symbol];
   }
   return { positions: next, balance, trade };
