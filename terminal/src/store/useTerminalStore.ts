@@ -8,6 +8,7 @@ import { fmtPrice, labelOf } from '../utils/formatters';
 import type {
   Alert, Candle, ConnectionStatus, Instrument, Order, OrderSide, Position, QuoteInfo, TickerStat, Timeframe, Trade,
 } from '../types/terminal';
+import { useExecutionEngineStore } from './useExecutionEngineStore';
 
 export const START_BALANCE = 10000; // USD
 export const LEVERAGES = [1, 2, 5, 10, 20, 50, 100];
@@ -65,6 +66,20 @@ interface TerminalState {
   removeAlert: (id: string) => void;
   updateOrderPrice: (id: string, newPrice: number) => void;
   updatePositionBrackets: (symbol: string, sl?: number, tp?: number) => void;
+  bulkModifyBrackets: (params: {
+    symbols: string[];
+    slOffsetPct?: number;
+    tpOffsetPct?: number;
+    slPrice?: number;
+    tpPrice?: number;
+    riskRewardRatio?: number;
+    isBreakEven?: boolean;
+  }) => void;
+  bulkClosePositions: (symbols: string[], fraction?: number) => void;
+  closeWinningPositions: () => void;
+  closeLosingPositions: () => void;
+  bulkCancelOrders: (orderIds: string[]) => void;
+  bulkShiftOrderPrices: (orderIds: string[], offsetPct: number) => void;
   resetAccount: () => void;
 }
 
@@ -266,6 +281,9 @@ export const useTerminalStore = create<TerminalState>()(
             return { prices: { ...s.prices, [symbol]: price }, currentPrice: symbol === s.symbol ? price : s.currentPrice, ...(r ?? {}) };
           });
           fireAlerts(symbol, price);
+          try {
+            useExecutionEngineStore.getState().evaluateRules(symbol, price);
+          } catch {}
         },
 
         addInstrument: (inst) => {
@@ -549,6 +567,197 @@ export const useTerminalStore = create<TerminalState>()(
           }
 
           set({ orders: trimOrders(orders) });
+        },
+
+        bulkModifyBrackets: ({
+          symbols,
+          slOffsetPct,
+          tpOffsetPct,
+          slPrice,
+          tpPrice,
+          riskRewardRatio,
+          isBreakEven,
+        }) => {
+          const s = get();
+          let orders = [...s.orders];
+          let updatedCount = 0;
+
+          for (const sym of symbols) {
+            const pos = s.positions[sym];
+            if (!pos) continue;
+
+            const isLong = pos.side === 'LONG';
+            const exitSide: OrderSide = isLong ? 'SELL' : 'BUY';
+
+            // Calculate SL
+            let finalSl: number | undefined = undefined;
+            if (isBreakEven) {
+              finalSl = pos.entryPrice;
+            } else if (slPrice !== undefined && slPrice > 0) {
+              finalSl = slPrice;
+            } else if (slOffsetPct !== undefined && slOffsetPct > 0) {
+              finalSl = +(isLong
+                ? pos.entryPrice * (1 - slOffsetPct / 100)
+                : pos.entryPrice * (1 + slOffsetPct / 100)
+              ).toFixed(sym.includes('BTC') ? 2 : 4);
+            }
+
+            // Calculate TP
+            let finalTp: number | undefined = undefined;
+            if (riskRewardRatio !== undefined && riskRewardRatio > 0 && finalSl !== undefined) {
+              const riskDist = Math.abs(pos.entryPrice - finalSl);
+              finalTp = +(isLong
+                ? pos.entryPrice + riskDist * riskRewardRatio
+                : pos.entryPrice - riskDist * riskRewardRatio
+              ).toFixed(sym.includes('BTC') ? 2 : 4);
+            } else if (tpPrice !== undefined && tpPrice > 0) {
+              finalTp = tpPrice;
+            } else if (tpOffsetPct !== undefined && tpOffsetPct > 0) {
+              finalTp = +(isLong
+                ? pos.entryPrice * (1 + tpOffsetPct / 100)
+                : pos.entryPrice * (1 - tpOffsetPct / 100)
+              ).toFixed(sym.includes('BTC') ? 2 : 4);
+            }
+
+            if (finalSl !== undefined) {
+              orders = orders.filter((o) => !(o.status === 'PENDING' && o.symbol === sym && o.type === 'STOP_LOSS'));
+              orders.push({
+                id: uid(),
+                symbol: sym,
+                side: exitSide,
+                type: 'STOP_LOSS',
+                price: 0,
+                triggerPrice: finalSl,
+                qty: pos.size,
+                status: 'PENDING',
+                timestamp: Date.now(),
+                reduceOnly: true,
+              });
+            }
+
+            if (finalTp !== undefined) {
+              orders = orders.filter((o) => !(o.status === 'PENDING' && o.symbol === sym && o.type === 'TAKE_PROFIT'));
+              orders.push({
+                id: uid(),
+                symbol: sym,
+                side: exitSide,
+                type: 'TAKE_PROFIT',
+                price: 0,
+                triggerPrice: finalTp,
+                qty: pos.size,
+                status: 'PENDING',
+                timestamp: Date.now(),
+                reduceOnly: true,
+              });
+            }
+
+            updatedCount++;
+          }
+
+          set({ orders: trimOrders(orders) });
+          notifyAlert('Bulk Brackets Updated', `Modified SL/TP for ${updatedCount} open position${updatedCount > 1 ? 's' : ''}.`);
+        },
+
+        bulkClosePositions: (symbols, fraction = 1) => {
+          const s = get();
+          let positions = s.positions;
+          let balance = s.balance;
+          let trades = s.trades;
+          let orders = s.orders;
+          let closedCount = 0;
+
+          for (const sym of symbols) {
+            const pos = positions[sym];
+            if (!pos) continue;
+
+            const mark = s.prices[sym] ?? pos.entryPrice;
+            const side: OrderSide = pos.side === 'LONG' ? 'SELL' : 'BUY';
+            const closeQty = +(pos.size * Math.min(1, Math.max(0.01, fraction))).toFixed(4);
+
+            const r = applyFill(positions, balance, sym, side, closeQty, mark, pos.leverage);
+            positions = r.positions;
+            balance = r.balance;
+            if (r.trade) trades = trimTrades([...trades, r.trade]);
+
+            orders = trimOrders([
+              ...orders,
+              {
+                id: uid(),
+                symbol: sym,
+                side,
+                type: 'MARKET',
+                price: mark,
+                qty: closeQty,
+                status: 'FILLED',
+                timestamp: Date.now(),
+              },
+            ]);
+
+            // If fully closed, cancel its reduceOnly bracket orders
+            if (!positions[sym]) {
+              orders = orders.map((o) =>
+                o.status === 'PENDING' && o.symbol === sym && o.reduceOnly
+                  ? { ...o, status: 'CANCELLED' as const }
+                  : o
+              );
+            }
+            closedCount++;
+          }
+
+          set({ positions, balance, trades, orders });
+          notifyAlert('Bulk Close Executed', `Closed ${(fraction * 100).toFixed(0)}% of ${closedCount} position${closedCount > 1 ? 's' : ''}.`);
+        },
+
+        closeWinningPositions: () => {
+          const s = get();
+          const winners = Object.values(s.positions).filter((p) => {
+            const mark = s.prices[p.symbol] ?? p.entryPrice;
+            return positionPnlUsd(p, mark) > 0;
+          });
+          if (winners.length === 0) {
+            notifyAlert('No Winning Positions', 'There are no open positions currently in profit.');
+            return;
+          }
+          s.bulkClosePositions(winners.map((p) => p.symbol), 1);
+        },
+
+        closeLosingPositions: () => {
+          const s = get();
+          const losers = Object.values(s.positions).filter((p) => {
+            const mark = s.prices[p.symbol] ?? p.entryPrice;
+            return positionPnlUsd(p, mark) < 0;
+          });
+          if (losers.length === 0) {
+            notifyAlert('No Losing Positions', 'There are no open positions currently in loss.');
+            return;
+          }
+          s.bulkClosePositions(losers.map((p) => p.symbol), 1);
+        },
+
+        bulkCancelOrders: (orderIds) => {
+          set((s) => ({
+            orders: s.orders.map((o) =>
+              orderIds.includes(o.id) && o.status === 'PENDING'
+                ? { ...o, status: 'CANCELLED' as const }
+                : o
+            ),
+          }));
+          notifyAlert('Orders Cancelled', `Cancelled ${orderIds.length} pending order${orderIds.length > 1 ? 's' : ''}.`);
+        },
+
+        bulkShiftOrderPrices: (orderIds, offsetPct) => {
+          set((s) => ({
+            orders: s.orders.map((o) => {
+              if (!orderIds.includes(o.id) || o.status !== 'PENDING') return o;
+              const mult = 1 + offsetPct / 100;
+              if (o.type === 'LIMIT') {
+                return { ...o, price: +(o.price * mult).toFixed(o.symbol.includes('BTC') ? 2 : 4) };
+              }
+              const trig = o.triggerPrice ? +(o.triggerPrice * mult).toFixed(o.symbol.includes('BTC') ? 2 : 4) : o.price;
+              return { ...o, triggerPrice: trig };
+            }),
+          }));
+          notifyAlert('Orders Shifted', `Shifted prices of ${orderIds.length} orders by ${offsetPct > 0 ? '+' : ''}${offsetPct}%.`);
         },
 
         removeAlert: (id) => set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) })),
