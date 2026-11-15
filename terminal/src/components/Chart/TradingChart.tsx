@@ -43,6 +43,8 @@ import VolumeProfileOverlay from './VolumeProfileOverlay';
 import DeepStudiesOverlay from './DeepStudiesOverlay';
 import PriceScaleActionFlyout from './PriceScaleActionFlyout';
 import SymbolSearchModal from '../Search/SymbolSearchModal';
+import CustomIntervalModal from './CustomIntervalModal';
+import { parseTimeframeToSeconds, formatCountdownTimer, loadStoredCustomTimeframes } from '../../utils/timeframe';
 import ChartContextMenu, { type ChartContextMenuPos } from './ChartContextMenu';
 import ShareChartModal from '../share/ShareChartModal';
 import RiskHUD from '../RiskHUD';
@@ -214,6 +216,7 @@ export default function TradingChart({
   const pineSeriesRef = useRef<ISeriesApi<'Line'>[]>([]);
   const hasFittedSymbolRef = useRef<Record<string, boolean>>({});
   const [countdownText, setCountdownText] = useState<string>('');
+  const [isCustomIntervalModalOpen, setIsCustomIntervalModalOpen] = useState(false);
 
   // Indicators Modal State
   const [isIndicatorsModalOpen, setIsIndicatorsModalOpen] = useState(false);
@@ -329,6 +332,10 @@ export default function TradingChart({
     () => TIMEFRAMES[provider].filter((t) => FAVORITE_TIMEFRAMES.includes(t)),
     [provider]
   );
+
+  const storedCustomTfs = useMemo(() => {
+    return loadStoredCustomTimeframes().filter((tf) => !TIMEFRAMES[provider].includes(tf as any));
+  }, [provider, isTfMenuOpen, isCustomIntervalModalOpen]);
 
   const activeLayersCount = useMemo(() => {
     return (
@@ -1182,19 +1189,7 @@ export default function TradingChart({
       return;
     }
 
-    const tfSecondsMap: Record<string, number> = {
-      '1m': 60,
-      '3m': 180,
-      '5m': 300,
-      '15m': 900,
-      '30m': 1800,
-      '1h': 3600,
-      '2h': 7200,
-      '4h': 14400,
-      '1d': 86400,
-      '1w': 604800,
-    };
-    const dur = tfSecondsMap[timeframe] || 60;
+    const dur = parseTimeframeToSeconds(timeframe);
 
     const tickCountdown = () => {
       const nowSec = Math.floor(Date.now() / 1000);
@@ -1202,9 +1197,7 @@ export default function TradingChart({
       if (!lastCandle) return;
       const nextClose = lastCandle.time + dur;
       const diff = Math.max(0, nextClose - nowSec);
-      const m = Math.floor(diff / 60);
-      const s = diff % 60;
-      setCountdownText(`${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+      setCountdownText(formatCountdownTimer(diff));
     };
 
     tickCountdown();
@@ -1557,9 +1550,9 @@ export default function TradingChart({
 
             {/* Timeframe Dropdown Menu */}
             {isTfMenuOpen && (
-              <div className="absolute left-0 top-full mt-2 z-50 w-44 clay-popover p-2 shadow-2xl font-mono text-xs">
+              <div className="absolute left-0 top-full mt-2 z-50 w-48 clay-popover p-2 shadow-2xl font-mono text-xs">
                 <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1">
-                  Select Timeframe
+                  Standard Timeframes
                 </div>
                 {TIMEFRAMES[provider].map((t) => (
                   <button
@@ -1584,6 +1577,52 @@ export default function TradingChart({
                     )}
                   </button>
                 ))}
+
+                {storedCustomTfs.length > 0 && (
+                  <>
+                    <div className="px-2 py-1 mt-2 text-[10px] font-bold uppercase tracking-wider text-[#38bdf8] border-b border-grid/60 mb-1">
+                      Custom Intervals
+                    </div>
+                    {storedCustomTfs.map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => {
+                          audioHaptics.tick();
+                          setTimeframe(t as Timeframe);
+                          setPaneTimeframe(paneId, t as Timeframe);
+                          setIsTfMenuOpen(false);
+                        }}
+                        className={`flex w-full items-center justify-between px-2.5 py-1.5 rounded-lg transition ${
+                          t === timeframe
+                            ? 'clay-btn-active font-bold'
+                            : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        <span>{t}</span>
+                        {t === timeframe && (
+                          <svg className="h-3.5 w-3.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                    ))}
+                  </>
+                )}
+
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    setIsTfMenuOpen(false);
+                    setIsCustomIntervalModalOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2 px-2.5 py-2 mt-2 rounded-lg text-[#38bdf8] hover:bg-[#38bdf8]/15 border-t border-[#262634] transition text-left font-medium"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  <span>Custom Interval...</span>
+                </button>
               </div>
             )}
           </div>
@@ -2626,6 +2665,17 @@ export default function TradingChart({
         isOpen={isCreateAlertOpen}
         onClose={() => setIsCreateAlertOpen(false)}
         initialPrice={alertInitialPrice}
+      />
+
+      {/* Custom Time Interval Modal */}
+      <CustomIntervalModal
+        isOpen={isCustomIntervalModalOpen}
+        onClose={() => setIsCustomIntervalModalOpen(false)}
+        activeTimeframe={timeframe}
+        onSelectTimeframe={(tf) => {
+          setTimeframe(tf);
+          setPaneTimeframe(paneId, tf);
+        }}
       />
     </div>
   );

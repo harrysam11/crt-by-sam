@@ -49,11 +49,18 @@ export function sanitizeSymbol(input: unknown): string {
 }
 
 /**
- * Validates timeframe against whitelist.
+ * Validates timeframe against whitelist or safe custom interval format (e.g. 2m, 10m, 45m, 2h, 3d, 1w, 1M).
  */
 export function sanitizeTimeframe(input: unknown): Timeframe {
-  if (typeof input === 'string' && VALID_TIMEFRAMES.has(input as Timeframe)) {
-    return input as Timeframe;
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (VALID_TIMEFRAMES.has(trimmed as Timeframe)) {
+      return trimmed as Timeframe;
+    }
+    // Allow custom intervals like 2m, 10m, 45m, 3h, 8h, 2d, 1w, 1M
+    if (/^[1-9][0-9]{0,3}[smhdwM]$/.test(trimmed)) {
+      return trimmed as Timeframe;
+    }
   }
   return '1m';
 }

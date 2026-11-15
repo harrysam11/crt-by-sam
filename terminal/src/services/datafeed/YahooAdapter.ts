@@ -38,8 +38,10 @@ interface YahooChartResult {
   };
 }
 
+import { parseTimeframeToSeconds } from '../../utils/timeframe';
+
 const TF_YAHOO_CONFIG: Record<
-  Timeframe,
+  string,
   { interval: string; range: string; aggregateSec?: number }
 > = {
   '1s': { interval: '1m', range: '1d' },
@@ -55,6 +57,26 @@ const TF_YAHOO_CONFIG: Record<
   '1w': { interval: '1wk', range: '5y' },
   '1M': { interval: '1mo', range: '10y' },
 };
+
+function getYahooConfig(timeframe: Timeframe): { interval: string; range: string; aggregateSec?: number } {
+  if (TF_YAHOO_CONFIG[timeframe]) {
+    return TF_YAHOO_CONFIG[timeframe];
+  }
+  const sec = parseTimeframeToSeconds(timeframe);
+  if (sec <= 300) {
+    return { interval: '1m', range: '5d', aggregateSec: sec };
+  } else if (sec <= 1800) {
+    return { interval: '5m', range: '1mo', aggregateSec: sec };
+  } else if (sec <= 3600) {
+    return { interval: '15m', range: '1mo', aggregateSec: sec };
+  } else if (sec <= 86400) {
+    return { interval: '60m', range: '1y', aggregateSec: sec };
+  } else if (sec <= 604800) {
+    return { interval: '1d', range: '5y', aggregateSec: sec };
+  } else {
+    return { interval: '1wk', range: '5y', aggregateSec: sec };
+  }
+}
 
 function aggregateBars(cs: Candle[], sec: number): Candle[] {
   const out: Candle[] = [];
@@ -175,7 +197,7 @@ export class YahooAdapter implements IDatafeedAdapter {
     _toSec?: number,
     signal?: AbortSignal
   ): Promise<{ candles: Candle[]; quote: QuoteInfo }> {
-    const cfg = TF_YAHOO_CONFIG[timeframe] || TF_YAHOO_CONFIG['1d'];
+    const cfg = getYahooConfig(timeframe);
     const url = `${BASE}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${cfg.interval}&range=${cfg.range}&includePrePost=false`;
 
     const res = await fetch(url, { signal });
@@ -232,7 +254,8 @@ export class YahooAdapter implements IDatafeedAdapter {
   subscribeBars(sub: DatafeedSubscription): () => void {
     let stop = false;
     let timer = 0;
-    const tfSec = TF_YAHOO_CONFIG[sub.timeframe]?.aggregateSec ?? 60;
+    const cfg = getYahooConfig(sub.timeframe);
+    const tfSec = cfg.aggregateSec ?? 60;
     const aggregator = new CandleAggregator(tfSec);
 
     const poll = async () => {

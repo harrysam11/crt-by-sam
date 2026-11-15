@@ -9,37 +9,30 @@ import type { DatafeedSubscription, IDatafeedAdapter } from './types';
 import { DEFAULT_INSTRUMENTS } from '../instruments';
 import { CandleAggregator } from '../aggregator';
 
+import { parseTimeframeToSeconds } from '../../utils/timeframe';
+
 const BINANCE_REST_BASE = 'https://api.binance.com/api/v3';
 
-const TF_TO_BINANCE: Record<Timeframe, string> = {
-  '1s': '1s',
-  '1m': '1m',
-  '3m': '3m',
-  '5m': '5m',
-  '15m': '15m',
-  '30m': '30m',
-  '1h': '1h',
-  '2h': '2h',
-  '4h': '4h',
-  '1d': '1d',
-  '1w': '1w',
-  '1M': '1M',
-};
+const BINANCE_NATIVE_INTERVALS = new Set<string>([
+  '1s', '1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M',
+]);
 
-const TF_TO_SECONDS: Record<Timeframe, number> = {
-  '1s': 1,
-  '1m': 60,
-  '3m': 180,
-  '5m': 300,
-  '15m': 900,
-  '30m': 1800,
-  '1h': 3600,
-  '2h': 7200,
-  '4h': 14400,
-  '1d': 86400,
-  '1w': 604800,
-  '1M': 2592000,
-};
+function aggregateBars(cs: Candle[], sec: number): Candle[] {
+  const out: Candle[] = [];
+  for (const c of cs) {
+    const b = Math.floor(c.time / sec) * sec;
+    const last = out[out.length - 1];
+    if (last && last.time === b) {
+      last.high = Math.max(last.high, c.high);
+      last.low = Math.min(last.low, c.low);
+      last.close = c.close;
+      last.volume += c.volume;
+    } else {
+      out.push({ ...c, time: b });
+    }
+  }
+  return out;
+}
 
 export class BinanceAdapter implements IDatafeedAdapter {
   readonly name = 'Binance Spot';
@@ -94,6 +87,26 @@ export class BinanceAdapter implements IDatafeedAdapter {
     };
   }
 
+  private getBaseIntervalAndAggregation(timeframe: Timeframe): { isNative: boolean; baseInterval: string; targetSec: number } {
+    if (BINANCE_NATIVE_INTERVALS.has(timeframe)) {
+      return { isNative: true, baseInterval: timeframe, targetSec: parseTimeframeToSeconds(timeframe) };
+    }
+    const targetSec = parseTimeframeToSeconds(timeframe);
+    let baseInterval = '1m';
+    if (targetSec < 60) {
+      baseInterval = '1s';
+    } else if (targetSec % 86400 === 0 && targetSec >= 86400) {
+      baseInterval = '1d';
+    } else if (targetSec % 3600 === 0 && targetSec >= 3600) {
+      baseInterval = '1h';
+    } else if (targetSec % 300 === 0 && targetSec >= 300) {
+      baseInterval = '5m';
+    } else {
+      baseInterval = '1m';
+    }
+    return { isNative: false, baseInterval, targetSec };
+  }
+
   async getBars(
     symbol: string,
     timeframe: Timeframe,
@@ -101,9 +114,9 @@ export class BinanceAdapter implements IDatafeedAdapter {
     toSec?: number,
     signal?: AbortSignal
   ): Promise<{ candles: Candle[]; quote: QuoteInfo }> {
-    const interval = TF_TO_BINANCE[timeframe] || '1m';
-    const limit = 600;
-    let url = `${BINANCE_REST_BASE}/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`;
+    const { isNative, baseInterval, targetSec } = this.getBaseIntervalAndAggregation(timeframe);
+    const limit = isNative ? 600 : 1000;
+    let url = `${BINANCE_REST_BASE}/klines?symbol=${encodeURIComponent(symbol)}&interval=${baseInterval}&limit=${limit}`;
     if (fromSec && toSec) {
       url += `&startTime=${fromSec * 1000}&endTime=${toSec * 1000}`;
     }
@@ -114,7 +127,7 @@ export class BinanceAdapter implements IDatafeedAdapter {
     }
 
     const rawKlines = (await res.json()) as (string | number)[][];
-    const candles: Candle[] = rawKlines.map((k) => ({
+    let candles: Candle[] = rawKlines.map((k) => ({
       time: Math.floor(Number(k[0]) / 1000),
       open: Number(k[1]),
       high: Number(k[2]),
@@ -122,6 +135,10 @@ export class BinanceAdapter implements IDatafeedAdapter {
       close: Number(k[4]),
       volume: Number(k[5]),
     }));
+
+    if (!isNative && targetSec > 0) {
+      candles = aggregateBars(candles, targetSec);
+    }
 
     const last = candles[candles.length - 1];
     const quote: QuoteInfo = {
@@ -139,10 +156,12 @@ export class BinanceAdapter implements IDatafeedAdapter {
   }
 
   subscribeBars(sub: DatafeedSubscription): () => void {
-    const interval = TF_TO_BINANCE[sub.timeframe] || '1m';
-    const stream = `${sub.symbol.toLowerCase()}@kline_${interval}`;
+    const { isNative, baseInterval, targetSec } = this.getBaseIntervalAndAggregation(sub.timeframe);
+    const stream = `${sub.symbol.toLowerCase()}@kline_${baseInterval}`;
     const wsUrl = `wss://stream.binance.com:9443/ws/${stream}`;
     let ws: WebSocket | null = new WebSocket(wsUrl);
+
+    let currentAggBar: Candle | null = null;
 
     ws.onmessage = (event) => {
       try {
@@ -158,7 +177,7 @@ export class BinanceAdapter implements IDatafeedAdapter {
         };
         if (msg.k) {
           const k = msg.k;
-          const bar: Candle = {
+          const rawBar: Candle = {
             time: Math.floor(k.t / 1000),
             open: Number(k.o),
             high: Number(k.h),
@@ -166,7 +185,28 @@ export class BinanceAdapter implements IDatafeedAdapter {
             close: Number(k.c),
             volume: Number(k.v),
           };
-          sub.onTick(bar);
+
+          if (isNative) {
+            sub.onTick(rawBar);
+          } else {
+            const bucket = Math.floor(rawBar.time / targetSec) * targetSec;
+            if (!currentAggBar || currentAggBar.time !== bucket) {
+              currentAggBar = {
+                time: bucket,
+                open: rawBar.open,
+                high: rawBar.high,
+                low: rawBar.low,
+                close: rawBar.close,
+                volume: rawBar.volume,
+              };
+            } else {
+              currentAggBar.high = Math.max(currentAggBar.high, rawBar.high);
+              currentAggBar.low = Math.min(currentAggBar.low, rawBar.low);
+              currentAggBar.close = rawBar.close;
+              currentAggBar.volume += rawBar.volume;
+            }
+            sub.onTick({ ...currentAggBar });
+          }
         }
       } catch {}
     };
