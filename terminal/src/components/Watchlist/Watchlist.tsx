@@ -13,6 +13,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTerminalStore } from '../../store/useTerminalStore';
 import { useWatchlistStore, FLAG_COLORS, type WatchlistFlagColor, type WatchlistFlagFilter } from '../../store/useWatchlistStore';
 import { useLayoutStore } from '../../store/useLayoutStore';
+import { useDrawingStore } from '../../store/useDrawingStore';
 import { CATEGORY_LABEL, getInstrument } from '../../services/instruments';
 import { fmtPct, fmtPrice } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
@@ -309,6 +310,20 @@ export default function Watchlist() {
             className="clay-btn px-2.5 py-1 text-[11px] text-muted hover:text-white"
           >
             {isSearching ? 'Close' : '+ Add'}
+          </button>
+
+          {/* Hide / Collapse Side Pane */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              useDrawingStore.getState().setActiveRightDrawer(null);
+            }}
+            className="clay-btn p-1 text-slate-400 hover:text-white transition"
+            title="Hide Side Pane"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
       </div>

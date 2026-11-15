@@ -25,11 +25,14 @@ import MarketScreenerModal from './components/screener/MarketScreenerModal';
 import SettingsModal from './components/settings/SettingsModal';
 import PopoutWindow from './components/popout/PopoutWindow';
 import MiniTerminalPopout from './components/popout/MiniTerminalPopout';
+import ObjectTreePanel from './components/Chart/ObjectTreePanel';
+import DataWindowPanel from './components/Chart/DataWindowPanel';
 import { useMarketFeed } from './hooks/useMarketFeed';
 import { useKeyboardHotkeys } from './hooks/useKeyboardHotkeys';
 import { useTerminalStore } from './store/useTerminalStore';
 import { useDerivativesStore } from './store/useDerivativesStore';
 import { useLayoutStore } from './store/useLayoutStore';
+import { useDrawingStore } from './store/useDrawingStore';
 import { getInstrument } from './services/instruments';
 import { audioHaptics } from './utils/notify';
 
@@ -45,7 +48,8 @@ export default function App() {
   const [rightW, setRightW] = useState(300);
   const [bottomH, setBottomH] = useState(160);
   const [isBottomCollapsed, setIsBottomCollapsed] = useState(false);
-  const [activeRightDrawer, setActiveRightDrawer] = useState<'WATCHLIST' | 'DOM' | 'TRADE' | 'ANALYTICS' | null>('WATCHLIST');
+  const activeRightDrawer = useDrawingStore((s) => s.activeRightDrawer);
+  const setActiveRightDrawer = useDrawingStore((s) => s.setActiveRightDrawer);
 
   // Modal visibility states
   const [isOptionChainOpen, setIsOptionChainOpen] = useState(false);
@@ -244,6 +248,12 @@ export default function App() {
                 </div>
               )}
               {activeRightDrawer === 'ANALYTICS' && <AnalyticsPanel />}
+              {activeRightDrawer === 'DATA_WINDOW' && (
+                <DataWindowPanel onClose={() => setActiveRightDrawer(null)} />
+              )}
+              {activeRightDrawer === 'OBJECT_TREE' && (
+                <ObjectTreePanel onClose={() => setActiveRightDrawer(null)} />
+              )}
             </div>
           </>
         )}
@@ -312,6 +322,38 @@ export default function App() {
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+              </svg>
+            </button>
+
+            {/* Data Window Toggle */}
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setActiveRightDrawer((prev) => (prev === 'DATA_WINDOW' ? null : 'DATA_WINDOW'));
+              }}
+              className={`p-2.5 rounded-xl transition ${
+                activeRightDrawer === 'DATA_WINDOW' ? 'clay-btn-active' : 'clay-btn text-slate-300'
+              }`}
+              title="TradingView Data Window (OHLC & Indicator Telemetry)"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </button>
+
+            {/* Object Tree (Layers) Toggle */}
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setActiveRightDrawer((prev) => (prev === 'OBJECT_TREE' ? null : 'OBJECT_TREE'));
+              }}
+              className={`p-2.5 rounded-xl transition ${
+                activeRightDrawer === 'OBJECT_TREE' ? 'clay-btn-active' : 'clay-btn text-slate-300'
+              }`}
+              title="TradingView Object Tree & Layers"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
             </button>
 

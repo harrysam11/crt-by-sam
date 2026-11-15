@@ -18,6 +18,7 @@ interface DrawingContextBarProps {
   onClose: () => void;
   onBringToFront?: (id: string) => void;
   onSendToBack?: (id: string) => void;
+  onOpenSettings?: () => void;
 }
 
 const PRESET_COLORS = [
@@ -32,18 +33,50 @@ const PRESET_COLORS = [
 
 export default function DrawingContextBar({
   selectedDrawing,
-  anchorPoint,
   onUpdateDrawing,
   onDeleteDrawing,
   onClose,
   onBringToFront,
   onSendToBack,
+  onOpenSettings,
 }: DrawingContextBarProps) {
   const templates = useDrawingStore((s) => s.templates);
   const saveTemplate = useDrawingStore((s) => s.saveTemplate);
+  const pos = useDrawingStore((s) => s.drawingContextBarPos);
+  const setPos = useDrawingStore((s) => s.setDrawingContextBarPos);
+
   const [templateNameInput, setTemplateNameInput] = useState('');
   const [showTemplatesMenu, setShowTemplatesMenu] = useState(false);
   const templatesMenuRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+
+  const handleGripPointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isDraggingRef.current = true;
+    const startMouseX = e.clientX;
+    const startMouseY = e.clientY;
+    const startPosX = pos.x;
+    const startPosY = pos.y;
+
+    const handlePointerMove = (moveEv: PointerEvent) => {
+      if (!isDraggingRef.current) return;
+      const dx = moveEv.clientX - startMouseX;
+      const dy = moveEv.clientY - startMouseY;
+      const newX = Math.max(10, Math.min(window.innerWidth - 380, startPosX + dx));
+      const newY = Math.max(45, Math.min(window.innerHeight - 60, startPosY + dy));
+      setPos({ x: newX, y: newY });
+    };
+
+    const handlePointerUp = () => {
+      isDraggingRef.current = false;
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+  };
 
   useEffect(() => {
     if (!showTemplatesMenu) return;
@@ -70,11 +103,6 @@ export default function DrawingContextBar({
 
   if (!selectedDrawing) return null;
 
-  const currentX = anchorPoint ? anchorPoint.x : selectedDrawing.p1.x;
-  const currentY = anchorPoint ? anchorPoint.y : selectedDrawing.p1.y;
-  const posX = Math.max(80, Math.min(window.innerWidth - 450, currentX));
-  const posY = Math.max(50, currentY - 50);
-
   const supportsFill = [
     'RECTANGLE',
     'CIRCLE',
@@ -87,9 +115,26 @@ export default function DrawingContextBar({
 
   return (
     <div
-      style={{ left: posX, top: posY }}
-      className="clay-popover absolute z-40 flex items-center gap-2 px-3 py-1.5 font-mono text-xs select-none shadow-2xl backdrop-blur-md"
+      style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
+      className="clay-popover fixed z-50 flex items-center gap-1.5 px-2 py-1 font-mono text-xs select-none shadow-2xl backdrop-blur-md border border-white/[0.08]"
     >
+      {/* Movable Drag Grip Handle */}
+      <div
+        onPointerDown={handleGripPointerDown}
+        className="flex items-center gap-0.5 px-1 py-1 cursor-grab active:cursor-grabbing text-zinc-500 hover:text-zinc-200 transition"
+        title="Drag toolbar to reposition (persists position)"
+      >
+        <svg className="h-3.5 w-2.5" viewBox="0 0 6 12" fill="currentColor">
+          <circle cx="1.5" cy="2" r="1" />
+          <circle cx="4.5" cy="2" r="1" />
+          <circle cx="1.5" cy="6" r="1" />
+          <circle cx="4.5" cy="6" r="1" />
+          <circle cx="1.5" cy="10" r="1" />
+          <circle cx="4.5" cy="10" r="1" />
+        </svg>
+      </div>
+
+      <div className="h-4 w-px bg-white/[0.08] mx-0.5" />
       {/* Color Swatches */}
       <div className="flex items-center gap-1.5 pr-2 border-r border-grid/50">
         {PRESET_COLORS.map((col) => (
@@ -270,6 +315,33 @@ export default function DrawingContextBar({
           </div>
         )}
       </div>
+
+      {/* Settings Modal Trigger */}
+      {onOpenSettings && (
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            onOpenSettings();
+          }}
+          className="clay-btn p-1 text-muted hover:text-white transition rounded"
+          title="Drawing Settings (Double-click drawing or click here)"
+        >
+          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+          </svg>
+        </button>
+      )}
 
       {/* Lock Toggle */}
       <button

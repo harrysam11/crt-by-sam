@@ -52,7 +52,13 @@ export interface DrawingItem {
   hidden?: boolean;
   zIndex?: number;
   text?: string;
+  textColor?: string;
   fontSize?: number;
+  textPosition?: 'top' | 'middle' | 'bottom';
+  notes?: string;
+  showPrice?: boolean;
+  extendLeft?: boolean;
+  extendRight?: boolean;
   // Position Tool Specifics
   entryPrice?: number;
   stopPrice?: number;

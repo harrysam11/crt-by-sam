@@ -13,6 +13,9 @@ interface DrawingState {
   floatingToolbarPos: { x: number; y: number };
   setFloatingToolbarPos: (pos: { x: number; y: number }) => void;
 
+  drawingContextBarPos: { x: number; y: number };
+  setDrawingContextBarPos: (pos: { x: number; y: number }) => void;
+
   selectedDrawingIds: string[];
   setSelectedDrawingIds: (ids: string[]) => void;
   toggleSelectDrawingId: (id: string, multi?: boolean) => void;
@@ -38,6 +41,86 @@ interface DrawingState {
   drawingsCount: number;
   setDrawingsCount: (count: number) => void;
 
+  activeSymbolDrawings: DrawingItem[];
+  setActiveSymbolDrawings: (drawings: DrawingItem[]) => void;
+
+  activeCandleOhlc: {
+    time?: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume?: number;
+  } | null;
+  setActiveCandleOhlc: (
+    ohlc: {
+      time?: number;
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+      volume?: number;
+    } | null
+  ) => void;
+
+  activeIndicatorsTelemetry: Array<{
+    id: string;
+    name: string;
+    color: string;
+    value?: string | number | null;
+  }>;
+  setActiveIndicatorsTelemetry: (
+    telemetry: Array<{
+      id: string;
+      name: string;
+      color: string;
+      value?: string | number | null;
+    }>
+  ) => void;
+
+  isLegendHudVisible: boolean;
+  setIsLegendHudVisible: (v: boolean) => void;
+  toggleLegendHud: () => void;
+
+  activeRightDrawer:
+    | 'WATCHLIST'
+    | 'DOM'
+    | 'TRADE'
+    | 'ANALYTICS'
+    | 'OBJECT_TREE'
+    | 'DATA_WINDOW'
+    | null;
+  setActiveRightDrawer: (
+    drawer:
+      | 'WATCHLIST'
+      | 'DOM'
+      | 'TRADE'
+      | 'ANALYTICS'
+      | 'OBJECT_TREE'
+      | 'DATA_WINDOW'
+      | null
+      | ((
+          prev:
+            | 'WATCHLIST'
+            | 'DOM'
+            | 'TRADE'
+            | 'ANALYTICS'
+            | 'OBJECT_TREE'
+            | 'DATA_WINDOW'
+            | null
+        ) =>
+          | 'WATCHLIST'
+          | 'DOM'
+          | 'TRADE'
+          | 'ANALYTICS'
+          | 'OBJECT_TREE'
+          | 'DATA_WINDOW'
+          | null)
+  ) => void;
+
+  editingDrawingModalItem: DrawingItem | null;
+  setEditingDrawingModalItem: (item: DrawingItem | null) => void;
+
   templates: Record<string, Partial<DrawingItem>>;
   saveTemplate: (name: string, template: Partial<DrawingItem>) => void;
   deleteTemplate: (name: string) => void;
@@ -62,8 +145,11 @@ export const useDrawingStore = create<DrawingState>()(
       toggleStayInDrawingMode: () => set((s) => ({ stayInDrawingMode: !s.stayInDrawingMode })),
       setStayInDrawingMode: (v) => set({ stayInDrawingMode: v }),
 
-      floatingToolbarPos: { x: 72, y: 520 },
+      floatingToolbarPos: { x: 80, y: 120 },
       setFloatingToolbarPos: (pos) => set({ floatingToolbarPos: pos }),
+
+      drawingContextBarPos: { x: 280, y: 65 },
+      setDrawingContextBarPos: (pos) => set({ drawingContextBarPos: pos }),
 
       selectedDrawingIds: [],
       setSelectedDrawingIds: (ids) => set({ selectedDrawingIds: ids }),
@@ -111,6 +197,31 @@ export const useDrawingStore = create<DrawingState>()(
       drawingsCount: 0,
       setDrawingsCount: (count) => set({ drawingsCount: count }),
 
+      activeSymbolDrawings: [],
+      setActiveSymbolDrawings: (drawings) => set({ activeSymbolDrawings: drawings }),
+
+      activeCandleOhlc: null,
+      setActiveCandleOhlc: (ohlc) => set({ activeCandleOhlc: ohlc }),
+
+      activeIndicatorsTelemetry: [],
+      setActiveIndicatorsTelemetry: (telemetry) => set({ activeIndicatorsTelemetry: telemetry }),
+
+      isLegendHudVisible: true,
+      setIsLegendHudVisible: (v) => set({ isLegendHudVisible: v }),
+      toggleLegendHud: () => set((s) => ({ isLegendHudVisible: !s.isLegendHudVisible })),
+
+      activeRightDrawer: 'WATCHLIST',
+      setActiveRightDrawer: (drawerOrUpdater) =>
+        set((s) => ({
+          activeRightDrawer:
+            typeof drawerOrUpdater === 'function'
+              ? drawerOrUpdater(s.activeRightDrawer)
+              : drawerOrUpdater,
+        })),
+
+      editingDrawingModalItem: null,
+      setEditingDrawingModalItem: (item) => set({ editingDrawingModalItem: item }),
+
       templates: {},
       saveTemplate: (name, template) =>
         set((s) => ({
@@ -129,9 +240,11 @@ export const useDrawingStore = create<DrawingState>()(
         favorites: state.favorites,
         isFavoritesBarVisible: state.isFavoritesBarVisible,
         floatingToolbarPos: state.floatingToolbarPos,
+        drawingContextBarPos: state.drawingContextBarPos,
         stayInDrawingMode: state.stayInDrawingMode,
         magnetConfig: state.magnetConfig,
         templates: state.templates,
+        isLegendHudVisible: state.isLegendHudVisible,
       }),
     }
   )

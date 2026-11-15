@@ -7,6 +7,8 @@
 import React, { useState } from 'react';
 import type { Timeframe } from '../../types/terminal';
 import { fmtPrice, fmtQty, labelOf } from '../../utils/formatters';
+import { useDrawingStore } from '../../store/useDrawingStore';
+import { audioHaptics } from '../../utils/notify';
 
 export interface ActiveIndicatorInfo {
   id: string;
@@ -45,6 +47,8 @@ export default function ChartLegendHUD({
   onClearAllIndicators,
 }: ChartLegendHUDProps) {
   const [isIndicatorsCollapsed, setIsIndicatorsCollapsed] = useState(false);
+  const isLegendHudVisible = useDrawingStore((s) => s.isLegendHudVisible);
+  const toggleLegendHud = useDrawingStore((s) => s.toggleLegendHud);
 
   const diff = currentOhlc ? currentOhlc.close - currentOhlc.open : 0;
   const diffPct = currentOhlc && currentOhlc.open ? ((diff / currentOhlc.open) * 100).toFixed(2) : '0.00';
@@ -52,10 +56,46 @@ export default function ChartLegendHUD({
   const diffColor = isUp ? '#089981' : '#f23645';
   const diffSign = isUp ? '+' : '';
 
+  if (!isLegendHudVisible) {
+    return (
+      <div className="pointer-events-auto absolute left-3 top-2.5 z-20 select-none font-mono text-[11px]">
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            toggleLegendHud();
+          }}
+          className="flex items-center gap-1.5 bg-panel/85 hover:bg-panel backdrop-blur-sm px-2 py-1 rounded border border-grid/80 text-slate-300 hover:text-white transition shadow-lg group"
+          title="Show Pair Name & OHLC Data"
+        >
+          <svg className="h-3.5 w-3.5 text-[#38bdf8] group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          <span className="font-semibold">{labelOf(symbol)}</span>
+          <span className="text-[10px] text-slate-500">({timeframe})</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="pointer-events-auto absolute left-3 top-2.5 z-20 flex flex-col gap-1 select-none font-mono text-[11px] leading-tight max-w-[85%]">
       {/* Symbol & Market Status Header */}
       <div className="flex flex-wrap items-center gap-1.5 bg-panel/75 backdrop-blur-sm px-2 py-1 rounded border border-grid/60 w-fit">
+        {/* Toggle hide/unhide legend button */}
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            toggleLegendHud();
+          }}
+          className="p-0.5 text-slate-400 hover:text-white transition rounded"
+          title="Hide pair name & OHLC data from chart"
+        >
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+          </svg>
+        </button>
+
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
         <button
           onClick={onOpenSymbolSearch}

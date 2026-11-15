@@ -563,6 +563,15 @@ export default function TradingChart({
     removeInstance,
   ]);
 
+  // Synchronize live candle OHLC and active indicators telemetry for Data Window panel
+  useEffect(() => {
+    useDrawingStore.getState().setActiveCandleOhlc(currentOhlc);
+  }, [currentOhlc]);
+
+  useEffect(() => {
+    useDrawingStore.getState().setActiveIndicatorsTelemetry(activeIndicatorsList);
+  }, [activeIndicatorsList]);
+
   // Effective candles respecting Bar Replay slice
   const effectiveCandles = useMemo(() => {
     if (!isReplayActive) return activeCandles;
@@ -2601,7 +2610,7 @@ export default function TradingChart({
             className="absolute inset-0 z-10"
             onDoubleClick={() => {
               audioHaptics.tick();
-              api.current?.candles.priceScale().applyOptions({ autoScale: true });
+              setIsChartSettingsOpen(true);
             }}
             onContextMenu={(e) => {
               e.preventDefault();

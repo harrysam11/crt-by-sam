@@ -18,7 +18,13 @@ export abstract class BaseDrawingTool {
   public hidden: boolean;
   public zIndex: number;
   public text?: string;
+  public textColor?: string;
   public fontSize?: number;
+  public textPosition?: 'top' | 'middle' | 'bottom';
+  public notes?: string;
+  public showPrice?: boolean;
+  public extendLeft?: boolean;
+  public extendRight?: boolean;
   public entryPrice?: number;
   public stopPrice?: number;
   public targetPrice?: number;
@@ -41,7 +47,13 @@ export abstract class BaseDrawingTool {
     this.hidden = !!item.hidden;
     this.zIndex = item.zIndex || 0;
     this.text = item.text;
+    this.textColor = item.textColor;
     this.fontSize = item.fontSize || 12;
+    this.textPosition = item.textPosition || 'top';
+    this.notes = item.notes;
+    this.showPrice = item.showPrice;
+    this.extendLeft = item.extendLeft;
+    this.extendRight = item.extendRight;
     this.entryPrice = item.entryPrice;
     this.stopPrice = item.stopPrice;
     this.targetPrice = item.targetPrice;
@@ -122,7 +134,13 @@ export abstract class BaseDrawingTool {
       hidden: this.hidden,
       zIndex: this.zIndex,
       text: this.text,
+      textColor: this.textColor,
       fontSize: this.fontSize,
+      textPosition: this.textPosition,
+      notes: this.notes,
+      showPrice: this.showPrice,
+      extendLeft: this.extendLeft,
+      extendRight: this.extendRight,
       entryPrice: this.entryPrice,
       stopPrice: this.stopPrice,
       targetPrice: this.targetPrice,

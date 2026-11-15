@@ -1,13 +1,19 @@
-import type { ToolType } from '../types';
+import type { ToolType, DrawingItem } from '../types';
 
 type DrawingEventListener = () => void;
 type ToolSelectListener = (tool: ToolType) => void;
+type UpdateDrawingListener = (id: string, patch: Partial<DrawingItem>) => void;
+type DeleteDrawingListener = (id: string) => void;
+type OpenDrawingSettingsListener = (drawing: DrawingItem) => void;
 
 class DrawingEventEmitter {
   private undoListeners = new Set<DrawingEventListener>();
   private redoListeners = new Set<DrawingEventListener>();
   private clearListeners = new Set<DrawingEventListener>();
   private toolSelectListeners = new Set<ToolSelectListener>();
+  private updateDrawingListeners = new Set<UpdateDrawingListener>();
+  private deleteDrawingListeners = new Set<DeleteDrawingListener>();
+  private openDrawingSettingsListeners = new Set<OpenDrawingSettingsListener>();
 
   onUndo(fn: DrawingEventListener): () => void {
     this.undoListeners.add(fn);
@@ -29,6 +35,21 @@ class DrawingEventEmitter {
     return () => this.toolSelectListeners.delete(fn);
   }
 
+  onUpdateDrawing(fn: UpdateDrawingListener): () => void {
+    this.updateDrawingListeners.add(fn);
+    return () => this.updateDrawingListeners.delete(fn);
+  }
+
+  onDeleteDrawing(fn: DeleteDrawingListener): () => void {
+    this.deleteDrawingListeners.add(fn);
+    return () => this.deleteDrawingListeners.delete(fn);
+  }
+
+  onOpenDrawingSettings(fn: OpenDrawingSettingsListener): () => void {
+    this.openDrawingSettingsListeners.add(fn);
+    return () => this.openDrawingSettingsListeners.delete(fn);
+  }
+
   undo(): void {
     this.undoListeners.forEach((fn) => fn());
   }
@@ -43,6 +64,18 @@ class DrawingEventEmitter {
 
   selectTool(tool: ToolType): void {
     this.toolSelectListeners.forEach((fn) => fn(tool));
+  }
+
+  emitUpdateDrawing(id: string, patch: Partial<DrawingItem>): void {
+    this.updateDrawingListeners.forEach((fn) => fn(id, patch));
+  }
+
+  emitDeleteDrawing(id: string): void {
+    this.deleteDrawingListeners.forEach((fn) => fn(id));
+  }
+
+  emitOpenDrawingSettings(drawing: DrawingItem): void {
+    this.openDrawingSettingsListeners.forEach((fn) => fn(drawing));
   }
 }
 

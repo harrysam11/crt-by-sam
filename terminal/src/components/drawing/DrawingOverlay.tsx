@@ -19,6 +19,7 @@ import type { ToolType, DrawingItem, Point2D, MagnetConfig } from './types';
 import type { Candle } from '../../types/terminal';
 import { audioHaptics } from '../../utils/notify';
 import DrawingContextBar from './DrawingContextBar';
+import DrawingSettingsModal from './DrawingSettingsModal';
 import { CoordinateHelper } from './framework/CoordinateHelper';
 import { ToolFactory } from './framework/ToolFactory';
 import { drawingEvents } from './framework/DrawingEvents';
@@ -89,6 +90,11 @@ export default function DrawingOverlay({
       return [];
     }
   });
+
+  // Drawing Settings Modal & Hover Notes State
+  const [editingDrawing, setEditingDrawing] = useState<DrawingItem | null>(null);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [hoveredNotes, setHoveredNotes] = useState<{ text: string; x: number; y: number } | null>(null);
 
   const [activeDrawing, setActiveDrawing] = useState<DrawingItem | null>(null);
   const [creationStep, setCreationStep] = useState<number>(0);
@@ -276,13 +282,33 @@ export default function DrawingOverlay({
     };
   }, [selectedDrawingIds, drawings, undo, redo, pushState, setSelectedDrawingIds, setActiveTool, onSelectTool, autoRevertToCrosshair]);
 
-  // Persist drawings per symbol to localStorage
+  // Persist drawings per symbol to localStorage & sync with useDrawingStore
   useEffect(() => {
     try {
       localStorage.setItem(`crt_drawings_${symbol}`, JSON.stringify(drawings));
     } catch {}
     onDrawingsCountChange?.(drawings.length);
+    useDrawingStore.getState().setActiveSymbolDrawings(drawings);
   }, [drawings, symbol, onDrawingsCountChange]);
+
+  // Synchronize with external drawing events (from Object Tree, Context Menu, etc.)
+  useEffect(() => {
+    const unsubUpdate = drawingEvents.onUpdateDrawing((id, patch) => {
+      updateDrawing(id, patch);
+    });
+    const unsubDelete = drawingEvents.onDeleteDrawing((id) => {
+      deleteDrawing(id);
+    });
+    const unsubOpenSettings = drawingEvents.onOpenDrawingSettings((drawing) => {
+      setEditingDrawing(drawing);
+      setIsSettingsModalOpen(true);
+    });
+    return () => {
+      unsubUpdate();
+      unsubDelete();
+      unsubOpenSettings();
+    };
+  }, [drawings]);
 
   // Reload drawings when symbol switches
   useEffect(() => {
@@ -1305,6 +1331,25 @@ export default function DrawingOverlay({
               data-drawing-element="true"
               className={`pointer-events-auto ${item.locked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
               style={{ pointerEvents: 'all' }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                audioHaptics.tick();
+                setEditingDrawing(item);
+                setIsSettingsModalOpen(true);
+              }}
+              onPointerEnter={(e) => {
+                if (item.notes && item.notes.trim()) {
+                  setHoveredNotes({ text: item.notes, x: e.clientX, y: e.clientY });
+                }
+              }}
+              onPointerMove={(e) => {
+                if (item.notes && item.notes.trim()) {
+                  setHoveredNotes({ text: item.notes, x: e.clientX, y: e.clientY });
+                }
+              }}
+              onPointerLeave={() => {
+                setHoveredNotes(null);
+              }}
               onPointerDown={(e) => {
                 if (isDrawingTool) return;
                 e.stopPropagation();
@@ -1312,6 +1357,47 @@ export default function DrawingOverlay({
               }}
             >
               {tool.renderSVG(isSelected, isHovered, coordHelper, symbol)}
+
+              {/* Custom In-Chart Text Label Badge for non-TEXT drawings */}
+              {item.type !== 'TEXT' && item.text && (
+                <g className="pointer-events-none select-none font-mono">
+                  {(() => {
+                    const p1Coord = coordHelper.pointToXY(item.p1);
+                    const p2Coord = item.p2 ? coordHelper.pointToXY(item.p2) : p1Coord;
+                    let tx = (p1Coord.x + p2Coord.x) / 2;
+                    let ty = (p1Coord.y + p2Coord.y) / 2;
+                    if (item.textPosition === 'top') ty -= 14;
+                    else if (item.textPosition === 'bottom') ty += 20;
+                    const fSize = item.fontSize || 11;
+                    const textWidth = Math.max(36, item.text.length * (fSize * 0.65) + 12);
+                    return (
+                      <>
+                        <rect
+                          x={tx - textWidth / 2}
+                          y={ty - 11}
+                          width={textWidth}
+                          height={18}
+                          rx={3}
+                          fill="#0b0e14"
+                          fillOpacity={0.88}
+                          stroke={item.color || '#38bdf8'}
+                          strokeWidth={1}
+                        />
+                        <text
+                          x={tx}
+                          y={ty + 2}
+                          fill={item.textColor || '#ffffff'}
+                          fontSize={fSize}
+                          textAnchor="middle"
+                          fontWeight="600"
+                        >
+                          {item.text}
+                        </text>
+                      </>
+                    );
+                  })()}
+                </g>
+              )}
 
               {/* Render anchor handles for selected drawings */}
               {isSelected &&
@@ -1340,6 +1426,21 @@ export default function DrawingOverlay({
           );
         })}
       </svg>
+
+      {/* Floating Notes Tooltip on Hover */}
+      {hoveredNotes && (
+        <div
+          style={{ left: hoveredNotes.x + 12, top: hoveredNotes.y + 12 }}
+          className="fixed z-50 pointer-events-none bg-[#0e1118]/95 border border-sky-500/40 px-3 py-2 rounded shadow-2xl text-xs max-w-xs font-mono text-slate-200 backdrop-blur"
+        >
+          <div className="text-[10px] uppercase font-bold text-sky-400 mb-0.5 flex items-center gap-1">
+            <span>Drawing Note</span>
+          </div>
+          <div className="whitespace-pre-wrap text-[11px] leading-relaxed text-slate-100">
+            {hoveredNotes.text}
+          </div>
+        </div>
+      )}
 
       {/* Multi-Selection Action Bar (when > 1 drawing selected) */}
       {selectedDrawingIds.length > 1 && !isHiddenAll && (
@@ -1381,14 +1482,38 @@ export default function DrawingOverlay({
       {singleSelectedDrawing && !isHiddenAll && (
         <DrawingContextBar
           selectedDrawing={singleSelectedDrawing}
-          anchorPoint={coordHelper.pointToXY(singleSelectedDrawing.p1)}
           onUpdateDrawing={updateDrawing}
           onDeleteDrawing={deleteDrawing}
           onClose={() => setSelectedDrawingIds([])}
           onBringToFront={bringToFront}
           onSendToBack={sendToBack}
+          onOpenSettings={() => {
+            setEditingDrawing(singleSelectedDrawing);
+            setIsSettingsModalOpen(true);
+          }}
         />
       )}
+
+      {/* TradingView-Style Drawing Settings Modal */}
+      <DrawingSettingsModal
+        isOpen={isSettingsModalOpen}
+        drawing={editingDrawing}
+        symbol={symbol}
+        onClose={() => {
+          setIsSettingsModalOpen(false);
+          setEditingDrawing(null);
+        }}
+        onSave={(id, patch) => {
+          updateDrawing(id, patch);
+          setIsSettingsModalOpen(false);
+          setEditingDrawing(null);
+        }}
+        onDelete={(id) => {
+          deleteDrawing(id);
+          setIsSettingsModalOpen(false);
+          setEditingDrawing(null);
+        }}
+      />
     </div>
   );
 }
