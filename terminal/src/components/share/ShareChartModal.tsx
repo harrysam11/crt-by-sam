@@ -7,9 +7,11 @@ import { audioHaptics } from '../../utils/notify';
 interface ShareChartModalProps {
   isOpen: boolean;
   onClose: () => void;
+  chartApi?: any;
+  chartContainer?: HTMLElement | null;
 }
 
-export default function ShareChartModal({ isOpen, onClose }: ShareChartModalProps) {
+export default function ShareChartModal({ isOpen, onClose, chartApi, chartContainer }: ShareChartModalProps) {
   const symbol = useTerminalStore((s) => s.symbol);
   const currentPrice = useTerminalStore((s) => s.currentPrice);
   const timeframe = useTerminalStore((s) => s.timeframe);
@@ -18,26 +20,30 @@ export default function ShareChartModal({ isOpen, onClose }: ShareChartModalProp
   const [copyToast, setCopyToast] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  const capture = async () => {
+    setIsGenerating(true);
+    const api = chartApi || (typeof window !== 'undefined' ? (window as any).__chartApi : null);
+    const container = chartContainer || (typeof window !== 'undefined' ? (window as any).__chartContainer : null);
+    try {
+      const dataUrl = await captureMultiCanvasSnapshot(container, api);
+      if (dataUrl) {
+        setSnapshotUrl(dataUrl);
+      }
+    } catch (err) {
+      console.warn('Snapshot capture error:', err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   useEffect(() => {
     if (!isOpen) {
       setSnapshotUrl(null);
       return;
     }
 
-    const capture = async () => {
-      setIsGenerating(true);
-      const container = (window as any).__chartContainer as HTMLElement | undefined;
-      if (container) {
-        try {
-          const dataUrl = await captureMultiCanvasSnapshot(container);
-          setSnapshotUrl(dataUrl);
-        } catch {}
-      }
-      setIsGenerating(false);
-    };
-
     capture();
-  }, [isOpen]);
+  }, [isOpen, chartApi, chartContainer]);
 
   if (!isOpen) return null;
 
@@ -124,8 +130,9 @@ export default function ShareChartModal({ isOpen, onClose }: ShareChartModalProp
 
             {/* Canvas Snapshot Image */}
             {isGenerating ? (
-              <div className="h-64 flex items-center justify-center text-muted">
-                Rendering multi-canvas institutional snapshot...
+              <div className="h-64 flex flex-col items-center justify-center gap-2 text-muted">
+                <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                <span>Rendering high-definition chart snapshot...</span>
               </div>
             ) : snapshotUrl ? (
               <img
@@ -134,8 +141,14 @@ export default function ShareChartModal({ isOpen, onClose }: ShareChartModalProp
                 className="w-full h-auto max-h-[380px] object-contain bg-black"
               />
             ) : (
-              <div className="h-64 flex items-center justify-center text-muted">
-                Chart container ready.
+              <div className="h-64 flex flex-col items-center justify-center gap-2 text-muted">
+                <span>Chart container ready.</span>
+                <button
+                  onClick={capture}
+                  className="px-3 py-1 rounded bg-white/10 hover:bg-white/20 text-xs text-white transition"
+                >
+                  Capture Snapshot
+                </button>
               </div>
             )}
           </div>

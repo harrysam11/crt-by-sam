@@ -963,6 +963,7 @@ export default function TradingChart({
     if (box.current) {
       (window as any).__chartContainer = box.current;
     }
+    (window as any).__chartApi = chart;
 
     chart.subscribeCrosshairMove((p) => {
       const d = p.seriesData.get(cs) as CandlestickData | undefined;
@@ -1095,6 +1096,8 @@ export default function TradingChart({
       offRange();
       liveCandleBus.delete(onLive);
       chart.remove();
+      delete (window as any).__chartContainer;
+      delete (window as any).__chartApi;
       api.current = null;
       setChartApi(null);
       setSeriesApi(null);
@@ -2462,60 +2465,21 @@ export default function TradingChart({
           </div>
         </div>
 
-        {/* Right Section: Session, Scale, Timezone, Snapshot, Settings, Fullscreen */}
+        {/* Right Section: Snapshot, Theme, Settings, Fullscreen */}
         <div className="flex items-center gap-1 shrink-0 ml-auto">
-          {/* Market Session Status Badge */}
-          <div className="hidden xl:flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] bg-white/[0.03] border border-white/[0.08] text-[10px] font-mono shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span className="text-slate-400 font-medium">
-              {provider === 'binance' ? '24/7 Live' : 'Regular'}
-            </span>
-          </div>
-
-          {/* Scale Mode Switcher */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              const nextMode: PriceScaleType =
-                scaleMode === 'NORMAL' ? 'LOGARITHMIC' : scaleMode === 'LOGARITHMIC' ? 'PERCENTAGE' : 'NORMAL';
-              handleSetScaleMode(nextMode);
-            }}
-            className="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold clay-pill text-slate-300 hover:text-white transition shrink-0 rounded"
-            title={`Price Scale Mode: ${scaleMode} (Click to toggle Normal / Log / %)`}
-          >
-            <span className="text-[10px] text-slate-400 font-normal">Scale:</span>
-            <span className="font-bold text-white text-[11px]">{scaleMode === 'NORMAL' ? 'Lin' : scaleMode === 'LOGARITHMIC' ? 'Log' : '%'}</span>
-          </button>
-
-          {/* Timezone Switcher */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              const tzs: ChartTimezone[] = ['UTC', 'Asia/Kolkata', 'America/New_York', 'Europe/London', 'Asia/Tokyo'];
-              const nextTz = tzs[(tzs.indexOf(timezone) + 1) % tzs.length];
-              setTimezone(nextTz);
-            }}
-            className="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold clay-pill text-slate-400 hover:text-white transition shrink-0 rounded"
-            title={`Chart Timezone: ${timezone} (Click to cycle UTC / IST / EDT / GMT / JST)`}
-          >
-            <span className="text-[10px] font-mono text-slate-300">
-              {timezone === 'UTC' ? 'UTC' : timezone === 'Asia/Kolkata' ? 'IST' : timezone === 'America/New_York' ? 'EDT' : timezone === 'Europe/London' ? 'GMT' : 'JST'}
-            </span>
-          </button>
           {/* Share Chart Snapshot Modal Trigger */}
           <button
             onClick={() => {
               audioHaptics.tick();
               setIsShareModalOpen(true);
             }}
-            className="flex items-center gap-1 clay-pill-active px-2.5 py-0.5 text-xs font-semibold transition shrink-0 rounded"
-            title="Export Watermarked Snapshot or Copy Chart Link"
+            className="p-1.5 rounded-full clay-btn transition shrink-0 text-slate-300 hover:text-white"
+            title="Take Chart Snapshot (Download PNG / Copy Image)"
           >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <span className="hidden sm:inline">Snapshot</span>
           </button>
 
           {/* Quick Theme Switcher Button */}
@@ -2980,7 +2944,12 @@ export default function TradingChart({
       <ChartSkinsModal isOpen={showSkinsModal} onClose={() => setShowSkinsModal(false)} />
 
       {/* Share Chart Snapshot Modal */}
-      <ShareChartModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
+      <ShareChartModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        chartApi={chartApi}
+        chartContainer={box.current}
+      />
 
       {/* Institutional Symbol Search Modal */}
       <SymbolSearchModal

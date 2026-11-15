@@ -2,17 +2,97 @@ import { useJournalStore } from '../store/useJournalStore';
 import type { JournalEntry } from '../types/psychology';
 
 /**
+ * Helper to render an SVG element into a 2D canvas context.
+ */
+function renderSvgToCanvas(
+  ctx: CanvasRenderingContext2D,
+  svgEl: SVGSVGElement,
+  width: number,
+  height: number
+): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      const cloned = svgEl.cloneNode(true) as SVGSVGElement;
+      cloned.setAttribute('width', `${width}`);
+      cloned.setAttribute('height', `${height}`);
+      if (!cloned.getAttribute('viewBox')) {
+        cloned.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      }
+      const xml = new XMLSerializer().serializeToString(cloned);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          ctx.drawImage(img, 0, 0, width, height);
+        } catch {}
+        resolve();
+      };
+      img.onerror = () => resolve();
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+    } catch {
+      resolve();
+    }
+  });
+}
+
+/**
  * Composite all visible HTML5 canvas layers inside the chart container
  * into a single base64 PNG data URL snapshot.
  */
-export async function captureChartScreenshot(chartContainer: HTMLElement | null): Promise<string> {
-  if (!chartContainer) return '';
+export async function captureChartScreenshot(
+  chartContainer: HTMLElement | null,
+  chartApi?: any
+): Promise<string> {
+  const api = chartApi || (typeof window !== 'undefined' ? (window as any).__chartApi : null);
+  const container = chartContainer || (typeof window !== 'undefined' ? (window as any).__chartContainer : null);
 
-  const canvases = chartContainer.querySelectorAll<HTMLCanvasElement>('canvas');
+  // Strategy 1: Use lightweight-charts native takeScreenshot() if available
+  if (api && typeof api.takeScreenshot === 'function') {
+    try {
+      const baseCanvas = api.takeScreenshot() as HTMLCanvasElement;
+      if (baseCanvas && baseCanvas.width > 0 && baseCanvas.height > 0) {
+        const width = baseCanvas.width;
+        const height = baseCanvas.height;
+
+        const offscreen = document.createElement('canvas');
+        offscreen.width = width;
+        offscreen.height = height;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) return baseCanvas.toDataURL('image/png', 0.95);
+
+        // Draw base chart (series, scales, grid, indicators)
+        ctx.drawImage(baseCanvas, 0, 0);
+
+        // Overlay SVG drawings if present
+        const parentEl = container?.parentElement || container;
+        if (parentEl && parentEl.querySelectorAll) {
+          const svgs = Array.from(parentEl.querySelectorAll('svg')) as SVGSVGElement[];
+          for (let i = 0; i < svgs.length; i++) {
+            const svg = svgs[i];
+            if (svg.querySelector('path, line, rect, circle, polygon, text')) {
+              await renderSvgToCanvas(ctx, svg, width, height);
+            }
+          }
+        }
+
+        // Stamp subtle institutional watermark
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.font = '11px monospace';
+        ctx.fillText(`CRT Terminal Snapshot • ${new Date().toLocaleString()}`, 14, height - 12);
+
+        return offscreen.toDataURL('image/png', 0.95);
+      }
+    } catch (e) {
+      console.warn('Native chart takeScreenshot failed, falling back to multi-canvas capture', e);
+    }
+  }
+
+  // Strategy 2: Multi-canvas compositing with relative bounding-box positioning
+  if (!container || !container.querySelectorAll) return '';
+  const canvases = Array.from(container.querySelectorAll('canvas')) as HTMLCanvasElement[];
   if (!canvases.length) return '';
 
-  const width = chartContainer.clientWidth || 800;
-  const height = chartContainer.clientHeight || 450;
+  const width = container.clientWidth || 800;
+  const height = container.clientHeight || 450;
 
   const offscreen = document.createElement('canvas');
   offscreen.width = width;
@@ -24,10 +104,17 @@ export async function captureChartScreenshot(chartContainer: HTMLElement | null)
   ctx.fillStyle = '#0b0e14';
   ctx.fillRect(0, 0, width, height);
 
-  // Draw each chart canvas layer in DOM order
-  canvases.forEach((c) => {
+  const containerRect = container.getBoundingClientRect();
+
+  // Draw each chart canvas layer using its relative bounding box to prevent stretching
+  canvases.forEach((c: HTMLCanvasElement) => {
     try {
-      ctx.drawImage(c, 0, 0, width, height);
+      const cRect = c.getBoundingClientRect();
+      const x = cRect.left - containerRect.left;
+      const y = cRect.top - containerRect.top;
+      const w = cRect.width || width;
+      const h = cRect.height || height;
+      ctx.drawImage(c, x, y, w, h);
     } catch {
       // Ignore cross-origin canvas security errors if any
     }
@@ -35,7 +122,7 @@ export async function captureChartScreenshot(chartContainer: HTMLElement | null)
 
   // Stamp timestamp watermark
   ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-  ctx.font = '11px sans-serif';
+  ctx.font = '11px monospace';
   ctx.fillText(`CRT Terminal Snapshot • ${new Date().toLocaleString()}`, 12, height - 12);
 
   return offscreen.toDataURL('image/png', 0.85);
