@@ -47,8 +47,9 @@ export class VerticalLineTool extends BaseDrawingTool {
           y1={0}
           x2={x}
           y2="100%"
-          stroke="transparent"
-          strokeWidth={Math.max(12, this.lineWidth + 8)}
+          stroke="rgba(0, 0, 0, 0.001)"
+          pointerEvents="stroke"
+          strokeWidth={Math.max(16, this.lineWidth + 10)}
         />
         <line
           x1={x}

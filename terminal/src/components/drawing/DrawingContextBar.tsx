@@ -12,6 +12,7 @@ import { useDrawingStore } from '../../store/useDrawingStore';
 
 interface DrawingContextBarProps {
   selectedDrawing: DrawingItem | null;
+  anchorPoint?: { x: number; y: number };
   onUpdateDrawing: (id: string, patch: Partial<DrawingItem>) => void;
   onDeleteDrawing: (id: string) => void;
   onClose: () => void;
@@ -31,6 +32,7 @@ const PRESET_COLORS = [
 
 export default function DrawingContextBar({
   selectedDrawing,
+  anchorPoint,
   onUpdateDrawing,
   onDeleteDrawing,
   onClose,
@@ -68,8 +70,10 @@ export default function DrawingContextBar({
 
   if (!selectedDrawing) return null;
 
-  const posX = Math.max(80, Math.min(window.innerWidth - 450, selectedDrawing.p1.x));
-  const posY = Math.max(50, selectedDrawing.p1.y - 50);
+  const currentX = anchorPoint ? anchorPoint.x : selectedDrawing.p1.x;
+  const currentY = anchorPoint ? anchorPoint.y : selectedDrawing.p1.y;
+  const posX = Math.max(80, Math.min(window.innerWidth - 450, currentX));
+  const posY = Math.max(50, currentY - 50);
 
   const supportsFill = [
     'RECTANGLE',

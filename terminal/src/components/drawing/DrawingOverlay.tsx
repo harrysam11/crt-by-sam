@@ -310,12 +310,41 @@ export default function DrawingOverlay({
     }
   }, [clearTrigger, pushState, setSelectedDrawingIds]);
 
+  // Live viewport update tick (synchronizes SVG drawings on chart zoom, pan, and price scale drag)
+  const [viewportTick, setViewportTick] = useState(0);
+
+  useEffect(() => {
+    if (!chartApi) return;
+    const timeScale = chartApi.timeScale();
+    let rafId: number | null = null;
+    const triggerUpdate = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        setViewportTick((v) => (v + 1) % 1000000);
+        rafId = null;
+      });
+    };
+
+    timeScale.subscribeVisibleLogicalRangeChange(triggerUpdate);
+    timeScale.subscribeVisibleTimeRangeChange(triggerUpdate);
+    chartApi.subscribeCrosshairMove(triggerUpdate);
+
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      try {
+        timeScale.unsubscribeVisibleLogicalRangeChange(triggerUpdate);
+        timeScale.unsubscribeVisibleTimeRangeChange(triggerUpdate);
+        chartApi.unsubscribeCrosshairMove(triggerUpdate);
+      } catch {}
+    };
+  }, [chartApi]);
+
   // Coordinate helper
   const coordHelper = useMemo(() => {
     const width = containerRef.current?.clientWidth || 800;
     const height = containerRef.current?.clientHeight || 500;
     return new CoordinateHelper(chartApi, seriesApi, width, height);
-  }, [chartApi, seriesApi, containerRef.current?.clientWidth, containerRef.current?.clientHeight]);
+  }, [chartApi, seriesApi, containerRef.current?.clientWidth, containerRef.current?.clientHeight, viewportTick]);
 
   // Magnet snapping helper
   const snapToCandle = useCallback(
@@ -987,6 +1016,204 @@ export default function DrawingOverlay({
     pushState(next);
   };
 
+  // Direct interaction on an SVG drawing item
+  const handleDrawingPointerDown = (e: React.PointerEvent, item: DrawingItem) => {
+    // Eraser mode deletes on click
+    if (activeTool === 'CURSOR_ERASER') {
+      audioHaptics.tick();
+      deleteDrawing(item.id);
+      return;
+    }
+
+    if (e.button !== 0) return;
+
+    audioHaptics.tick();
+    const isMulti = e.ctrlKey || e.metaKey;
+
+    if (isMulti) {
+      toggleSelectDrawingId(item.id, true);
+    } else {
+      if (!selectedDrawingIds.includes(item.id)) {
+        setSelectedDrawingIds([item.id]);
+      }
+    }
+
+    // Ctrl + Drag: Instant Duplicate
+    if ((e.ctrlKey || e.metaKey) && !item.locked && !isLockedAll) {
+      const clonedId = `draw_${Date.now()}`;
+      const cloned: DrawingItem = {
+        ...item,
+        id: clonedId,
+        p1: { ...item.p1 },
+        p2: item.p2 ? { ...item.p2 } : undefined,
+        p3: item.p3 ? { ...item.p3 } : undefined,
+      };
+      const next = [...drawings, cloned];
+      setDrawings(next);
+      pushState(next);
+      setSelectedDrawingIds([clonedId]);
+
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const rawX = e.clientX - rect.left;
+      const rawY = e.clientY - rect.top;
+      const startPoint = snapToCandle(rawX, rawY);
+
+      setDraggingBody({
+        startPoint,
+        items: [{
+          drawingId: clonedId,
+          initialP1: { ...cloned.p1 },
+          initialP2: cloned.p2 ? { ...cloned.p2 } : undefined,
+          initialP3: cloned.p3 ? { ...cloned.p3 } : undefined,
+        }],
+      });
+      return;
+    }
+
+    // Start dragging drawing body if not locked
+    if (!item.locked && !isLockedAll) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const rawX = e.clientX - rect.left;
+      const rawY = e.clientY - rect.top;
+      const startPoint = snapToCandle(rawX, rawY);
+
+      const targetIds = selectedDrawingIds.includes(item.id) ? selectedDrawingIds : [item.id];
+      const items = targetIds.map((id) => {
+        const d = drawings.find((x) => x.id === id) || item;
+        return {
+          drawingId: d.id,
+          initialP1: { ...d.p1 },
+          initialP2: d.p2 ? { ...d.p2 } : undefined,
+          initialP3: d.p3 ? { ...d.p3 } : undefined,
+          initialPoints: d.points ? d.points.map((p) => ({ ...p })) : undefined,
+        };
+      });
+
+      setDraggingBody({ startPoint, items });
+    }
+  };
+
+  // Window-level dragging listener for handles and drawing bodies
+  useEffect(() => {
+    if (!draggingHandle && !draggingBody) return;
+
+    const onGlobalPointerMove = (e: PointerEvent) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const rawX = e.clientX - rect.left;
+      const rawY = e.clientY - rect.top;
+      const point = snapToCandle(rawX, rawY);
+
+      if (draggingHandle) {
+        setDrawings((prev) =>
+          prev.map((d) => {
+            if (d.id !== draggingHandle.drawingId) return d;
+            const tool = ToolFactory.create(d);
+            tool.onDragHandle(draggingHandle.handleId, point);
+            return tool.toJSON();
+          })
+        );
+      } else if (draggingBody) {
+        const deltaPrice = point.price - draggingBody.startPoint.price;
+        const deltaTime = point.time && draggingBody.startPoint.time ? point.time - draggingBody.startPoint.time : 0;
+        const deltaX = point.x - draggingBody.startPoint.x;
+        const deltaY = point.y - draggingBody.startPoint.y;
+
+        setDrawings((prev) =>
+          prev.map((d) => {
+            const item = draggingBody.items.find((x) => x.drawingId === d.id);
+            if (!item) return d;
+
+            const tool = ToolFactory.create(d);
+            tool.p1 = {
+              ...item.initialP1,
+              x: item.initialP1.x + deltaX,
+              y: item.initialP1.y + deltaY,
+              price: item.initialP1.price + deltaPrice,
+              time: item.initialP1.time !== undefined ? item.initialP1.time + deltaTime : undefined,
+            };
+            if (item.initialP2) {
+              tool.p2 = {
+                ...item.initialP2,
+                x: item.initialP2.x + deltaX,
+                y: item.initialP2.y + deltaY,
+                price: item.initialP2.price + deltaPrice,
+                time: item.initialP2.time !== undefined ? item.initialP2.time + deltaTime : undefined,
+              };
+            }
+            if (item.initialP3) {
+              tool.p3 = {
+                ...item.initialP3,
+                x: item.initialP3.x + deltaX,
+                y: item.initialP3.y + deltaY,
+                price: item.initialP3.price + deltaPrice,
+                time: item.initialP3.time !== undefined ? item.initialP3.time + deltaTime : undefined,
+              };
+            }
+            if (item.initialPoints) {
+              (tool as any).points = item.initialPoints.map((pt: Point2D) => ({
+                ...pt,
+                x: pt.x + deltaX,
+                y: pt.y + deltaY,
+                price: pt.price + deltaPrice,
+                time: pt.time !== undefined ? pt.time + deltaTime : undefined,
+              }));
+            }
+            return tool.toJSON();
+          })
+        );
+      }
+    };
+
+    const onGlobalPointerUp = () => {
+      if (draggingHandle) {
+        setDraggingHandle(null);
+        pushState(drawings);
+      }
+      if (draggingBody) {
+        setDraggingBody(null);
+        pushState(drawings);
+      }
+    };
+
+    window.addEventListener('pointermove', onGlobalPointerMove);
+    window.addEventListener('pointerup', onGlobalPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onGlobalPointerMove);
+      window.removeEventListener('pointerup', onGlobalPointerUp);
+    };
+  }, [draggingHandle, draggingBody, snapToCandle, drawings, pushState]);
+
+  // Window-level listener to deselect drawings when clicking empty chart space
+  useEffect(() => {
+    const handleGlobalPointerDown = (e: PointerEvent) => {
+      if (isDrawingTool || activeDrawing || creationStep > 0) return;
+      if (selectedDrawingIds.length === 0) return;
+
+      const target = e.target as HTMLElement | SVGElement | null;
+      if (!target) return;
+
+      if (
+        target.closest('[data-drawing-element]') ||
+        target.closest('.clay-popover') ||
+        target.closest('.clay-btn') ||
+        target.closest('button') ||
+        target.closest('input')
+      ) {
+        return;
+      }
+
+      if (containerRef.current?.parentElement?.contains(target)) {
+        setSelectedDrawingIds([]);
+      }
+    };
+
+    window.addEventListener('pointerdown', handleGlobalPointerDown);
+    return () => window.removeEventListener('pointerdown', handleGlobalPointerDown);
+  }, [selectedDrawingIds, isDrawingTool, activeDrawing, creationStep, setSelectedDrawingIds]);
+
   const singleSelectedDrawing =
     selectedDrawingIds.length === 1 ? drawings.find((d) => d.id === selectedDrawingIds[0]) ?? null : null;
 
@@ -1003,15 +1230,18 @@ export default function DrawingOverlay({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       style={{ right: `${priceScaleWidth}px`, bottom: '26px' }}
-      className={`absolute left-0 top-0 z-10 ${
-        isDrawingTool || activeDrawing || selectionBox || draggingHandle || draggingBody
+      className={`absolute left-0 top-0 z-20 ${
+        isDrawingTool || activeDrawing || selectionBox || isCtrlHeld || isShiftHeld || isAltHeld
           ? 'cursor-crosshair pointer-events-auto'
           : activeTool === 'CURSOR_ERASER'
           ? 'cursor-not-allowed pointer-events-auto'
           : 'pointer-events-none'
       }`}
     >
-      <svg className="h-full w-full pointer-events-none">
+      <svg
+        className="h-full w-full pointer-events-none"
+        style={{ overflow: 'visible' }}
+      >
         {/* Selection Marquee Box */}
         {selectionBox && (
           <rect
@@ -1069,7 +1299,18 @@ export default function DrawingOverlay({
           const tool = ToolFactory.create(item);
 
           return (
-            <g key={item.id} className="pointer-events-auto">
+            <g
+              key={item.id}
+              data-drawing-id={item.id}
+              data-drawing-element="true"
+              className={`pointer-events-auto ${item.locked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+              style={{ pointerEvents: 'all' }}
+              onPointerDown={(e) => {
+                if (isDrawingTool) return;
+                e.stopPropagation();
+                handleDrawingPointerDown(e, item);
+              }}
+            >
               {tool.renderSVG(isSelected, isHovered, coordHelper, symbol)}
 
               {/* Render anchor handles for selected drawings */}
@@ -1079,13 +1320,15 @@ export default function DrawingOverlay({
                 tool.getHandles(coordHelper).map((h) => (
                   <circle
                     key={h.id}
+                    data-drawing-element="true"
                     cx={h.x}
                     cy={h.y}
-                    r={5}
+                    r={6}
                     fill="#ffffff"
                     stroke="#38bdf8"
                     strokeWidth={2}
-                    className="cursor-pointer pointer-events-auto hover:scale-125 transition-transform"
+                    className="cursor-crosshair pointer-events-auto hover:scale-125 transition-transform"
+                    style={{ pointerEvents: 'all' }}
                     onPointerDown={(e) => {
                       e.stopPropagation();
                       audioHaptics.tick();
@@ -1138,6 +1381,7 @@ export default function DrawingOverlay({
       {singleSelectedDrawing && !isHiddenAll && (
         <DrawingContextBar
           selectedDrawing={singleSelectedDrawing}
+          anchorPoint={coordHelper.pointToXY(singleSelectedDrawing.p1)}
           onUpdateDrawing={updateDrawing}
           onDeleteDrawing={deleteDrawing}
           onClose={() => setSelectedDrawingIds([])}

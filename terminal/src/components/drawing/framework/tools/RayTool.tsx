@@ -56,8 +56,9 @@ export class RayTool extends BaseDrawingTool {
           y1={pt1.y}
           x2={farX}
           y2={farY}
-          stroke="transparent"
-          strokeWidth={Math.max(12, this.lineWidth + 8)}
+          stroke="rgba(0, 0, 0, 0.001)"
+          pointerEvents="stroke"
+          strokeWidth={Math.max(16, this.lineWidth + 10)}
         />
         <line
           x1={pt1.x}

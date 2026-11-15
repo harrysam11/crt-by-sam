@@ -49,8 +49,9 @@ export class TrendlineTool extends BaseDrawingTool {
           y1={pt1.y}
           x2={pt2.x}
           y2={pt2.y}
-          stroke="transparent"
-          strokeWidth={Math.max(12, this.lineWidth + 8)}
+          stroke="rgba(0, 0, 0, 0.001)"
+          pointerEvents="stroke"
+          strokeWidth={Math.max(16, this.lineWidth + 10)}
         />
         {/* Visible line */}
         <line
