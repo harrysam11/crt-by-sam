@@ -133,6 +133,9 @@ export default function DrawingOverlay({
       initialP2?: Point2D;
       initialP3?: Point2D;
       initialPoints?: Point2D[];
+      initialEntryPrice?: number;
+      initialTargetPrice?: number;
+      initialStopPrice?: number;
     }>;
   } | null>(null);
 
@@ -372,13 +375,14 @@ export default function DrawingOverlay({
     return new CoordinateHelper(chartApi, seriesApi, width, height);
   }, [chartApi, seriesApi, containerRef.current?.clientWidth, containerRef.current?.clientHeight, viewportTick]);
 
-  // Magnet snapping helper
+  // Magnet snapping helper (with TradingView-style Ctrl key candle snapping)
   const snapToCandle = useCallback(
-    (rawX: number, rawY: number): Point2D => {
+    (rawX: number, rawY: number, forceMagnet: boolean = false): Point2D => {
       const rawPrice = coordHelper.yToPrice(rawY);
       const rawTime = coordHelper.xToTime(rawX);
 
-      if (!magnetConfig.enabled || !candles.length || !chartApi || !seriesApi) {
+      const isMagnetActive = magnetConfig.enabled || forceMagnet || isCtrlHeld;
+      if (!isMagnetActive || !candles.length || !chartApi || !seriesApi) {
         return { x: rawX, y: rawY, price: rawPrice, time: rawTime };
       }
 
@@ -419,7 +423,7 @@ export default function DrawingOverlay({
         }
       }
 
-      const threshold = magnetConfig.mode === 'STRONG' ? 60 : 25;
+      const threshold = isCtrlHeld ? 80 : magnetConfig.mode === 'STRONG' ? 60 : 30;
       if (minXDist <= threshold && minYDist <= threshold) {
         return {
           x: candleX,
@@ -431,7 +435,7 @@ export default function DrawingOverlay({
 
       return { x: rawX, y: rawY, price: rawPrice, time: rawTime };
     },
-    [magnetConfig, candles, chartApi, seriesApi, coordHelper]
+    [magnetConfig, isCtrlHeld, candles, chartApi, seriesApi, coordHelper]
   );
 
   // Handle external line triggers (from PriceScaleActionFlyout)
@@ -563,8 +567,8 @@ export default function DrawingOverlay({
     const rawY = e.clientY - rect.top;
     const point = snapToCandle(rawX, rawY);
 
-    // 1. Shift + Drag: Instant TradingView Measure Ruler
-    if (e.shiftKey && e.button === 0) {
+    // 1. Shift + Drag: Instant TradingView Measure Ruler (ONLY when in cursor mode)
+    if (e.shiftKey && e.button === 0 && !isDrawingTool && !activeDrawing) {
       audioHaptics.tick();
       const measureDrawing: DrawingItem = {
         id: `measure_${Date.now()}`,
@@ -598,8 +602,8 @@ export default function DrawingOverlay({
       return;
     }
 
-    // 4. Ctrl + drag Marquee selection
-    if (isCtrlHeld && e.button === 0) {
+    // 4. Ctrl + drag Marquee selection (ONLY when in cursor mode and not drawing)
+    if (isCtrlHeld && e.button === 0 && !isDrawingTool && !activeDrawing && creationStep === 0) {
       setSelectionBox({
         startX: rawX,
         startY: rawY,
@@ -656,6 +660,9 @@ export default function DrawingOverlay({
                   initialP1: { ...cloned.p1 },
                   initialP2: cloned.p2 ? { ...cloned.p2 } : undefined,
                   initialP3: cloned.p3 ? { ...cloned.p3 } : undefined,
+                  initialEntryPrice: cloned.entryPrice,
+                  initialTargetPrice: cloned.targetPrice,
+                  initialStopPrice: cloned.stopPrice,
                 }],
               });
               return;
@@ -669,6 +676,9 @@ export default function DrawingOverlay({
                 initialP2: d.p2 ? { ...d.p2 } : undefined,
                 initialP3: d.p3 ? { ...d.p3 } : undefined,
                 initialPoints: d.points ? d.points.map((p) => ({ ...p })) : undefined,
+                initialEntryPrice: d.entryPrice,
+                initialTargetPrice: d.targetPrice,
+                initialStopPrice: d.stopPrice,
               };
             });
             setDraggingBody({ startPoint: point, items });
@@ -704,14 +714,45 @@ export default function DrawingOverlay({
       if (creationStep === 0) {
         audioHaptics.tick();
 
-        // 1-point instant tools
+        // 1-point instant tools: Horizontal, Vertical, Price Tag Label
         if (activeTool === 'HORIZONTAL_LINE' || activeTool === 'VERTICAL_LINE' || activeTool === 'PRICE_LABEL') {
           const newDrawing: DrawingItem = {
             id: `draw_${Date.now()}`,
             type: activeTool,
             p1: point,
             color: '#38bdf8',
-            lineWidth: 2,
+            lineWidth: activeTool === 'PRICE_LABEL' ? 1.5 : 2,
+            lineStyle: 'solid',
+          };
+          const next = [...drawings, newDrawing];
+          setDrawings(next);
+          pushState(next);
+          setSelectedDrawingIds([newDrawing.id]);
+          autoRevertToCrosshair();
+          return;
+        }
+
+        // TradingView Single-Click Instant Long & Short Position Placement
+        if (activeTool === 'POSITION_LONG' || activeTool === 'POSITION_SHORT') {
+          const isLong = activeTool === 'POSITION_LONG';
+          const entryPrice = point.price;
+          const riskAmount = entryPrice * 0.015;
+          const rewardAmount = riskAmount * 2;
+          const targetPrice = isLong ? entryPrice + rewardAmount : entryPrice - rewardAmount;
+          const stopPrice = isLong ? entryPrice - riskAmount : entryPrice + riskAmount;
+          const p2Time = point.time ? point.time + 3600 * 24 : undefined;
+          const p2X = point.x + 180;
+
+          const newDrawing: DrawingItem = {
+            id: `pos_${Date.now()}`,
+            type: activeTool,
+            p1: { ...point },
+            p2: { x: p2X, y: point.y, price: entryPrice, time: p2Time },
+            entryPrice,
+            targetPrice,
+            stopPrice,
+            color: isLong ? '#22c55e' : '#ef4444',
+            lineWidth: 1.5,
             lineStyle: 'solid',
           };
           const next = [...drawings, newDrawing];
@@ -761,7 +802,7 @@ export default function DrawingOverlay({
           type: activeTool,
           p1: point,
           p2: point,
-          color: activeTool === 'POSITION_LONG' ? '#22c55e' : activeTool === 'POSITION_SHORT' ? '#ef4444' : '#38bdf8',
+          color: '#38bdf8',
           lineWidth: 2,
           lineStyle: 'solid',
         };
@@ -817,8 +858,8 @@ export default function DrawingOverlay({
       return;
     }
 
-    // Shift Angle Lock (snap to nearest 45 degrees)
-    if (e.shiftKey && activeDrawing && creationStep === 1) {
+    // Shift Angle Lock (snap to nearest 45 degrees: horizontal, vertical, 45-deg diagonal)
+    if ((e.shiftKey || isShiftHeld) && activeDrawing && creationStep === 1) {
       const p1XY = coordHelper.pointToXY(activeDrawing.p1);
       const dx = rawX - p1XY.x;
       const dy = rawY - p1XY.y;
@@ -844,6 +885,30 @@ export default function DrawingOverlay({
 
     // Dragging an anchor handle
     if (draggingHandle) {
+      if (e.shiftKey || isShiftHeld) {
+        const d = drawings.find((x) => x.id === draggingHandle.drawingId);
+        if (d && d.p1) {
+          const originPoint = draggingHandle.handleId === 'p2' ? d.p1 : (draggingHandle.handleId === 'p1' && d.p2 ? d.p2 : null);
+          if (originPoint) {
+            const originXY = coordHelper.pointToXY(originPoint);
+            const dx = rawX - originXY.x;
+            const dy = rawY - originXY.y;
+            const angle = Math.atan2(dy, dx);
+            const snapStep = Math.PI / 4;
+            const snappedAngle = Math.round(angle / snapStep) * snapStep;
+            const dist = Math.hypot(dx, dy);
+            const snapX = originXY.x + dist * Math.cos(snappedAngle);
+            const snapY = originXY.y + dist * Math.sin(snappedAngle);
+            point = {
+              x: snapX,
+              y: snapY,
+              price: coordHelper.yToPrice(snapY),
+              time: coordHelper.xToTime(snapX),
+            };
+          }
+        }
+      }
+
       setDrawings((prev) =>
         prev.map((d) => {
           if (d.id !== draggingHandle.drawingId) return d;
@@ -891,6 +956,15 @@ export default function DrawingOverlay({
               price: pt.price + deltaPrice,
               time: pt.time !== undefined ? pt.time + deltaTime : undefined,
             }));
+          }
+          if (item.initialEntryPrice !== undefined) {
+            tool.entryPrice = item.initialEntryPrice + deltaPrice;
+          }
+          if (item.initialTargetPrice !== undefined) {
+            tool.targetPrice = item.initialTargetPrice + deltaPrice;
+          }
+          if (item.initialStopPrice !== undefined) {
+            tool.stopPrice = item.initialStopPrice + deltaPrice;
           }
           return tool.toJSON();
         })
@@ -1114,6 +1188,9 @@ export default function DrawingOverlay({
           initialP2: d.p2 ? { ...d.p2 } : undefined,
           initialP3: d.p3 ? { ...d.p3 } : undefined,
           initialPoints: d.points ? d.points.map((p) => ({ ...p })) : undefined,
+          initialEntryPrice: d.entryPrice,
+          initialTargetPrice: d.targetPrice,
+          initialStopPrice: d.stopPrice,
         };
       });
 
@@ -1130,9 +1207,33 @@ export default function DrawingOverlay({
       const rect = containerRef.current.getBoundingClientRect();
       const rawX = e.clientX - rect.left;
       const rawY = e.clientY - rect.top;
-      const point = snapToCandle(rawX, rawY);
+      let point = snapToCandle(rawX, rawY);
 
       if (draggingHandle) {
+        if (e.shiftKey || isShiftHeld) {
+          const d = drawings.find((x) => x.id === draggingHandle.drawingId);
+          if (d && d.p1) {
+            const originPoint = draggingHandle.handleId === 'p2' ? d.p1 : (draggingHandle.handleId === 'p1' && d.p2 ? d.p2 : null);
+            if (originPoint) {
+              const originXY = coordHelper.pointToXY(originPoint);
+              const dx = rawX - originXY.x;
+              const dy = rawY - originXY.y;
+              const angle = Math.atan2(dy, dx);
+              const snapStep = Math.PI / 4;
+              const snappedAngle = Math.round(angle / snapStep) * snapStep;
+              const dist = Math.hypot(dx, dy);
+              const snapX = originXY.x + dist * Math.cos(snappedAngle);
+              const snapY = originXY.y + dist * Math.sin(snappedAngle);
+              point = {
+                x: snapX,
+                y: snapY,
+                price: coordHelper.yToPrice(snapY),
+                time: coordHelper.xToTime(snapX),
+              };
+            }
+          }
+        }
+
         setDrawings((prev) =>
           prev.map((d) => {
             if (d.id !== draggingHandle.drawingId) return d;
@@ -1186,6 +1287,15 @@ export default function DrawingOverlay({
                 price: pt.price + deltaPrice,
                 time: pt.time !== undefined ? pt.time + deltaTime : undefined,
               }));
+            }
+            if (item.initialEntryPrice !== undefined) {
+              tool.entryPrice = item.initialEntryPrice + deltaPrice;
+            }
+            if (item.initialTargetPrice !== undefined) {
+              tool.targetPrice = item.initialTargetPrice + deltaPrice;
+            }
+            if (item.initialStopPrice !== undefined) {
+              tool.stopPrice = item.initialStopPrice + deltaPrice;
             }
             return tool.toJSON();
           })

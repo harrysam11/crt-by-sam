@@ -39,24 +39,51 @@ export default function DrawingToolbar({
   onOpenObjectTree,
 }: DrawingToolbarProps) {
   const [openDrawer, setOpenDrawer] = useState<string | null>(null);
+  const [drawerAnchor, setDrawerAnchor] = useState<{ top: number; left: number } | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const favorites = useDrawingStore((s) => s.favorites);
   const toggleFavorite = useDrawingStore((s) => s.toggleFavorite);
   const isFavoritesBarVisible = useDrawingStore((s) => s.isFavoritesBarVisible);
   const toggleFavoritesBar = useDrawingStore((s) => s.toggleFavoritesBar);
+  const setFloatingToolbarPos = useDrawingStore((s) => s.setFloatingToolbarPos);
+  const setDrawingContextBarPos = useDrawingStore((s) => s.setDrawingContextBarPos);
+
+  const toggleDrawer = (name: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    if (openDrawer === name) {
+      setOpenDrawer(null);
+      setDrawerAnchor(null);
+    } else {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setOpenDrawer(name);
+      setDrawerAnchor({ top: rect.top, left: rect.right + 4 });
+    }
+  };
+
+  const handleResetFloatingBars = () => {
+    audioHaptics.tick();
+    setFloatingToolbarPos({ x: 80, y: 120 });
+    setDrawingContextBarPos({ x: 280, y: 75 });
+  };
 
   useEffect(() => {
     if (!openDrawer) return;
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+      const target = e.target as HTMLElement;
+      if (
+        toolbarRef.current &&
+        !toolbarRef.current.contains(target) &&
+        !target.closest('.clay-popover')
+      ) {
         setOpenDrawer(null);
+        setDrawerAnchor(null);
       }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setOpenDrawer(null);
+        setDrawerAnchor(null);
       }
     };
 
@@ -72,6 +99,7 @@ export default function DrawingToolbar({
     audioHaptics.tick();
     onSelectTool(t);
     setOpenDrawer(null);
+    setDrawerAnchor(null);
   };
 
   const isCurrentInGroup = (tools: ToolType[]) => tools.includes(activeTool);
@@ -125,11 +153,14 @@ export default function DrawingToolbar({
   };
 
   return (
-    <div ref={toolbarRef} className="relative z-30 flex w-12 shrink-0 flex-col items-center gap-1.5 border-r border-grid bg-panel py-2 select-none font-mono text-xs">
+    <div
+      ref={toolbarRef}
+      className="relative z-30 flex w-12 shrink-0 flex-col items-center gap-1.5 border-r border-grid bg-panel py-2 select-none font-mono text-xs overflow-y-auto overflow-x-hidden scrollbar-none max-h-full"
+    >
       {/* Drawer 1: Cursors */}
-      <div className="relative">
+      <div>
         <button
-          onClick={() => setOpenDrawer(openDrawer === 'CURSOR' ? null : 'CURSOR')}
+          onClick={(e) => toggleDrawer('CURSOR', e)}
           className={btnCls(isCurrentInGroup(['CURSOR_CROSSHAIR', 'CURSOR_ARROW', 'CURSOR_DOT', 'CURSOR_ERASER']))}
           title="Cursors"
         >
@@ -139,7 +170,13 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'CURSOR' && (
-          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[160px]">
+          <div
+            style={{
+              top: `${Math.max(50, Math.min(window.innerHeight - 200, drawerAnchor?.top ?? 60))}px`,
+              left: `${drawerAnchor?.left ?? 50}px`,
+            }}
+            className="fixed z-50 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[160px] max-h-[85vh] overflow-y-auto"
+          >
             {renderToolRow('CURSOR_CROSSHAIR', 'Crosshair')}
             {renderToolRow('CURSOR_ARROW', 'Arrow Cursor')}
             {renderToolRow('CURSOR_DOT', 'Dot Cursor')}
@@ -149,9 +186,9 @@ export default function DrawingToolbar({
       </div>
 
       {/* Drawer 2: Lines & Channels */}
-      <div className="relative">
+      <div>
         <button
-          onClick={() => setOpenDrawer(openDrawer === 'LINES' ? null : 'LINES')}
+          onClick={(e) => toggleDrawer('LINES', e)}
           className={btnCls(
             isCurrentInGroup([
               'TRENDLINE',
@@ -171,7 +208,13 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'LINES' && (
-          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[200px]">
+          <div
+            style={{
+              top: `${Math.max(50, Math.min(window.innerHeight - 280, drawerAnchor?.top ?? 90))}px`,
+              left: `${drawerAnchor?.left ?? 50}px`,
+            }}
+            className="fixed z-50 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[200px] max-h-[85vh] overflow-y-auto"
+          >
             {renderToolRow('TRENDLINE', 'Trend Line', 'Alt+T')}
             {renderToolRow('RAY', 'Ray')}
             {renderToolRow('HORIZONTAL_LINE', 'Horizontal Line', 'Alt+H')}
@@ -184,9 +227,9 @@ export default function DrawingToolbar({
       </div>
 
       {/* Drawer 3: Fibonacci */}
-      <div className="relative">
+      <div>
         <button
-          onClick={() => setOpenDrawer(openDrawer === 'FIB' ? null : 'FIB')}
+          onClick={(e) => toggleDrawer('FIB', e)}
           className={btnCls(isCurrentInGroup(['FIBONACCI', 'FIB_EXTENSION']))}
           title="Fibonacci Tools"
         >
@@ -196,7 +239,13 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'FIB' && (
-          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[200px]">
+          <div
+            style={{
+              top: `${Math.max(50, Math.min(window.innerHeight - 150, drawerAnchor?.top ?? 130))}px`,
+              left: `${drawerAnchor?.left ?? 50}px`,
+            }}
+            className="fixed z-50 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[200px] max-h-[85vh] overflow-y-auto"
+          >
             {renderToolRow('FIBONACCI', 'Fib Retracement', 'Alt+F')}
             {renderToolRow('FIB_EXTENSION', 'Trend-Based Fib Extension')}
           </div>
@@ -204,9 +253,9 @@ export default function DrawingToolbar({
       </div>
 
       {/* Drawer 4: Geometric Shapes */}
-      <div className="relative">
+      <div>
         <button
-          onClick={() => setOpenDrawer(openDrawer === 'SHAPES' ? null : 'SHAPES')}
+          onClick={(e) => toggleDrawer('SHAPES', e)}
           className={btnCls(isCurrentInGroup(['RECTANGLE', 'CIRCLE', 'BRUSH']))}
           title="Geometric Shapes & Brush"
         >
@@ -216,7 +265,13 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'SHAPES' && (
-          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[170px]">
+          <div
+            style={{
+              top: `${Math.max(50, Math.min(window.innerHeight - 180, drawerAnchor?.top ?? 170))}px`,
+              left: `${drawerAnchor?.left ?? 50}px`,
+            }}
+            className="fixed z-50 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[170px] max-h-[85vh] overflow-y-auto"
+          >
             {renderToolRow('RECTANGLE', 'Rectangle Box')}
             {renderToolRow('CIRCLE', 'Circle / Ellipse')}
             {renderToolRow('BRUSH', 'Brush / Pen')}
@@ -225,9 +280,9 @@ export default function DrawingToolbar({
       </div>
 
       {/* Drawer 5: Annotations */}
-      <div className="relative">
+      <div>
         <button
-          onClick={() => setOpenDrawer(openDrawer === 'TEXT' ? null : 'TEXT')}
+          onClick={(e) => toggleDrawer('TEXT', e)}
           className={btnCls(isCurrentInGroup(['TEXT', 'CALLOUT', 'PRICE_LABEL']))}
           title="Text & Annotations"
         >
@@ -237,7 +292,13 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'TEXT' && (
-          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[170px]">
+          <div
+            style={{
+              top: `${Math.max(50, Math.min(window.innerHeight - 180, drawerAnchor?.top ?? 210))}px`,
+              left: `${drawerAnchor?.left ?? 50}px`,
+            }}
+            className="fixed z-50 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[170px] max-h-[85vh] overflow-y-auto"
+          >
             {renderToolRow('TEXT', 'Text Note')}
             {renderToolRow('CALLOUT', 'Callout Balloon')}
             {renderToolRow('PRICE_LABEL', 'Price Tag Label')}
@@ -246,9 +307,9 @@ export default function DrawingToolbar({
       </div>
 
       {/* Drawer 6: Position & Forecasting */}
-      <div className="relative">
+      <div>
         <button
-          onClick={() => setOpenDrawer(openDrawer === 'POSITION' ? null : 'POSITION')}
+          onClick={(e) => toggleDrawer('POSITION', e)}
           className={btnCls(isCurrentInGroup(['POSITION_LONG', 'POSITION_SHORT', 'POSITION_TOOL', 'MEASURE_RULER']))}
           title="Long & Short Position / Measurement"
         >
@@ -258,7 +319,13 @@ export default function DrawingToolbar({
         </button>
 
         {openDrawer === 'POSITION' && (
-          <div className="absolute left-12 top-0 z-40 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[190px]">
+          <div
+            style={{
+              top: `${Math.max(50, Math.min(window.innerHeight - 180, drawerAnchor?.top ?? 250))}px`,
+              left: `${drawerAnchor?.left ?? 50}px`,
+            }}
+            className="fixed z-50 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[190px] max-h-[85vh] overflow-y-auto"
+          >
             {renderToolRow('POSITION_LONG', 'Long Position (R:R)')}
             {renderToolRow('POSITION_SHORT', 'Short Position (R:R)')}
             {renderToolRow('MEASURE_RULER', 'Measure Ruler')}
@@ -283,6 +350,17 @@ export default function DrawingToolbar({
       >
         <svg className="h-4 w-4" fill={isFavoritesBarVisible && favorites.length > 0 ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+        </svg>
+      </button>
+
+      {/* Reset Floating Toolbars Positions */}
+      <button
+        onClick={handleResetFloatingBars}
+        className="p-2 rounded-lg flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:bg-slate-800/80 transition"
+        title="Reset Floating Toolbars Position (Favorites & Context Toolbar)"
+      >
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
       </button>
 

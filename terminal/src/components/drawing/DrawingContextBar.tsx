@@ -45,26 +45,30 @@ export default function DrawingContextBar({
   const pos = useDrawingStore((s) => s.drawingContextBarPos);
   const setPos = useDrawingStore((s) => s.setDrawingContextBarPos);
 
+  // Boundary safety clamp so context bar is never hidden behind top menubar
+  const safeX = Math.max(16, Math.min((typeof window !== 'undefined' ? window.innerWidth : 1200) - 380, pos?.x ?? 280));
+  const safeY = Math.max(64, Math.min((typeof window !== 'undefined' ? window.innerHeight : 800) - 60, pos?.y ?? 75));
+
   const [templateNameInput, setTemplateNameInput] = useState('');
   const [showTemplatesMenu, setShowTemplatesMenu] = useState(false);
   const templatesMenuRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
 
-  const handleGripPointerDown = (e: React.PointerEvent) => {
+  const startDrag = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
     isDraggingRef.current = true;
     const startMouseX = e.clientX;
     const startMouseY = e.clientY;
-    const startPosX = pos.x;
-    const startPosY = pos.y;
+    const startPosX = safeX;
+    const startPosY = safeY;
 
     const handlePointerMove = (moveEv: PointerEvent) => {
       if (!isDraggingRef.current) return;
       const dx = moveEv.clientX - startMouseX;
       const dy = moveEv.clientY - startMouseY;
-      const newX = Math.max(10, Math.min(window.innerWidth - 380, startPosX + dx));
-      const newY = Math.max(45, Math.min(window.innerHeight - 60, startPosY + dy));
+      const newX = Math.max(16, Math.min(window.innerWidth - 380, startPosX + dx));
+      const newY = Math.max(64, Math.min(window.innerHeight - 60, startPosY + dy));
       setPos({ x: newX, y: newY });
     };
 
@@ -76,6 +80,11 @@ export default function DrawingContextBar({
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
+  };
+
+  const handleResetPos = () => {
+    audioHaptics.tick();
+    setPos({ x: 280, y: 75 });
   };
 
   useEffect(() => {
@@ -115,14 +124,20 @@ export default function DrawingContextBar({
 
   return (
     <div
-      style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
-      className="clay-popover fixed z-50 flex items-center gap-1.5 px-2 py-1 font-mono text-xs select-none shadow-2xl backdrop-blur-md border border-white/[0.08]"
+      style={{ left: `${safeX}px`, top: `${safeY}px` }}
+      onPointerDown={(e) => {
+        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
+        startDrag(e);
+      }}
+      onDoubleClick={handleResetPos}
+      className="clay-popover fixed z-50 flex items-center gap-1.5 px-2 py-1 font-mono text-xs select-none shadow-2xl backdrop-blur-md border border-white/[0.08] cursor-move"
+      title="Drawing Context Toolbar (Drag to move, Double-click to reset)"
     >
       {/* Movable Drag Grip Handle */}
       <div
-        onPointerDown={handleGripPointerDown}
+        onPointerDown={startDrag}
         className="flex items-center gap-0.5 px-1 py-1 cursor-grab active:cursor-grabbing text-zinc-500 hover:text-zinc-200 transition"
-        title="Drag toolbar to reposition (persists position)"
+        title="Drag toolbar to reposition (Double-click to reset)"
       >
         <svg className="h-3.5 w-2.5" viewBox="0 0 6 12" fill="currentColor">
           <circle cx="1.5" cy="2" r="1" />

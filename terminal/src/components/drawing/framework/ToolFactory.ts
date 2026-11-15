@@ -13,6 +13,8 @@ import { MeasureTool } from './tools/MeasureTool';
 import { PositionTool } from './tools/PositionTool';
 import { ArrowTool } from './tools/ArrowTool';
 import { BrushTool } from './tools/BrushTool';
+import { CircleTool } from './tools/CircleTool';
+import { PriceLabelTool } from './tools/PriceLabelTool';
 
 export class ToolFactory {
   static create(item: DrawingItem): BaseDrawingTool {
@@ -23,13 +25,15 @@ export class ToolFactory {
       case 'HORIZONTAL_RAY':
         return new RayTool(item);
       case 'HORIZONTAL_LINE':
-      case 'PRICE_LABEL':
         return new HorizontalLineTool(item);
+      case 'PRICE_LABEL':
+        return new PriceLabelTool(item);
       case 'VERTICAL_LINE':
         return new VerticalLineTool(item);
       case 'RECTANGLE':
-      case 'CIRCLE':
         return new RectangleTool(item);
+      case 'CIRCLE':
+        return new CircleTool(item);
       case 'PARALLEL_CHANNEL':
         return new ParallelChannelTool(item);
       case 'FIBONACCI':

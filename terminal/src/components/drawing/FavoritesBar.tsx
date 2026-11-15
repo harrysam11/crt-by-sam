@@ -230,22 +230,26 @@ export default function FavoritesBar() {
   const stayInDrawingMode = useDrawingStore((s) => s.stayInDrawingMode);
   const toggleStayInDrawingMode = useDrawingStore((s) => s.toggleStayInDrawingMode);
 
+  // Boundary safety clamp so toolbar is never positioned under or behind the top navbar (min Y = 64)
+  const safeX = Math.max(16, Math.min((typeof window !== 'undefined' ? window.innerWidth : 1200) - 320, pos?.x ?? 80));
+  const safeY = Math.max(64, Math.min((typeof window !== 'undefined' ? window.innerHeight : 800) - 70, pos?.y ?? 120));
+
   const isDraggingRef = React.useRef(false);
 
-  const handleGripPointerDown = (e: React.PointerEvent) => {
+  const startDrag = (e: React.PointerEvent) => {
     e.preventDefault();
     isDraggingRef.current = true;
     const startMouseX = e.clientX;
     const startMouseY = e.clientY;
-    const startPosX = pos.x;
-    const startPosY = pos.y;
+    const startPosX = safeX;
+    const startPosY = safeY;
 
     const handlePointerMove = (moveEv: PointerEvent) => {
       if (!isDraggingRef.current) return;
       const dx = moveEv.clientX - startMouseX;
       const dy = moveEv.clientY - startMouseY;
-      const newX = Math.max(10, Math.min(window.innerWidth - 300, startPosX + dx));
-      const newY = Math.max(45, Math.min(window.innerHeight - 50, startPosY + dy));
+      const newX = Math.max(16, Math.min(window.innerWidth - 320, startPosX + dx));
+      const newY = Math.max(64, Math.min(window.innerHeight - 70, startPosY + dy));
       setPos({ x: newX, y: newY });
     };
 
@@ -259,19 +263,29 @@ export default function FavoritesBar() {
     window.addEventListener('pointerup', handlePointerUp);
   };
 
+  const handleResetPos = () => {
+    audioHaptics.tick();
+    setPos({ x: 80, y: 120 });
+  };
+
   if (!isFavoritesBarVisible || favorites.length === 0) return null;
 
   return (
     <div
-      style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
-      className="clay-popover fixed z-40 flex items-center gap-1 px-2 py-1 select-none font-mono text-xs shadow-2xl backdrop-blur-md border border-white/[0.08]"
-      title="In-Chart Drawing Toolbar (Drag to reposition)"
+      style={{ left: `${safeX}px`, top: `${safeY}px` }}
+      onPointerDown={(e) => {
+        if ((e.target as HTMLElement).closest('button')) return;
+        startDrag(e);
+      }}
+      onDoubleClick={handleResetPos}
+      className="clay-popover fixed z-40 flex items-center gap-1 px-2 py-1 select-none font-mono text-xs shadow-2xl backdrop-blur-md border border-white/[0.08] cursor-move"
+      title="In-Chart Drawing Toolbar (Drag to reposition, Double-click to reset)"
     >
       {/* Movable Drag Grip Handle */}
       <div
-        onPointerDown={handleGripPointerDown}
+        onPointerDown={startDrag}
         className="flex items-center gap-0.5 px-1 py-1.5 cursor-grab active:cursor-grabbing text-zinc-500 hover:text-zinc-200 transition"
-        title="Drag toolbar to reposition (sticks to last place)"
+        title="Drag toolbar to reposition (Double-click to reset)"
       >
         <svg className="h-3.5 w-2.5" viewBox="0 0 6 12" fill="currentColor">
           <circle cx="1.5" cy="2" r="1" />

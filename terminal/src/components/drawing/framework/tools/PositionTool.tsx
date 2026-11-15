@@ -1,3 +1,10 @@
+/**
+ * TradingView-Style Long & Short Position Drawing Tool.
+ * Provides risk/reward visualization, profit target zone, stop loss zone,
+ * draggable target/stop/entry/width handles, and institutional price tag badges.
+ * ZERO EMOJI POLICY strictly enforced.
+ */
+
 import React from 'react';
 import { BaseDrawingTool } from '../BaseDrawingTool';
 import type { CoordinateHelper } from '../CoordinateHelper';
@@ -11,7 +18,7 @@ export class PositionTool extends BaseDrawingTool {
     super(item);
     this.isLong = item.type === 'POSITION_LONG';
 
-    // Initialize defaults if not set
+    // Initialize sensible defaults if not set
     const p = item.p1.price;
     if (this.entryPrice === undefined) this.entryPrice = p;
     if (this.targetPrice === undefined) {
@@ -28,9 +35,13 @@ export class PositionTool extends BaseDrawingTool {
 
   getHandles(coord: CoordinateHelper): DrawingHandle[] {
     const pt1 = coord.pointToXY(this.p1);
-    const targetY = coord.priceToY(this.targetPrice);
-    const stopY = coord.priceToY(this.stopPrice);
-    const entryY = coord.priceToY(this.entryPrice);
+    const entryPrice = this.entryPrice ?? this.p1.price;
+    const targetPrice = this.targetPrice ?? (this.isLong ? entryPrice * 1.03 : entryPrice * 0.97);
+    const stopPrice = this.stopPrice ?? (this.isLong ? entryPrice * 0.985 : entryPrice * 1.015);
+
+    const targetY = coord.priceToY(targetPrice);
+    const stopY = coord.priceToY(stopPrice);
+    const entryY = coord.priceToY(entryPrice);
 
     const rightX = this.p2 ? coord.timeToX(this.p2.time, this.p2.x) : pt1.x + 180;
     const midX = (pt1.x + rightX) / 2;
@@ -49,15 +60,30 @@ export class PositionTool extends BaseDrawingTool {
       this.targetPrice = point.price;
     } else if (handleId === 'stop') {
       this.stopPrice = point.price;
-    } else if (handleId === 'entry') {
-      const delta = point.price - (this.entryPrice ?? this.p1.price);
+    } else if (handleId === 'entry' || handleId === 'p1') {
+      const oldEntry = this.entryPrice ?? this.p1.price;
+      const delta = point.price - oldEntry;
       this.entryPrice = point.price;
       this.p1.price = point.price;
       if (this.targetPrice !== undefined) this.targetPrice += delta;
       if (this.stopPrice !== undefined) this.stopPrice += delta;
-    } else if (handleId === 'width') {
-      this.p2 = { ...point };
+    } else if (handleId === 'width' || handleId === 'p2') {
+      this.p2 = { ...point, price: this.entryPrice ?? this.p1.price };
     }
+  }
+
+  onTranslate(deltaPrice: number, deltaTime: number): void {
+    if (this.locked) return;
+    this.p1.price += deltaPrice;
+    if (this.p1.time !== undefined && deltaTime) this.p1.time += deltaTime;
+
+    if (this.p2) {
+      this.p2.price += deltaPrice;
+      if (this.p2.time !== undefined && deltaTime) this.p2.time += deltaTime;
+    }
+    if (this.entryPrice !== undefined) this.entryPrice += deltaPrice;
+    if (this.targetPrice !== undefined) this.targetPrice += deltaPrice;
+    if (this.stopPrice !== undefined) this.stopPrice += deltaPrice;
   }
 
   hitTest(x: number, y: number, coord: CoordinateHelper): boolean {
@@ -66,12 +92,17 @@ export class PositionTool extends BaseDrawingTool {
     const leftX = Math.min(pt1.x, rightX);
     const maxX = Math.max(pt1.x, rightX);
 
-    const targetY = coord.priceToY(this.targetPrice);
-    const stopY = coord.priceToY(this.stopPrice);
-    const minY = Math.min(targetY, stopY);
-    const maxY = Math.max(targetY, stopY);
+    const entryPrice = this.entryPrice ?? this.p1.price;
+    const targetPrice = this.targetPrice ?? (this.isLong ? entryPrice * 1.03 : entryPrice * 0.97);
+    const stopPrice = this.stopPrice ?? (this.isLong ? entryPrice * 0.985 : entryPrice * 1.015);
 
-    return x >= leftX && x <= maxX && y >= minY && y <= maxY;
+    const targetY = coord.priceToY(targetPrice);
+    const stopY = coord.priceToY(stopPrice);
+    const entryY = coord.priceToY(entryPrice);
+    const minY = Math.min(targetY, stopY, entryY);
+    const maxY = Math.max(targetY, stopY, entryY);
+
+    return x >= leftX - 4 && x <= maxX + 4 && y >= minY - 4 && y <= maxY + 4;
   }
 
   renderSVG(
@@ -85,16 +116,16 @@ export class PositionTool extends BaseDrawingTool {
     const leftX = Math.min(pt1.x, rightX);
     const width = Math.max(60, Math.abs(rightX - pt1.x));
 
-    const entryY = coord.priceToY(this.entryPrice);
-    const targetY = coord.priceToY(this.targetPrice);
-    const stopY = coord.priceToY(this.stopPrice);
-
-    const targetHeight = Math.abs(targetY - entryY);
-    const stopHeight = Math.abs(stopY - entryY);
-
     const entryPrice = this.entryPrice ?? this.p1.price;
-    const targetPrice = this.targetPrice ?? entryPrice;
-    const stopPrice = this.stopPrice ?? entryPrice;
+    const targetPrice = this.targetPrice ?? (this.isLong ? entryPrice * 1.03 : entryPrice * 0.97);
+    const stopPrice = this.stopPrice ?? (this.isLong ? entryPrice * 0.985 : entryPrice * 1.015);
+
+    const entryY = coord.priceToY(entryPrice);
+    const targetY = coord.priceToY(targetPrice);
+    const stopY = coord.priceToY(stopPrice);
+
+    const targetHeight = Math.max(2, Math.abs(targetY - entryY));
+    const stopHeight = Math.max(2, Math.abs(stopY - entryY));
 
     const reward = Math.abs(targetPrice - entryPrice);
     const risk = Math.max(0.0000001, Math.abs(entryPrice - stopPrice));
@@ -103,6 +134,10 @@ export class PositionTool extends BaseDrawingTool {
     const targetPct = entryPrice > 0 ? ((reward / entryPrice) * 100).toFixed(2) : '0';
     const stopPct = entryPrice > 0 ? ((risk / entryPrice) * 100).toFixed(2) : '0';
 
+    const targetTagText = `TP ${fmtPrice(targetPrice, symbol)} (+${targetPct}%)`;
+    const stopTagText = `SL ${fmtPrice(stopPrice, symbol)} (-${stopPct}%)`;
+    const entryTagText = fmtPrice(entryPrice, symbol);
+
     return (
       <g key={this.id}>
         {/* Target profit zone (green) */}
@@ -110,10 +145,10 @@ export class PositionTool extends BaseDrawingTool {
           x={leftX}
           y={Math.min(targetY, entryY)}
           width={width}
-          height={Math.max(1, targetHeight)}
-          fill="rgba(34, 197, 94, 0.18)"
+          height={targetHeight}
+          fill="rgba(34, 197, 94, 0.2)"
           stroke="#22c55e"
-          strokeWidth={1}
+          strokeWidth={1.2}
         />
 
         {/* Stop loss zone (red) */}
@@ -121,10 +156,10 @@ export class PositionTool extends BaseDrawingTool {
           x={leftX}
           y={Math.min(stopY, entryY)}
           width={width}
-          height={Math.max(1, stopHeight)}
-          fill="rgba(239, 68, 68, 0.18)"
+          height={stopHeight}
+          fill="rgba(239, 68, 68, 0.2)"
           stroke="#ef4444"
-          strokeWidth={1}
+          strokeWidth={1.2}
         />
 
         {/* Entry line */}
@@ -137,49 +172,98 @@ export class PositionTool extends BaseDrawingTool {
           strokeWidth={1.5}
         />
 
-        {/* Information HUD Header */}
+        {/* Central Information HUD Card */}
         <rect
-          x={leftX}
+          x={leftX + width / 2 - 75}
           y={entryY - 12}
-          width={width}
+          width={150}
           height={24}
-          fill="#101015"
-          stroke={isSelected ? '#38bdf8' : 'rgba(255, 255, 255, 0.15)'}
+          fill="#0e1118"
+          stroke={isSelected ? '#38bdf8' : 'rgba(255, 255, 255, 0.2)'}
           strokeWidth={1}
-          rx={3}
+          rx={4}
+          className="shadow-xl"
         />
         <text
-          x={leftX + 6}
+          x={leftX + width / 2}
           y={entryY + 4}
           fill="#ffffff"
-          fontSize={10}
+          fontSize={10.5}
           fontFamily="monospace"
           fontWeight="bold"
+          textAnchor="middle"
         >
           {this.isLong ? 'Long' : 'Short'} | R:R {rr}
         </text>
 
-        {/* Target Label */}
-        <text
-          x={leftX + 6}
-          y={targetY + (this.isLong ? -4 : 12)}
-          fill="#22c55e"
-          fontSize={10}
-          fontFamily="monospace"
-        >
-          TP: {fmtPrice(targetPrice, symbol)} (+{targetPct}%)
-        </text>
+        {/* Target Price Tag Badge (Green) on Right Edge */}
+        <g className="font-mono text-[10px]">
+          <rect
+            x={leftX + width + 4}
+            y={targetY - 10}
+            width={targetTagText.length * 6.5 + 10}
+            height={20}
+            rx={3}
+            fill="#052e16"
+            stroke="#22c55e"
+            strokeWidth={1}
+          />
+          <text
+            x={leftX + width + 9}
+            y={targetY + 4}
+            fill="#4ade80"
+            fontSize={10}
+            fontWeight="bold"
+          >
+            {targetTagText}
+          </text>
+        </g>
 
-        {/* Stop Label */}
-        <text
-          x={leftX + 6}
-          y={stopY + (this.isLong ? 12 : -4)}
-          fill="#ef4444"
-          fontSize={10}
-          fontFamily="monospace"
-        >
-          SL: {fmtPrice(stopPrice, symbol)} (-{stopPct}%)
-        </text>
+        {/* Stop Price Tag Badge (Red) on Right Edge */}
+        <g className="font-mono text-[10px]">
+          <rect
+            x={leftX + width + 4}
+            y={stopY - 10}
+            width={stopTagText.length * 6.5 + 10}
+            height={20}
+            rx={3}
+            fill="#450a0a"
+            stroke="#ef4444"
+            strokeWidth={1}
+          />
+          <text
+            x={leftX + width + 9}
+            y={stopY + 4}
+            fill="#f87171"
+            fontSize={10}
+            fontWeight="bold"
+          >
+            {stopTagText}
+          </text>
+        </g>
+
+        {/* Entry Price Tag Badge (Slate) on Right Edge */}
+        <g className="font-mono text-[10px]">
+          <rect
+            x={leftX + width + 4}
+            y={entryY - 9}
+            width={entryTagText.length * 6.5 + 10}
+            height={18}
+            rx={3}
+            fill="#1e293b"
+            stroke="#64748b"
+            strokeWidth={1}
+          />
+          <text
+            x={leftX + width + 9}
+            y={entryY + 3.5}
+            fill="#cbd5e1"
+            fontSize={9.5}
+            fontWeight="bold"
+          >
+            {entryTagText}
+          </text>
+        </g>
       </g>
     );
   }
