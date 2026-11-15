@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createChart, ColorType, CrosshairMode, LineStyle, PriceScaleMode,
   type CandlestickData, type IChartApi, type IPriceLine, type ISeriesApi, type SeriesType, type Time, type UTCTimestamp,
@@ -298,42 +298,105 @@ export default function TradingChart({
   const [overlayValues, setOverlayValues] = useState<Record<string, number | null>>({});
   const overlaySeriesMap = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
 
-  // Top Toolbar Dropdown menus
-  const [isTfMenuOpen, setIsTfMenuOpen] = useState(false);
-  const [isStyleMenuOpen, setIsStyleMenuOpen] = useState(false);
-  const [isLayersMenuOpen, setIsLayersMenuOpen] = useState(false);
-  const [isColorMenuOpen, setIsColorMenuOpen] = useState(false);
+  // Top Toolbar Dropdown menus with fixed non-clipping viewport coordinates
+  const [activeMenu, setActiveMenu] = useState<'TF' | 'STYLE' | 'COLOR' | 'LAYERS' | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; left: number } | null>(null);
+
+  const isTfMenuOpen = activeMenu === 'TF';
+  const isStyleMenuOpen = activeMenu === 'STYLE';
+  const isColorMenuOpen = activeMenu === 'COLOR';
+  const isLayersMenuOpen = activeMenu === 'LAYERS';
 
   const tfMenuRef = useRef<HTMLDivElement>(null);
   const styleMenuRef = useRef<HTMLDivElement>(null);
   const layersMenuRef = useRef<HTMLDivElement>(null);
   const colorMenuRef = useRef<HTMLDivElement>(null);
 
+  const closeAllMenus = useCallback(() => {
+    setActiveMenu(null);
+    setMenuAnchor(null);
+  }, []);
+
+  const toggleTfMenu = useCallback(() => {
+    if (activeMenu === 'TF') {
+      closeAllMenus();
+    } else {
+      const rect = tfMenuRef.current?.getBoundingClientRect();
+      if (rect) {
+        setMenuAnchor({
+          top: rect.bottom + 4,
+          left: Math.max(10, Math.min(window.innerWidth - 300, rect.left)),
+        });
+      }
+      setActiveMenu('TF');
+    }
+  }, [activeMenu, closeAllMenus]);
+
+  const toggleStyleMenu = useCallback(() => {
+    if (activeMenu === 'STYLE') {
+      closeAllMenus();
+    } else {
+      const rect = styleMenuRef.current?.getBoundingClientRect();
+      if (rect) {
+        setMenuAnchor({
+          top: rect.bottom + 4,
+          left: Math.max(10, Math.min(window.innerWidth - 260, rect.left)),
+        });
+      }
+      setActiveMenu('STYLE');
+    }
+  }, [activeMenu, closeAllMenus]);
+
+  const toggleColorMenu = useCallback(() => {
+    if (activeMenu === 'COLOR') {
+      closeAllMenus();
+    } else {
+      const rect = colorMenuRef.current?.getBoundingClientRect();
+      if (rect) {
+        setMenuAnchor({
+          top: rect.bottom + 4,
+          left: Math.max(10, Math.min(window.innerWidth - 280, rect.left)),
+        });
+      }
+      setActiveMenu('COLOR');
+    }
+  }, [activeMenu, closeAllMenus]);
+
+  const toggleLayersMenu = useCallback(() => {
+    if (activeMenu === 'LAYERS') {
+      closeAllMenus();
+    } else {
+      const rect = layersMenuRef.current?.getBoundingClientRect();
+      if (rect) {
+        setMenuAnchor({
+          top: rect.bottom + 4,
+          left: Math.max(10, Math.min(window.innerWidth - 320, rect.left)),
+        });
+      }
+      setActiveMenu('LAYERS');
+    }
+  }, [activeMenu, closeAllMenus]);
+
   useEffect(() => {
     const handleOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (tfMenuRef.current && !tfMenuRef.current.contains(target)) {
-        setIsTfMenuOpen(false);
+      const target = e.target as HTMLElement;
+      if (
+        (tfMenuRef.current && tfMenuRef.current.contains(target)) ||
+        (styleMenuRef.current && styleMenuRef.current.contains(target)) ||
+        (layersMenuRef.current && layersMenuRef.current.contains(target)) ||
+        (colorMenuRef.current && colorMenuRef.current.contains(target)) ||
+        target.closest('.clay-popover')
+      ) {
+        return;
       }
-      if (styleMenuRef.current && !styleMenuRef.current.contains(target)) {
-        setIsStyleMenuOpen(false);
-      }
-      if (layersMenuRef.current && !layersMenuRef.current.contains(target)) {
-        setIsLayersMenuOpen(false);
-      }
-      if (colorMenuRef.current && !colorMenuRef.current.contains(target)) {
-        setIsColorMenuOpen(false);
-      }
+      closeAllMenus();
     };
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setIsTfMenuOpen(false);
-        setIsStyleMenuOpen(false);
-        setIsLayersMenuOpen(false);
-        setIsColorMenuOpen(false);
+        closeAllMenus();
       }
     };
-    if (isTfMenuOpen || isStyleMenuOpen || isLayersMenuOpen || isColorMenuOpen) {
+    if (activeMenu) {
       window.addEventListener('mousedown', handleOutside);
       window.addEventListener('keydown', handleEscape);
     }
@@ -341,7 +404,7 @@ export default function TradingChart({
       window.removeEventListener('mousedown', handleOutside);
       window.removeEventListener('keydown', handleEscape);
     };
-  }, [isTfMenuOpen, isStyleMenuOpen, isLayersMenuOpen, isColorMenuOpen]);
+  }, [activeMenu, closeAllMenus]);
 
   const favoriteTimeframes = useMemo(
     () => TIMEFRAMES[provider].filter((t) => FAVORITE_TIMEFRAMES.includes(t)),
@@ -363,31 +426,6 @@ export default function TradingChart({
       (isNotesOpen ? 1 : 0)
     );
   }, [showVolumeProfile, isGhostVisible, showSessionOHL, canvasOrderLines.length, showRiskHUD, isRulerActive, isNotesOpen]);
-
-  const toggleTfMenu = () => {
-    setIsStyleMenuOpen(false);
-    setIsLayersMenuOpen(false);
-    setIsColorMenuOpen(false);
-    setIsTfMenuOpen((v) => !v);
-  };
-  const toggleStyleMenu = () => {
-    setIsTfMenuOpen(false);
-    setIsLayersMenuOpen(false);
-    setIsColorMenuOpen(false);
-    setIsStyleMenuOpen((v) => !v);
-  };
-  const toggleColorMenu = () => {
-    setIsTfMenuOpen(false);
-    setIsStyleMenuOpen(false);
-    setIsLayersMenuOpen(false);
-    setIsColorMenuOpen((v) => !v);
-  };
-  const toggleLayersMenu = () => {
-    setIsTfMenuOpen(false);
-    setIsStyleMenuOpen(false);
-    setIsColorMenuOpen(false);
-    setIsLayersMenuOpen((v) => !v);
-  };
 
   const handleSetScaleMode = (mode: PriceScaleType) => {
     setScaleMode(mode);
@@ -671,7 +709,7 @@ export default function TradingChart({
     saveStoredCustomTimeframe(tfStr);
     setTimeframe(tfStr);
     setPaneTimeframe(paneId, tfStr);
-    setIsTfMenuOpen(false);
+    closeAllMenus();
   };
 
   const box = useRef<HTMLDivElement>(null);
@@ -1642,7 +1680,7 @@ export default function TradingChart({
       <ChartSkinsLayer />
 
       {/* Institutional TradingView-Style Chart Top Toolbar */}
-      <div className="relative z-30 flex items-center justify-between border-b border-grid bg-panel px-2.5 py-1 select-none text-xs gap-2 overflow-hidden">
+      <div className="relative z-30 flex items-center justify-between border-b border-grid bg-panel px-2.5 py-1 select-none text-xs gap-2 overflow-visible">
         {/* Left Section: Symbol, Timeframes, Candle Style, Indicators, Replay, Alert, Undo/Redo, Layers */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none min-w-0 flex-1 py-0.5">
           {/* Symbol Search Trigger */}
@@ -1698,7 +1736,7 @@ export default function TradingChart({
               <button
                 onClick={() => {
                   audioHaptics.tick();
-                  setIsTfMenuOpen((v) => !v);
+                  toggleTfMenu();
                 }}
                 className="px-1.5 py-0.5 text-xs clay-pill text-[#38bdf8] hover:text-white hover:bg-[#38bdf8]/20 transition rounded font-bold"
                 title="Add Custom Interval"
@@ -1723,7 +1761,13 @@ export default function TradingChart({
 
             {/* Timeframe Dropdown Menu with Direct User Input */}
             {isTfMenuOpen && (
-              <div className="absolute left-0 top-full mt-2 z-50 w-72 clay-popover p-2.5 shadow-2xl font-mono text-xs max-h-[85vh] overflow-y-auto">
+              <div
+                style={{
+                  top: `${menuAnchor?.top ?? 45}px`,
+                  left: `${menuAnchor?.left ?? 10}px`,
+                }}
+                className="fixed z-50 w-72 clay-popover p-2.5 shadow-2xl font-mono text-xs max-h-[85vh] overflow-y-auto"
+              >
                 {/* Direct User Input Form for Custom Interval */}
                 <div className="p-2 border border-[#2d2d3e] bg-black/60 rounded-xl mb-2.5">
                   <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#38bdf8] mb-1.5">
@@ -1817,7 +1861,7 @@ export default function TradingChart({
                               audioHaptics.tick();
                               setTimeframe(t as Timeframe);
                               setPaneTimeframe(paneId, t as Timeframe);
-                              setIsTfMenuOpen(false);
+                              closeAllMenus();
                             }}
                             className="flex-1 text-left flex items-center gap-1.5"
                           >
@@ -1833,8 +1877,6 @@ export default function TradingChart({
                               e.stopPropagation();
                               audioHaptics.tick();
                               removeStoredCustomTimeframe(t);
-                              setIsTfMenuOpen(false);
-                              setTimeout(() => setIsTfMenuOpen(true), 10);
                             }}
                             className="text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 p-0.5 text-xs transition"
                             title={`Delete ${t}`}
@@ -1859,7 +1901,7 @@ export default function TradingChart({
                         audioHaptics.tick();
                         setTimeframe(t);
                         setPaneTimeframe(paneId, t);
-                        setIsTfMenuOpen(false);
+                        closeAllMenus();
                       }}
                       className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg transition ${
                         t === timeframe
@@ -1880,7 +1922,7 @@ export default function TradingChart({
                 <button
                   onClick={() => {
                     audioHaptics.tick();
-                    setIsTfMenuOpen(false);
+                    closeAllMenus();
                     setIsCustomIntervalModalOpen(true);
                   }}
                   className="flex w-full items-center gap-2 px-2.5 py-2 mt-2 rounded-lg text-[#38bdf8] hover:bg-[#38bdf8]/15 border-t border-[#262634] transition text-left font-medium"
@@ -1981,7 +2023,13 @@ export default function TradingChart({
 
             {/* Candle Style Menu */}
             {isStyleMenuOpen && (
-              <div className="absolute left-0 top-full mt-2 z-50 w-60 clay-popover p-2 shadow-2xl font-mono text-xs max-h-80 overflow-y-auto">
+              <div
+                style={{
+                  top: `${menuAnchor?.top ?? 45}px`,
+                  left: `${menuAnchor?.left ?? 10}px`,
+                }}
+                className="fixed z-50 w-60 clay-popover p-2 shadow-2xl font-mono text-xs max-h-80 overflow-y-auto"
+              >
                 <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1">
                   Chart Style
                 </div>
@@ -2000,7 +2048,7 @@ export default function TradingChart({
                     onClick={() => {
                       audioHaptics.tick();
                       setChartStyle(s.id as ChartStyle);
-                      setIsStyleMenuOpen(false);
+                      closeAllMenus();
                     }}
                     className={`flex w-full items-start justify-between px-2.5 py-1.5 rounded-lg text-left transition ${
                       chartStyle === s.id
@@ -2052,7 +2100,13 @@ export default function TradingChart({
             </button>
 
             {isColorMenuOpen && (
-              <div className="absolute left-0 top-full mt-2 z-50 w-64 clay-popover p-3 shadow-2xl font-mono text-xs select-none max-h-[80vh] overflow-y-auto">
+              <div
+                style={{
+                  top: `${menuAnchor?.top ?? 45}px`,
+                  left: `${menuAnchor?.left ?? 10}px`,
+                }}
+                className="fixed z-50 w-64 clay-popover p-3 shadow-2xl font-mono text-xs select-none max-h-[80vh] overflow-y-auto"
+              >
                 <div className="px-1 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-2 flex items-center justify-between">
                   <span>Candle Palette</span>
                   <button
@@ -2300,7 +2354,13 @@ export default function TradingChart({
 
             {/* Layers Dropdown Menu */}
             {isLayersMenuOpen && (
-              <div className="absolute left-0 top-full mt-2 z-50 w-72 clay-popover p-2.5 shadow-2xl font-mono text-xs select-none max-h-[80vh] overflow-y-auto">
+              <div
+                style={{
+                  top: `${menuAnchor?.top ?? 45}px`,
+                  left: `${menuAnchor?.left ?? 10}px`,
+                }}
+                className="fixed z-50 w-72 clay-popover p-2.5 shadow-2xl font-mono text-xs select-none max-h-[80vh] overflow-y-auto"
+              >
                 <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1.5">
                   Chart Overlays & Tools
                 </div>
@@ -2385,7 +2445,7 @@ export default function TradingChart({
                       onClick={() => {
                         audioHaptics.tick();
                         setShowSkinsModal(true);
-                        setIsLayersMenuOpen(false);
+                        closeAllMenus();
                       }}
                       className="flex w-full items-center justify-between px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white transition"
                     >
