@@ -1527,7 +1527,12 @@ export default function TradingChart({
               ))}
               {!favoriteTimeframes.includes(timeframe) && (
                 <button
-                  className="px-2.5 py-0.5 text-xs clay-pill-active"
+                  onClick={() => {
+                    audioHaptics.tick();
+                    setIsCustomIntervalModalOpen(true);
+                  }}
+                  className="px-2.5 py-0.5 text-xs clay-pill-active font-bold"
+                  title="Active Custom Timeframe (Click to manage)"
                 >
                   {timeframe}
                 </button>

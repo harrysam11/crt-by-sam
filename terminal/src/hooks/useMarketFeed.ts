@@ -5,6 +5,7 @@ import { fetchQuote } from '../services/yahoo';
 import { fxSymbol, getInstrument, setFx, TIMEFRAMES } from '../services/instruments';
 import { useTerminalStore } from '../store/useTerminalStore';
 import { datafeedHub } from '../services/datafeed';
+import { parseTimeframeToSeconds } from '../utils/timeframe';
 import type { Candle, Tick, Timeframe } from '../types/terminal';
 
 const TF_SEC: Record<Timeframe, number> = {
@@ -70,7 +71,8 @@ export function useMarketFeed(): void {
   useEffect(() => {
     const st = store();
     const provider = getInstrument(symbol)?.provider ?? 'binance';
-    if (!TIMEFRAMES[provider]?.includes(timeframe)) {
+    const isCustom = /^[1-9]\d{0,3}[smhdwM]$/.test(timeframe);
+    if (!TIMEFRAMES[provider]?.includes(timeframe) && !isCustom) {
       st.setTimeframe('1m');
       return;
     }
@@ -98,7 +100,8 @@ export function useMarketFeed(): void {
           store().updateQuote(symbol, quote);
           store().updateWatchlist({ [symbol]: { price: quote.price, change: pct(quote.price, quote.prevClose) } });
         }
-        agg = new CandleAggregator(TF_SEC[timeframe] || 60, candles[candles.length - 1]);
+        const durSec = parseTimeframeToSeconds(timeframe);
+        agg = new CandleAggregator(durSec > 0 ? durSec : 60, candles[candles.length - 1]);
         store().setError(null);
         store().setCandles(candles);
       } catch (e) {

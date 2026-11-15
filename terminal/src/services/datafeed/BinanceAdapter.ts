@@ -162,6 +162,7 @@ export class BinanceAdapter implements IDatafeedAdapter {
     let ws: WebSocket | null = new WebSocket(wsUrl);
 
     let currentAggBar: Candle | null = null;
+    const baseVolumes = new Map<number, number>();
 
     ws.onmessage = (event) => {
       try {
@@ -191,6 +192,8 @@ export class BinanceAdapter implements IDatafeedAdapter {
           } else {
             const bucket = Math.floor(rawBar.time / targetSec) * targetSec;
             if (!currentAggBar || currentAggBar.time !== bucket) {
+              baseVolumes.clear();
+              baseVolumes.set(rawBar.time, rawBar.volume);
               currentAggBar = {
                 time: bucket,
                 open: rawBar.open,
@@ -200,10 +203,13 @@ export class BinanceAdapter implements IDatafeedAdapter {
                 volume: rawBar.volume,
               };
             } else {
+              baseVolumes.set(rawBar.time, rawBar.volume);
+              let totalVol = 0;
+              baseVolumes.forEach((v) => { totalVol += v; });
               currentAggBar.high = Math.max(currentAggBar.high, rawBar.high);
               currentAggBar.low = Math.min(currentAggBar.low, rawBar.low);
               currentAggBar.close = rawBar.close;
-              currentAggBar.volume += rawBar.volume;
+              currentAggBar.volume = totalVol;
             }
             sub.onTick({ ...currentAggBar });
           }
