@@ -30,6 +30,7 @@ import ObjectTreePanel from './components/Chart/ObjectTreePanel';
 import DataWindowPanel from './components/Chart/DataWindowPanel';
 import GuardianModal from './components/guardian/GuardianModal';
 import PortfolioDashboardModal from './components/portfolio/PortfolioDashboardModal';
+import LandingPage from './components/landing/LandingPage';
 import { useMarketFeed } from './hooks/useMarketFeed';
 import { useKeyboardHotkeys } from './hooks/useKeyboardHotkeys';
 import { useTerminalStore } from './store/useTerminalStore';
@@ -131,6 +132,15 @@ export default function App() {
   const [isGuardianOpen, setIsGuardianOpen] = useState(false);
   const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
 
+  // View Mode: TERMINAL or LANDING showcase
+  const [viewMode, setViewMode] = useState<'TERMINAL' | 'LANDING'>(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('view') === 'landing') return 'LANDING';
+    } catch {}
+    return 'TERMINAL';
+  });
+
   // Global Keyboard Hotkeys Listener
   useKeyboardHotkeys({
     onOpenCheatsheet: () => setIsHotkeyOpen(true),
@@ -160,6 +170,38 @@ export default function App() {
       document.body.classList.remove('theme-light');
     }
   }, [themeMode]);
+
+  // Landing Page View
+  if (viewMode === 'LANDING') {
+    return (
+      <div className="min-h-screen bg-bg text-slate-200 overflow-x-hidden font-mono">
+        <LandingPage
+          onLaunchTerminal={(targetSymbol) => {
+            if (targetSymbol) {
+              useTerminalStore.getState().setSymbol(targetSymbol);
+            }
+            setViewMode('TERMINAL');
+          }}
+          onOpenGuardian={() => {
+            setViewMode('TERMINAL');
+            setIsGuardianOpen(true);
+          }}
+          onOpenPortfolio={() => {
+            setViewMode('TERMINAL');
+            setIsPortfolioOpen(true);
+          }}
+        />
+        <GuardianModal
+          isOpen={isGuardianOpen}
+          onClose={() => setIsGuardianOpen(false)}
+        />
+        <PortfolioDashboardModal
+          isOpen={isPortfolioOpen}
+          onClose={() => setIsPortfolioOpen(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col bg-bg text-slate-200 overflow-hidden font-mono">
@@ -289,6 +331,7 @@ export default function App() {
           }}
           onTogglePopout={() => setIsPopoutOpen((v) => !v)}
           isPopoutActive={isPopoutOpen}
+          onOpenLanding={() => setViewMode('LANDING')}
         />
       )}
 

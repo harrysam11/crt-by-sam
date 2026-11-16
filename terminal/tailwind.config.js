@@ -4,13 +4,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: 'var(--color-bg, #050508)',
-        panel: 'var(--color-panel, #101015)',
-        grid: 'var(--color-grid, #1e1e26)',
-        up: 'var(--color-up, #ffffff)',
-        down: 'var(--color-down, #52525c)',
-        accent: 'var(--color-accent, #ffffff)',
-        muted: 'var(--color-muted, #828290)',
+        bg: 'var(--color-bg, #08090d)',
+        panel: 'var(--color-panel, #0e1017)',
+        grid: 'var(--color-grid, rgba(255, 255, 255, 0.08))',
+        up: 'var(--color-up, #22c55e)',
+        down: 'var(--color-down, #ef4444)',
+        accent: 'var(--color-accent, #38bdf8)',
+        muted: 'var(--color-muted, #64748b)',
       },
       boxShadow: {
         'clay-card': '6px 6px 14px #020204, -3px -3px 8px rgba(255, 255, 255, 0.03), inset 1px 1px 1.5px rgba(255, 255, 255, 0.12), inset -2px -2px 4px rgba(0, 0, 0, 0.65)',

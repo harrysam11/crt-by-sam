@@ -7,6 +7,7 @@ import { useDrawingStore } from '../../store/useDrawingStore';
 import { useIndicatorsStore } from '../../store/useIndicatorsStore';
 import { audioHaptics } from '../../utils/notify';
 import { labelOf } from '../../utils/formatters';
+import { safeJsonParse } from '../../utils/safeJson';
 
 interface SessionManagerModalProps {
   isOpen: boolean;
@@ -173,9 +174,9 @@ export default function SessionManagerModal({
     reader.onload = async (ev) => {
       try {
         const text = ev.target?.result as string;
-        const parsed: DatabaseBackup = JSON.parse(text);
-        if (!parsed.sessions && !parsed.drawings) {
-          showFeedback('Invalid backup format.', false);
+        const parsed = safeJsonParse<DatabaseBackup | null>(text, null);
+        if (!parsed || (!parsed.sessions && !parsed.drawings)) {
+          showFeedback('Invalid backup format or corrupted payload.', false);
           return;
         }
 

@@ -169,6 +169,25 @@ export default function ExecutionPanel() {
   const submit = async (side: OrderSide) => {
     audioHaptics.tick();
 
+    // 0. Strict input bounds and sanity check
+    if (q === null || q === undefined || q <= 0 || !Number.isFinite(q)) {
+      audioHaptics.error();
+      setMsg({ ok: false, text: 'Invalid order size. Quantity must be a positive finite number.' });
+      return;
+    }
+
+    if (type === 'LIMIT' && (!entry || entry <= 0 || !Number.isFinite(entry))) {
+      audioHaptics.error();
+      setMsg({ ok: false, text: 'Invalid limit price. Price must be a positive number.' });
+      return;
+    }
+
+    if (!Number.isFinite(lev) || lev < 1 || lev > 125) {
+      audioHaptics.error();
+      setMsg({ ok: false, text: 'Invalid leverage. Leverage must be between 1x and 125x.' });
+      return;
+    }
+
     // 1. Guard against Kill-Switch lockout
     if (killSwitch.isLocked) {
       audioHaptics.error();

@@ -10,31 +10,31 @@
    ========================================================================= */
 
 :root {
-  --color-bg: #09090b;
-  --color-panel: #111114;
-  --color-surface: #17171b;
-  --color-grid: rgba(255, 255, 255, 0.07);
-  --color-text: #fafafa;
-  --color-secondary: #a1a1aa;
-  --color-muted: #71717a;
-  --color-accent: #ffffff;
-  --color-up: #fafafa;
-  --color-down: #71717a;
+  --color-bg: #08090d;
+  --color-panel: #0e1017;
+  --color-surface: #141722;
+  --color-grid: rgba(255, 255, 255, 0.08);
+  --color-text: #f8fafc;
+  --color-secondary: #94a3b8;
+  --color-muted: #64748b;
+  --color-accent: #38bdf8;
+  --color-up: #22c55e;
+  --color-down: #ef4444;
 }
 
 html.theme-light, body.theme-light, #root.theme-light {
-  --color-bg: #f7f6f3;
+  --color-bg: #f8fafc;
   --color-panel: #ffffff;
-  --color-surface: #f1f0ec;
-  --color-grid: rgba(0, 0, 0, 0.07);
-  --color-text: #111111;
-  --color-secondary: #555555;
-  --color-muted: #888888;
-  --color-accent: #111111;
-  --color-up: #111111;
-  --color-down: #888888;
-  background: #f7f6f3 !important;
-  color: #111111 !important;
+  --color-surface: #f1f5f9;
+  --color-grid: rgba(0, 0, 0, 0.08);
+  --color-text: #0f172a;
+  --color-secondary: #475569;
+  --color-muted: #64748b;
+  --color-accent: #0284c7;
+  --color-up: #16a34a;
+  --color-down: #dc2626;
+  background: #f8fafc !important;
+  color: #0f172a !important;
 }
 
 html, body, #root {
@@ -138,69 +138,70 @@ html.theme-light select option:checked {
    ========================================================================= */
 
 /* 1. Flat Crisp Card & Panel */
-.clay-card {
-  background: #111114;
+.clay-card, .clay-panel {
+  background: #0e1017;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 /* 2. Tactile Utilitarian Button */
 .clay-pill, .clay-btn {
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 5px;
-  color: #a1a1aa;
+  border-radius: 6px;
+  color: #94a3b8;
   font-weight: 500;
   box-shadow: none;
   transition: all 0.12s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .clay-pill:hover, .clay-btn:hover {
-  background: rgba(255, 255, 255, 0.07);
-  color: #fafafa;
-  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .clay-pill:active, .clay-btn:active {
   transform: scale(0.98);
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* 3. High-Contrast Active Button */
 .clay-pill-active, .clay-btn-active {
-  background: #ffffff !important;
-  color: #09090b !important;
+  background: #f8fafc !important;
+  color: #08090d !important;
   font-weight: 600 !important;
   border: 1px solid #ffffff !important;
-  border-radius: 5px !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15) !important;
 }
 
 /* 4. Recessed Inset Surface (Inputs, Scrubber bars) */
 .clay-inset {
-  background: #09090c;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 5px;
+  background: #08090e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
   box-shadow: none;
 }
 
 /* 5. Floating Dropdown Menu & Popover */
 .clay-popover {
-  background: #121216;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 7px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(14px);
+  background: #0f111a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(16px);
 }
 
 /* 6. Modal Dialog Container */
 .clay-modal {
-  background: #111114;
+  background: #0c0e15;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8);
+  border-radius: 12px;
+  box-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(20px);
 }
 
 /* 7. Tag / Status Badge */
@@ -208,7 +209,7 @@ html.theme-light select option:checked {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 4px;
-  color: #a1a1aa;
+  color: #94a3b8;
   font-weight: 500;
   box-shadow: none;
 }
@@ -234,59 +235,59 @@ kbd, .kbd {
    LIGHT THEME REFINED MINIMALIST OVERRIDES
    ========================================================================= */
 
-html.theme-light .clay-card {
+html.theme-light .clay-card,
+html.theme-light .clay-panel {
   background: #ffffff;
   border-color: rgba(0, 0, 0, 0.08);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  color: #111111;
+  color: #0f172a;
 }
 
 html.theme-light .clay-pill,
 html.theme-light .clay-btn {
-  background: #f7f6f3;
+  background: #f1f5f9;
   border-color: rgba(0, 0, 0, 0.08);
-  border-radius: 5px;
-  color: #555555;
+  border-radius: 6px;
+  color: #475569;
   box-shadow: none;
 }
 
 html.theme-light .clay-pill:hover,
 html.theme-light .clay-btn:hover {
-  background: #eeebe6;
-  color: #111111;
+  background: #e2e8f0;
+  color: #0f172a;
   border-color: rgba(0, 0, 0, 0.15);
 }
 
 html.theme-light .clay-pill-active,
 html.theme-light .clay-btn-active {
-  background: #111111 !important;
+  background: #0f172a !important;
   color: #ffffff !important;
-  border-color: #111111 !important;
-  border-radius: 5px !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) !important;
+  border-color: #0f172a !important;
+  border-radius: 6px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15) !important;
 }
 
 html.theme-light .clay-popover {
   background: #ffffff;
   border-color: rgba(0, 0, 0, 0.1);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  color: #111111;
-}
-
-html.theme-light .clay-inset {
-  background: #f1f0ec;
-  border-color: rgba(0, 0, 0, 0.08);
-  border-radius: 5px;
-  box-shadow: none;
-  color: #111111;
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.12);
+  color: #0f172a;
 }
 
 html.theme-light .clay-modal {
   background: #ffffff;
   border-color: rgba(0, 0, 0, 0.12);
-  border-radius: 10px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
-  color: #111111;
+  box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.15);
+  color: #0f172a;
+}
+
+html.theme-light .clay-inset {
+  background: #f8fafc;
+  border-color: rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  color: #0f172a;
+  box-shadow: none;
 }
 
 html.theme-light .clay-badge {

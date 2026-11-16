@@ -10,6 +10,7 @@ import type { DrawingItem } from './types';
 import { audioHaptics } from '../../utils/notify';
 import { useDrawingStore } from '../../store/useDrawingStore';
 import { drawingEvents } from './framework/DrawingEvents';
+import { safeJsonParse } from '../../utils/safeJson';
 
 interface ManageDrawingsModalProps {
   isOpen: boolean;
@@ -120,9 +121,9 @@ export default function ManageDrawingsModal({
   const handleApplyImport = () => {
     try {
       setImportError(null);
-      const parsed = JSON.parse(importJsonText);
+      const parsed = safeJsonParse(importJsonText, null);
       if (!Array.isArray(parsed)) {
-        throw new Error('Import data must be a JSON array of drawings.');
+        throw new Error('Import data must be a valid JSON array of drawings.');
       }
       audioHaptics.tick();
       persistDrawings(parsed);

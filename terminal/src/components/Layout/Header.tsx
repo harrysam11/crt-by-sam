@@ -36,6 +36,7 @@ interface HeaderProps {
   isPopoutActive?: boolean;
   terminalMode?: 'SIMPLE' | 'PRO';
   onToggleMode?: () => void;
+  onOpenLanding?: () => void;
 }
 
 export default function Header({
@@ -55,6 +56,7 @@ export default function Header({
   onOpenSettings,
   onTogglePopout,
   isPopoutActive,
+  onOpenLanding,
 }: HeaderProps) {
   const symbol = useTerminalStore((s) => s.symbol);
   const price = useTerminalStore((s) => s.currentPrice);
@@ -272,41 +274,48 @@ export default function Header({
   const displayPnl = hideDollar ? (open >= 0 ? '+Target Track' : '-Risk Zone') : fmtPnl(open);
 
   return (
-    <header className="relative flex h-11 shrink-0 items-center gap-2.5 border-b border-grid bg-panel px-3 select-none font-mono text-xs overflow-visible z-30">
+    <header className="relative flex h-11 shrink-0 items-center justify-between gap-2 border-b border-grid bg-panel px-2.5 sm:px-3 select-none font-mono text-xs z-30">
       {/* Daily Drawdown Progress Bar along top border */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-grid/30 overflow-hidden">
         <div
           className={`h-full transition-all duration-300 ${
-            drawdownPct > 80 ? 'bg-red-500' : drawdownPct > 50 ? 'bg-zinc-400' : 'bg-white'
+            drawdownPct > 80 ? 'bg-red-500' : drawdownPct > 50 ? 'bg-amber-400' : 'bg-emerald-500'
           }`}
           style={{ width: `${drawdownPct}%` }}
           title={`Daily Drawdown: $${realizedLossToday.toFixed(2)} / $${riskRules.maxDailyLoss} (${drawdownPct}%)`}
         />
       </div>
 
-      <div className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap min-w-0">
+      {/* Left Symbol & Price Cluster */}
+      <div className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap min-w-0 shrink-0">
         <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate">{labelOf(symbol)}</span>
-        <span className={`num text-xs sm:text-base font-semibold ${dir === 'up' ? 'text-white' : dir === 'down' ? 'text-zinc-500' : 'text-white'}`}>
+        <span className={`num text-xs sm:text-base font-bold transition-colors ${dir === 'up' ? 'text-up' : dir === 'down' ? 'text-down' : 'text-slate-100'}`}>
           {fmtPrice(price, symbol)}
         </span>
         <span className="text-xs text-muted font-medium hidden sm:inline">{inst?.currency}</span>
-        <span className="num text-[10px] sm:text-xs font-semibold text-white bg-white/5 px-1 sm:px-1.5 py-0.5 rounded-[4px] border border-white/10">{fmtPct(change)}</span>
+        <span className={`num text-[10px] sm:text-xs font-semibold px-1 sm:px-1.5 py-0.5 rounded-[4px] border ${
+          change >= 0
+            ? 'text-up bg-emerald-500/10 border-emerald-500/25'
+            : 'text-down bg-rose-500/10 border-rose-500/25'
+        }`}>
+          {fmtPct(change)}
+        </span>
         {marketOpen === false && <span className="clay-badge px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs text-zinc-400 hidden xs:inline">Closed</span>}
 
         {/* Kill-Switch alert badge */}
         {killSwitch.isLocked && (
-          <span className="rounded-[4px] bg-red-500/10 border border-red-500/30 px-2 py-0.5 text-[11px] font-semibold text-red-300">
+          <span className="rounded-[4px] bg-red-500/15 border border-red-500/40 px-2 py-0.5 text-[11px] font-bold text-red-300">
             [Locked]
           </span>
         )}
 
-        {/* Live Market Sessions & Killzones Pill */}
+        {/* Live Market Sessions & Killzones Pill (Responsive 2xl display to avoid collision) */}
         <button
           onClick={() => {
             audioHaptics.tick();
             onOpenSessions?.();
           }}
-          className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold border transition hidden xl:inline-flex items-center gap-1.5 cursor-pointer ${
+          className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold border transition hidden 2xl:inline-flex items-center gap-1.5 cursor-pointer ${
             sessionData.isLondonNyOverlap
               ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
               : sessionData.activeKillzones.filter(k => k.isActive).length > 0
@@ -326,7 +335,7 @@ export default function Header({
             sessionData.activeKillzones.filter(k => k.isActive).length > 0 ? 'bg-amber-400 animate-pulse' :
             sessionData.activeCount > 0 ? 'bg-cyan-400' : 'bg-zinc-500'
           }`} />
-          <span>
+          <span className="truncate max-w-[150px]">
             {sessionData.isLondonNyOverlap
               ? 'LON / NY [OVERLAP]'
               : sessionData.activeKillzones.filter(k => k.isActive).length > 0
@@ -345,7 +354,8 @@ export default function Header({
       {/* Breathing Guide Halo in Zen Mode */}
       <BreathingHalo />
 
-      <div className="ml-auto flex items-center gap-1.5 sm:gap-2 whitespace-nowrap">
+      {/* Right Controls & Tools Cluster */}
+      <div className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap min-w-0 justify-end">
         {/* Compact Account Capsule Pill & Detailed Popover */}
         <div className="relative" ref={accountRef}>
           <button
@@ -353,7 +363,7 @@ export default function Header({
               audioHaptics.tick();
               setIsAccountOpen((v) => !v);
             }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] border transition ${
+            className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-[6px] border transition ${
               isAccountOpen
                 ? 'border-white/40 bg-white/15 text-white'
                 : 'border-white/[0.08] bg-white/[0.03] hover:border-white/20 text-white'
@@ -367,8 +377,8 @@ export default function Header({
                 hideDollar
                   ? 'text-zinc-400 bg-white/5'
                   : open >= 0
-                  ? 'text-emerald-400 bg-emerald-500/10'
-                  : 'text-rose-400 bg-rose-500/10'
+                  ? 'text-up bg-emerald-500/10'
+                  : 'text-down bg-rose-500/10'
               }`}
             >
               {hideDollar ? '••••' : fmtPnl(open)}
@@ -384,7 +394,7 @@ export default function Header({
           </button>
 
           {isAccountOpen && (
-            <div className="absolute right-0 top-full mt-2 z-50 w-80 clay-popover p-3.5 shadow-2xl select-none font-mono text-xs space-y-3">
+            <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 z-50 w-80 max-w-[calc(100vw-24px)] clay-popover p-3.5 shadow-2xl select-none font-mono text-xs space-y-3">
               {/* Account Popover Header */}
               <div className="flex items-center justify-between border-b border-grid/60 pb-2">
                 <div className="flex items-center gap-1.5">
@@ -730,7 +740,7 @@ export default function Header({
           </div>
 
           {/* Multi-Chart Layout Dropdown (TradingView-Grade) */}
-          <div className="relative" ref={layoutRef}>
+          <div className="relative hidden 2xl:block" ref={layoutRef}>
             <button
               onClick={() => {
                 audioHaptics.tick();
@@ -900,7 +910,7 @@ export default function Header({
                 audioHaptics.tick();
                 onOpenGuardian();
               }}
-              className={`px-2 py-1 text-xs font-semibold rounded-[6px] border transition hidden md:flex items-center gap-1.5 ${
+              className={`px-2 py-1 text-xs font-semibold rounded-[6px] border transition hidden sm:flex items-center gap-1.5 ${
                 guardianEmergencyLocked
                   ? 'border-red-500/60 bg-red-500/20 text-red-400 animate-pulse'
                   : 'clay-btn text-white'
@@ -915,6 +925,23 @@ export default function Header({
             </button>
           )}
 
+          {/* Overview Landing Page Toggle */}
+          {onOpenLanding && (
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                onOpenLanding();
+              }}
+              className="clay-btn px-2 sm:px-2.5 py-1 text-xs font-semibold transition hidden lg:flex items-center gap-1 text-slate-300 hover:text-white"
+              title="Institutional Showcase & Platform Overview"
+            >
+              <svg className="h-3.5 w-3.5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              <span>Home</span>
+            </button>
+          )}
+
           {/* Settings & Account Center */}
           {onOpenSettings && (
             <button
@@ -922,7 +949,7 @@ export default function Header({
                 audioHaptics.tick();
                 onOpenSettings();
               }}
-              className="clay-btn px-2 sm:px-2.5 py-1 text-xs font-semibold transition hidden sm:flex items-center gap-1.5"
+              className="clay-btn px-2 sm:px-2.5 py-1 text-xs font-semibold transition hidden xl:flex items-center gap-1.5"
               title="Settings, Themes, Language & Notifications"
             >
               <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -965,7 +992,7 @@ export default function Header({
               const next = audioHaptics.toggleMute();
               setIsMuted(next);
             }}
-            className={`px-2 py-1 text-xs font-semibold rounded-[6px] border transition hidden sm:flex items-center gap-1 ${
+            className={`px-2 py-1 text-xs font-semibold rounded-[6px] border transition hidden 2xl:flex items-center gap-1 ${
               isMuted
                 ? 'border-rose-500/40 bg-rose-500/10 text-rose-400 hover:border-rose-500/60'
                 : 'clay-btn text-white'
@@ -982,7 +1009,7 @@ export default function Header({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
               </svg>
             )}
-            <span className="hidden lg:inline">{isMuted ? 'Muted' : 'Audio'}</span>
+            <span>{isMuted ? 'Muted' : 'Audio'}</span>
           </button>
 
           {/* Mini Popout Window */}
@@ -992,7 +1019,7 @@ export default function Header({
                 audioHaptics.tick();
                 onTogglePopout();
               }}
-              className={`px-2 py-1 text-xs font-semibold transition hidden lg:flex items-center gap-1 ${
+              className={`px-2 py-1 text-xs font-semibold transition hidden 2xl:flex items-center gap-1 ${
                 isPopoutActive ? 'clay-btn-active' : 'clay-btn'
               }`}
               title="Open Compact Pop-out Window (Picture-in-Picture)"
@@ -1010,7 +1037,7 @@ export default function Header({
                 audioHaptics.tick();
                 onOpenHotkeys();
               }}
-              className="clay-btn px-2 py-0.5 font-bold text-muted hover:text-white hidden xl:inline-block"
+              className="clay-btn px-2 py-0.5 font-bold text-muted hover:text-white hidden 2xl:inline-block"
               title="Keyboard Shortcuts Cheatsheet (?)"
             >
               [?]
@@ -1033,7 +1060,7 @@ export default function Header({
           )}
 
           {/* Responsive Mobile / Tablet Overflow Menu */}
-          <div className="relative xl:hidden" ref={overflowRef}>
+          <div className="relative 2xl:hidden" ref={overflowRef}>
             <button
               onClick={() => {
                 audioHaptics.tick();
@@ -1074,6 +1101,29 @@ export default function Header({
                       </div>
                     </div>
                     <span className="text-[10px] font-bold text-white bg-white/10 px-1.5 py-0.5 rounded">PRO+</span>
+                  </button>
+                )}
+
+                {/* Overview Landing Page in Overflow */}
+                {onOpenLanding && (
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      onOpenLanding();
+                      setIsOverflowOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <svg className="h-4 w-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                      </svg>
+                      <div>
+                        <span className="font-bold text-white block">Home / Landing Page</span>
+                        <span className="text-[9px] text-muted">Platform Overview & Showcase</span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded">VIEW</span>
                   </button>
                 )}
 
@@ -1325,15 +1375,6 @@ export default function Header({
           </button>
         )}
 
-        {/* Trading Mode Badge (Desktop) */}
-        <span
-          className={`clay-badge px-2 py-0.5 text-[10px] font-bold hidden xl:inline-block ${
-            tradingMode === 'LIVE' ? 'text-red-400 border-red-500/30' : 'text-zinc-400'
-          }`}
-          title={tradingMode === 'PAPER' ? 'Paper Trading: simulated capital' : 'LIVE mode: real broker orders'}
-        >
-          [{tradingMode}]
-        </span>
 
         {/* WebSocket Latency Ping Meter (Desktop with Click-to-Reconnect) */}
         <button
