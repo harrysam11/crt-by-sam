@@ -5,8 +5,43 @@
 
 class AudioHapticsEngine {
   private ctx: AudioContext | null = null;
+  private muted: boolean = false;
+  private listeners: Set<(muted: boolean) => void> = new Set();
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      try {
+        this.muted = localStorage.getItem('crt_sound_muted') === 'true';
+      } catch {}
+    }
+  }
+
+  isMuted(): boolean {
+    return this.muted;
+  }
+
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    try {
+      localStorage.setItem('crt_sound_muted', String(muted));
+    } catch {}
+    this.listeners.forEach((fn) => fn(muted));
+  }
+
+  toggleMute(): boolean {
+    this.setMuted(!this.muted);
+    return this.muted;
+  }
+
+  subscribeMute(fn: (muted: boolean) => void): () => void {
+    this.listeners.add(fn);
+    return () => {
+      this.listeners.delete(fn);
+    };
+  }
 
   private getContext(): AudioContext | null {
+    if (this.muted) return null;
     if (!this.ctx && typeof window !== 'undefined') {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (AudioCtx) {
@@ -21,6 +56,7 @@ class AudioHapticsEngine {
 
   /** Ultra-crisp click/tick when placing order or tapping hotkey */
   tick(): void {
+    if (this.muted) return;
     try {
       const ctx = this.getContext();
       if (!ctx) return;
@@ -41,6 +77,7 @@ class AudioHapticsEngine {
 
   /** Smooth two-tone chord on successful fill */
   fill(): void {
+    if (this.muted) return;
     try {
       const ctx = this.getContext();
       if (!ctx) return;
@@ -64,6 +101,7 @@ class AudioHapticsEngine {
 
   /** Upward arpeggio on profit target hit or win */
   win(): void {
+    if (this.muted) return;
     try {
       const ctx = this.getContext();
       if (!ctx) return;
@@ -87,6 +125,7 @@ class AudioHapticsEngine {
 
   /** Low rejection or risk limit violation buzz */
   error(): void {
+    if (this.muted) return;
     try {
       const ctx = this.getContext();
       if (!ctx) return;
@@ -107,6 +146,7 @@ class AudioHapticsEngine {
 
   /** High-priority three-tone chime for price, indicator, or drawing alerts */
   alert(): void {
+    if (this.muted) return;
     try {
       const ctx = this.getContext();
       if (!ctx) return;

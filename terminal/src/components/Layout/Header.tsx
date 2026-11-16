@@ -10,6 +10,8 @@ import { audioHaptics } from '../../utils/notify';
 import { loadTelegramConfig } from '../../services/telegramService';
 import { useLayoutStore, type ChartGridLayout } from '../../store/useLayoutStore';
 import { useDrawingStore } from '../../store/useDrawingStore';
+import { computeActiveSessions } from '../../services/marketSessions';
+import { wsManager } from '../../services/websocket';
 
 const DOT = { open: 'bg-up', connecting: 'bg-yellow-400', reconnecting: 'bg-yellow-400', closed: 'bg-down' } as const;
 
@@ -151,6 +153,21 @@ export default function Header({
     return () => clearInterval(id);
   }, [status]);
 
+  // Global Sound Haptics Mute State
+  const [isMuted, setIsMuted] = useState(() => audioHaptics.isMuted());
+  useEffect(() => {
+    return audioHaptics.subscribeMute((m) => setIsMuted(m));
+  }, []);
+
+  // Institutional Market Sessions & Killzones Real-Time Engine
+  const [sessionData, setSessionData] = useState(() => computeActiveSessions());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSessionData(computeActiveSessions());
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Session Opening Countdown (Tokyo 00:00, London 08:00, New York 13:30 UTC)
   const [sessionInfo, setSessionInfo] = useState({ name: 'London', remaining: '2h 15m' });
   useEffect(() => {
@@ -267,13 +284,42 @@ export default function Header({
           </span>
         )}
 
-        {/* Session Opening Countdown */}
-        <span
-          className="clay-badge px-2 py-0.5 text-[10px] text-zinc-300 hidden xl:inline-block"
-          title={`Time until ${sessionInfo.name} session open`}
+        {/* Live Market Sessions & Killzones Pill */}
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            onOpenSessions?.();
+          }}
+          className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold border transition hidden xl:inline-flex items-center gap-1.5 cursor-pointer ${
+            sessionData.isLondonNyOverlap
+              ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+              : sessionData.activeKillzones.length > 0
+              ? 'border-amber-500/50 bg-amber-500/15 text-amber-300'
+              : sessionData.activeCount > 0
+              ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300'
+              : 'clay-badge text-zinc-400'
+          }`}
+          title={
+            `Active Sessions: ${sessionData.sessions.filter(s => s.isActive).map(s => s.name).join(', ') || 'Inter-Session'}` +
+            (sessionData.activeKillzones.length > 0 ? ` | Killzone: ${sessionData.activeKillzones.map(k => k.name).join(', ')}` : '') +
+            ` (UTC ${sessionData.currentUtcTimeString}) - Click to open Sessions & DB Backup`
+          }
         >
-          {sessionInfo.name}: {sessionInfo.remaining}
-        </span>
+          <span className={`h-1.5 w-1.5 rounded-full ${
+            sessionData.isLondonNyOverlap ? 'bg-emerald-400 animate-pulse' :
+            sessionData.activeKillzones.length > 0 ? 'bg-amber-400 animate-pulse' :
+            sessionData.activeCount > 0 ? 'bg-cyan-400' : 'bg-zinc-500'
+          }`} />
+          <span>
+            {sessionData.isLondonNyOverlap
+              ? 'LON / NY [OVERLAP]'
+              : sessionData.activeKillzones.length > 0
+              ? `${sessionData.activeKillzones[0].name.toUpperCase()}`
+              : sessionData.sessions.find(s => s.isActive)
+              ? `${sessionData.sessions.find(s => s.isActive)?.name.toUpperCase()}`
+              : `${sessionInfo.name}: ${sessionInfo.remaining}`}
+          </span>
+        </button>
       </div>
 
       {/* Breathing Guide Halo in Zen Mode */}
@@ -781,6 +827,32 @@ export default function Header({
             </button>
           )}
 
+          {/* Sound Mute / Unmute Toggle Button */}
+          <button
+            onClick={() => {
+              const next = audioHaptics.toggleMute();
+              setIsMuted(next);
+            }}
+            className={`px-2 py-1 text-xs font-semibold rounded-[6px] border transition hidden sm:flex items-center gap-1 ${
+              isMuted
+                ? 'border-rose-500/40 bg-rose-500/10 text-rose-400 hover:border-rose-500/60'
+                : 'clay-btn text-white'
+            }`}
+            title={isMuted ? 'Sound Muted (Alt+U to unmute)' : 'Sound Enabled (Alt+U to mute)'}
+          >
+            {isMuted ? (
+              <svg className="h-3.5 w-3.5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+              </svg>
+            ) : (
+              <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+              </svg>
+            )}
+            <span className="hidden lg:inline">{isMuted ? 'Muted' : 'Audio'}</span>
+          </button>
+
           {/* Mini Popout Window */}
           {onTogglePopout && (
             <button
@@ -997,6 +1069,31 @@ export default function Header({
                     </button>
                   )}
 
+                  <button
+                    onClick={() => {
+                      const next = audioHaptics.toggleMute();
+                      setIsMuted(next);
+                    }}
+                    className="flex w-full items-center justify-between px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                  >
+                    <div className="flex items-center gap-2">
+                      {isMuted ? (
+                        <svg className="h-4 w-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                        </svg>
+                      ) : (
+                        <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                        </svg>
+                      )}
+                      <span>Audio Haptics</span>
+                    </div>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isMuted ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                      {isMuted ? 'MUTED' : 'ENABLED'}
+                    </span>
+                  </button>
+
                   {/* Multi-Chart Grid Layout Picker for Mobile */}
                   <div className="border-t border-grid/60 pt-2 mt-1">
                     <span className="text-[10px] uppercase font-bold text-muted block mb-1 px-1">
@@ -1059,15 +1156,19 @@ export default function Header({
           [SANDBOX]
         </span>
 
-        {/* WebSocket Latency Ping Meter (Desktop) */}
-        <span
-          className="hidden 2xl:flex items-center gap-1.5 text-[11px] text-muted border-l border-grid pl-2"
-          title={`WebSocket Connection Health: ${status} | Ping: ${pingMs}ms`}
+        {/* WebSocket Latency Ping Meter (Desktop with Click-to-Reconnect) */}
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            wsManager.forceReconnect();
+          }}
+          className="hidden 2xl:flex items-center gap-1.5 text-[11px] text-muted border-l border-grid pl-2 hover:text-white transition cursor-pointer"
+          title={`WebSocket Status: ${status} | Ping: ${pingMs}ms. Click to force-reconnect feed.`}
         >
           <span className={`h-2 w-2 rounded-full ${DOT[feed]}`} />
           <span>{feedText}</span>
           {pingMs > 0 && <span className="text-white font-bold">{pingMs}ms</span>}
-        </span>
+        </button>
       </div>
     </header>
   );

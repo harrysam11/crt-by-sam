@@ -53,6 +53,15 @@ class WebSocketManager {
     this.setStatus('closed');
   }
 
+  /** Force immediate reconnection cycle (useful for recovering stalled sockets) */
+  forceReconnect(): void {
+    this.killSocket();
+    this.clearReconnect();
+    this.setStatus('reconnecting');
+    this.attempts = 0;
+    this.open();
+  }
+
   subscribe(streams: string[]): void {
     const fresh = streams.filter((s) => !this.streams.has(s));
     fresh.forEach((s) => this.streams.add(s));

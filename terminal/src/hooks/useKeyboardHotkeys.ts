@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useTerminalStore } from '../store/useTerminalStore';
 import { usePsychologyStore } from '../store/usePsychologyStore';
+import { useLayoutStore } from '../store/useLayoutStore';
 import { audioHaptics } from '../utils/notify';
 import type { Timeframe } from '../types/terminal';
 import { drawingEvents } from '../components/drawing/framework/DrawingEvents';
@@ -121,6 +122,44 @@ export function useKeyboardHotkeys({ onOpenCheatsheet }: UseKeyboardHotkeysProps
         if (typeof openCal === 'function') openCal();
         return;
       }
+      // Hotkey: Alt+U -> Toggle Audio Haptics Mute
+      if (e.altKey && (e.key === 'u' || e.key === 'U')) {
+        e.preventDefault();
+        audioHaptics.toggleMute();
+        return;
+      }
+      // Hotkeys: Alt+1..4 -> Multi-Chart Grid Layouts (1x1, 1x2, 2x1, 2x2)
+      if (e.altKey && e.key === '1') {
+        e.preventDefault();
+        audioHaptics.tick();
+        useLayoutStore.getState().setLayout('1x1');
+        return;
+      }
+      if (e.altKey && e.key === '2') {
+        e.preventDefault();
+        audioHaptics.tick();
+        useLayoutStore.getState().setLayout('1x2');
+        return;
+      }
+      if (e.altKey && e.key === '3') {
+        e.preventDefault();
+        audioHaptics.tick();
+        useLayoutStore.getState().setLayout('2x1');
+        return;
+      }
+      if (e.altKey && e.key === '4') {
+        e.preventDefault();
+        audioHaptics.tick();
+        useLayoutStore.getState().setLayout('2x2');
+        return;
+      }
+      // Hotkey: Alt+M or Alt+Enter -> Maximize / Restore Active Chart
+      if (e.altKey && (e.key === 'm' || e.key === 'M' || e.key === 'Enter')) {
+        e.preventDefault();
+        audioHaptics.tick();
+        useLayoutStore.getState().toggleChartMaximized();
+        return;
+      }
 
       // Hotkey: Space / Shift+Space -> Cycle through Watchlist symbols
       if (e.key === ' ' && !e.ctrlKey && !e.altKey && !e.metaKey) {
@@ -143,8 +182,8 @@ export function useKeyboardHotkeys({ onOpenCheatsheet }: UseKeyboardHotkeysProps
         return;
       }
 
-      // Hotkeys: 1-5 or H -> Timeframes
-      if (TF_KEYS[e.key]) {
+      // Hotkeys: 1-5 or H -> Timeframes (only when Alt / Ctrl / Meta not pressed)
+      if (!e.altKey && !e.ctrlKey && !e.metaKey && TF_KEYS[e.key]) {
         e.preventDefault();
         audioHaptics.tick();
         setTimeframe(TF_KEYS[e.key]);

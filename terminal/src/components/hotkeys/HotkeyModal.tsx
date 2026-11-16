@@ -27,6 +27,27 @@ export default function HotkeyModal({ isOpen, onClose }: HotkeyModalProps) {
       ],
     },
     {
+      title: 'Multi-Chart Layouts & Views',
+      keys: [
+        { key: 'Alt + 1', desc: 'Single Chart layout (1x1 full size)' },
+        { key: 'Alt + 2', desc: 'Dual Split Chart layout (1x2 side-by-side)' },
+        { key: 'Alt + 3', desc: 'Dual Stacked Chart layout (2x1 stacked)' },
+        { key: 'Alt + 4', desc: 'Quad Grid Chart layout (2x2 quad screen)' },
+        { key: 'Alt + M / Alt + Enter', desc: 'Maximize or Restore active chart' },
+        { key: 'Alt + R', desc: 'Reset chart scale & auto-fit price action' },
+      ],
+    },
+    {
+      title: 'Tools & Utilities',
+      keys: [
+        { key: 'Alt + S', desc: 'Open Multi-Asset Market Screener' },
+        { key: 'Alt + E', desc: 'Open Global Macro Economic Calendar' },
+        { key: 'Alt + A', desc: 'Create Price Alert modal' },
+        { key: 'Alt + U', desc: 'Mute / Unmute Audio Haptics & Sound' },
+        { key: 'Alt + T / H / V', desc: 'Select Trendline / Horizontal / Vertical Line tool' },
+      ],
+    },
+    {
       title: 'Psychology & System',
       keys: [
         { key: 'Alt + Z', desc: 'Toggle Zen Stream Mode (PnL Obfuscation & Box Breathing)' },
