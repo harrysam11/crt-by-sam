@@ -121,6 +121,9 @@ export type SupportedBroker =
   | 'METATRADER_5'
   | 'TRADOVATE'
   | 'INTERACTIVE_BROKERS'
+  | 'ZERODHA_KITE'
+  | 'DHAN'
+  | 'ANGEL_ONE'
   | 'DELTA_EXCHANGE'
   | 'BINANCE'
   | 'BYBIT'
@@ -137,6 +140,9 @@ export interface ApiCredentials {
   gatewayUrl?: string;
   appId?: string;
   accountNumber?: string;
+  totpSecret?: string;
+  propFirmShieldEnabled?: boolean;
+  propFirmDailyLossPct?: number;
 }
 
 const VAULT_STORAGE_KEY = 'crt_secure_vault_v1';

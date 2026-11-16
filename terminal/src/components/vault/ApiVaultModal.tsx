@@ -27,6 +27,8 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
   const [server, setServer] = useState('MetaQuotes-Demo');
   const [gatewayUrl, setGatewayUrl] = useState('ws://127.0.0.1:8765');
   const [appId, setAppId] = useState('CRT-Terminal');
+  const [totpSecret, setTotpSecret] = useState('');
+  const [propFirmShieldEnabled, setPropFirmShieldEnabled] = useState(true);
 
   const [activeTab, setActiveTab] = useState<'CONNECT' | 'STATUS' | 'GUIDE'>('CONNECT');
   const [unlockPassword, setUnlockPassword] = useState('');
@@ -54,6 +56,9 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
         gatewayUrl: gatewayUrl.trim(),
         appId: appId.trim(),
         accountNumber: accountNumber.trim(),
+        totpSecret: totpSecret.trim(),
+        propFirmShieldEnabled,
+        propFirmDailyLossPct: 4.5,
       };
 
       const encrypted = await encryptSecret(JSON.stringify(payload), password);
@@ -201,6 +206,9 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
                         <option value="METATRADER_5">MetaTrader 5 (MT5 Bridge Gateway)</option>
                         <option value="TRADOVATE">Tradovate (CME Futures Direct)</option>
                         <option value="INTERACTIVE_BROKERS">Interactive Brokers (IBKR TWS)</option>
+                        <option value="ZERODHA_KITE">Zerodha Kite (NSE/BSE Equities & F&O)</option>
+                        <option value="DHAN">Dhan HQ (NSE/BSE/MCX Direct API)</option>
+                        <option value="ANGEL_ONE">Angel One SmartAPI (Nifty & Bank Nifty)</option>
                         <option value="DELTA_EXCHANGE">Delta Exchange (Options & Futures)</option>
                         <option value="BINANCE">Binance Futures (Perp USDT)</option>
                         <option value="BYBIT">Bybit Perpetuals</option>
@@ -358,6 +366,151 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
                     </div>
                   )}
 
+                  {broker === 'ZERODHA_KITE' && (
+                    <div className="space-y-3 border-t border-grid/50 pt-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            Zerodha User ID / Client Code
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. AB1234"
+                            value={accountNumber}
+                            onChange={(e) => setAccountNumber(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            Kite API Key
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Kite Connect API Key"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            Kite API Secret
+                          </label>
+                          <input
+                            type="password"
+                            placeholder="API Secret"
+                            value={apiSecret}
+                            onChange={(e) => setApiSecret(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            Daily Request Token
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Request token from login redirect"
+                            value={server}
+                            onChange={(e) => setServer(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {broker === 'DHAN' && (
+                    <div className="space-y-3 border-t border-grid/50 pt-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            Dhan Client ID
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 1000123456"
+                            value={accountNumber}
+                            onChange={(e) => setAccountNumber(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            Dhan HQ Access Token (JWT)
+                          </label>
+                          <input
+                            type="password"
+                            placeholder="Paste Dhan HQ Access Token"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {broker === 'ANGEL_ONE' && (
+                    <div className="space-y-3 border-t border-grid/50 pt-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            Angel One Client Code
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. A123456"
+                            value={accountNumber}
+                            onChange={(e) => setAccountNumber(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            SmartAPI Key
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="SmartAPI Key"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            Trading PIN / Password
+                          </label>
+                          <input
+                            type="password"
+                            placeholder="Trading PIN"
+                            value={apiSecret}
+                            onChange={(e) => setApiSecret(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            TOTP Secret Key (2FA)
+                          </label>
+                          <input
+                            type="password"
+                            placeholder="TOTP Secret key"
+                            value={totpSecret}
+                            onChange={(e) => setTotpSecret(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {['DELTA_EXCHANGE', 'BINANCE', 'BYBIT', 'OANDA', 'CUSTOM'].includes(broker) && (
                     <div className="space-y-3 border-t border-grid/50 pt-3">
                       <div>
@@ -386,6 +539,31 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* Prop Firm Rule Compliance Shield Guardrail */}
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] space-y-1.5 border-t border-grid/50 pt-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-amber-400" />
+                        <span className="font-bold text-white uppercase">Prop Firm Rule Compliance Shield</span>
+                      </div>
+                      <label className="flex items-center gap-1.5 text-[10px] cursor-pointer text-amber-300">
+                        <input
+                          type="checkbox"
+                          checked={propFirmShieldEnabled}
+                          onChange={(e) => setPropFirmShieldEnabled(e.target.checked)}
+                          className="rounded bg-black border-grid text-white focus:ring-0"
+                        />
+                        <span>Shield Active (4.5% Buffer)</span>
+                      </label>
+                    </div>
+                    <p className="text-slate-300 leading-relaxed text-[10px]">
+                      Automated Daily Loss Lockout: If session loss exceeds 4.5% of starting capital, terminal automatically locks execution to protect your FTMO / FundedNext / Prop Firm account from the 5% max daily loss breach rule.
+                    </p>
+                    <p className="text-zinc-400 text-[9px]">
+                      Notice: FTMO and FundedNext permit standard local MT5 bridges. If your firm restricts third-party EAs, use direct broker login.
+                    </p>
+                  </div>
 
                   {/* Encryption Passphrase */}
                   <div className="border-t border-grid/50 pt-3">

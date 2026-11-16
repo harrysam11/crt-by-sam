@@ -88,6 +88,10 @@ export default function Header({
   const instToolsRef = useRef<HTMLDivElement>(null);
   const [isLayoutOpen, setIsLayoutOpen] = useState(false);
   const layoutRef = useRef<HTMLDivElement>(null);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const [isOverflowOpen, setIsOverflowOpen] = useState(false);
+  const overflowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -98,14 +102,22 @@ export default function Header({
       if (layoutRef.current && !layoutRef.current.contains(target)) {
         setIsLayoutOpen(false);
       }
+      if (accountRef.current && !accountRef.current.contains(target)) {
+        setIsAccountOpen(false);
+      }
+      if (overflowRef.current && !overflowRef.current.contains(target)) {
+        setIsOverflowOpen(false);
+      }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsInstToolsOpen(false);
         setIsLayoutOpen(false);
+        setIsAccountOpen(false);
+        setIsOverflowOpen(false);
       }
     };
-    if (isInstToolsOpen || isLayoutOpen) {
+    if (isInstToolsOpen || isLayoutOpen || isAccountOpen || isOverflowOpen) {
       window.addEventListener('mousedown', handleClickOutside);
       window.addEventListener('keydown', handleKeyDown);
     }
@@ -113,7 +125,7 @@ export default function Header({
       window.removeEventListener('mousedown', handleClickOutside);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isInstToolsOpen, isLayoutOpen]);
+  }, [isInstToolsOpen, isLayoutOpen, isAccountOpen, isOverflowOpen]);
 
   // Colour the price by tick direction
   const prev = useRef(price);
@@ -264,47 +276,173 @@ export default function Header({
       {/* Breathing Guide Halo in Zen Mode */}
       <BreathingHalo />
 
-      <div className="ml-auto flex items-center gap-2 whitespace-nowrap">
-        <Stat label="Balance" value={displayBalance} />
-        <Stat label="Equity" value={displayEquity} />
-        <Stat
-          label="HWM"
-          value={displayHwm}
-          sub={!hideDollar && hwmDrawdown > 0 ? `-${fmtUsd(hwmDrawdown)}` : undefined}
-        />
-        <Stat label="Open PnL" value={displayPnl} cls={hideDollar ? 'text-zinc-300' : pnlClass(open)} />
-
-        {/* Session PnL Sparkline Header */}
-        {sparklinePoints && (
-          <div className="hidden sm:flex flex-col items-center">
-            <span className="text-[9px] text-muted">Session</span>
-            <svg width="48" height="14" className="overflow-visible">
-              <polyline
-                fill="none"
-                stroke={open >= 0 ? '#ffffff' : '#71717a'}
-                strokeWidth="1.5"
-                points={sparklinePoints}
-              />
+      <div className="ml-auto flex items-center gap-1.5 sm:gap-2 whitespace-nowrap">
+        {/* Compact Account Capsule Pill & Detailed Popover */}
+        <div className="relative" ref={accountRef}>
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setIsAccountOpen((v) => !v);
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] border transition ${
+              isAccountOpen
+                ? 'border-white/40 bg-white/15 text-white'
+                : 'border-white/[0.08] bg-white/[0.03] hover:border-white/20 text-white'
+            }`}
+            title="Click to view Account Health, Prop Firm Shield & Drawdown"
+          >
+            <span className="text-[10px] text-muted font-medium">Eq</span>
+            <span className="font-bold text-xs">{displayEquity}</span>
+            <span
+              className={`text-[10px] font-semibold px-1 py-0.5 rounded ${
+                hideDollar
+                  ? 'text-zinc-400 bg-white/5'
+                  : open >= 0
+                  ? 'text-emerald-400 bg-emerald-500/10'
+                  : 'text-rose-400 bg-rose-500/10'
+              }`}
+            >
+              {hideDollar ? '••••' : fmtPnl(open)}
+            </span>
+            <svg
+              className={`h-3 w-3 text-muted transition-transform ${isAccountOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
-          </div>
-        )}
+          </button>
+
+          {isAccountOpen && (
+            <div className="absolute right-0 top-full mt-2 z-50 w-80 clay-popover p-3.5 shadow-2xl select-none font-mono text-xs space-y-3">
+              {/* Account Popover Header */}
+              <div className="flex items-center justify-between border-b border-grid/60 pb-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-accent" />
+                  <span className="font-bold text-white text-[11px] uppercase tracking-wider">Account & Prop Shield</span>
+                </div>
+                <button
+                  onClick={() => setIsMasked((v) => !v)}
+                  className="text-[10px] text-muted hover:text-white px-1.5 py-0.5 rounded border border-grid/60 transition"
+                  title="Toggle Stealth Mode Mask"
+                >
+                  {isMasked ? 'Unmask' : 'Mask'}
+                </button>
+              </div>
+
+              {/* 4 Key Metrics in compact 2x2 grid */}
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="p-2 rounded bg-white/[0.02] border border-grid/50">
+                  <span className="text-[9px] uppercase text-muted block">Wallet Balance</span>
+                  <span className="font-bold text-white mt-0.5 block">{displayBalance}</span>
+                </div>
+                <div className="p-2 rounded bg-white/[0.02] border border-grid/50">
+                  <span className="text-[9px] uppercase text-muted block">Net Equity</span>
+                  <span className="font-bold text-white mt-0.5 block">{displayEquity}</span>
+                </div>
+                <div className="p-2 rounded bg-white/[0.02] border border-grid/50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] uppercase text-muted">HWM Peak</span>
+                    {!hideDollar && hwmDrawdown > 0 && (
+                      <span className="text-[9px] text-zinc-400">-{fmtUsd(hwmDrawdown)}</span>
+                    )}
+                  </div>
+                  <span className="font-bold text-white mt-0.5 block">{displayHwm}</span>
+                </div>
+                <div className="p-2 rounded bg-white/[0.02] border border-grid/50">
+                  <span className="text-[9px] uppercase text-muted block">Open PnL</span>
+                  <span className={`font-bold mt-0.5 block ${hideDollar ? 'text-zinc-300' : pnlClass(open)}`}>
+                    {displayPnl}
+                  </span>
+                </div>
+              </div>
+
+              {/* Prop Firm Rule Compliance Shield Status */}
+              <div className="p-2.5 rounded-lg border border-grid/60 bg-white/[0.01] space-y-1.5">
+                <div className="flex items-center justify-between text-[10px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`h-1.5 w-1.5 rounded-full ${riskRules.propFirmShieldEnabled ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
+                    <span className="font-bold text-white">
+                      {riskRules.propFirmShieldEnabled ? `Prop Firm Shield (${riskRules.propFirmDailyLossPct}% Guardrail)` : 'Standard Risk Guardrail'}
+                    </span>
+                  </div>
+                  <span className={`font-semibold ${drawdownPct > 80 ? 'text-rose-400' : drawdownPct > 50 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {drawdownPct}% Used
+                  </span>
+                </div>
+
+                {/* Progress bar */}
+                <div className="h-1.5 w-full bg-grid/40 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all ${
+                      drawdownPct > 80 ? 'bg-rose-500' : drawdownPct > 50 ? 'bg-amber-400' : 'bg-emerald-400'
+                    }`}
+                    style={{ width: `${Math.min(100, drawdownPct)}%` }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-[9px] text-muted">
+                  <span>Today's Loss: {fmtUsd(realizedLossToday)}</span>
+                  <span>Safety Buffer: {fmtUsd(Math.max(0, riskRules.maxDailyLoss - realizedLossToday))}</span>
+                </div>
+              </div>
+
+              {/* Session Sparkline */}
+              {sparklinePoints && (
+                <div className="p-2 rounded border border-grid/50 bg-white/[0.02] flex items-center justify-between">
+                  <span className="text-[10px] text-muted">Session Curve</span>
+                  <svg width="120" height="18" className="overflow-visible">
+                    <polyline
+                      fill="none"
+                      stroke={open >= 0 ? '#34d399' : '#f87171'}
+                      strokeWidth="1.5"
+                      points={sparklinePoints}
+                    />
+                  </svg>
+                </div>
+              )}
+
+              {/* Quick links */}
+              <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-grid/60">
+                {onOpenRiskManager && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenRiskManager(); setIsAccountOpen(false); }}
+                    className="clay-btn py-1 text-center font-bold text-[11px] text-white"
+                  >
+                    Risk Manager
+                  </button>
+                )}
+                {onOpenVault && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenVault(); setIsAccountOpen(false); }}
+                    className="clay-btn py-1 text-center font-bold text-[11px] text-white"
+                  >
+                    Broker Vault
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Feature Toggles Cluster */}
-        <div className="flex items-center gap-1.5 border-l border-grid pl-2">
+        <div className="flex items-center gap-1 sm:gap-1.5 border-l border-grid pl-1.5 sm:pl-2">
           {/* Zen Mode Button */}
           <button
             onClick={() => {
               audioHaptics.tick();
               toggleZenMode();
             }}
-            className={`px-2.5 py-1 text-xs font-semibold transition ${
+            className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 text-xs font-semibold transition ${
               zenMode.active
                 ? 'clay-pill-active'
                 : 'clay-pill'
             }`}
             title="Toggle Zen Mode (Alt+Z)"
           >
-            Zen {zenMode.active ? 'ON' : 'OFF'}
+            <span className={`h-1.5 w-1.5 rounded-full ${zenMode.active ? 'bg-black' : 'bg-zinc-500'}`} />
+            <span>Zen</span>
           </button>
 
           {/* Institutional Suite Dropdown */}
@@ -314,17 +452,17 @@ export default function Header({
                 audioHaptics.tick();
                 setIsInstToolsOpen((v) => !v);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold transition ${
+              className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 text-xs font-semibold transition ${
                 isInstToolsOpen
                   ? 'clay-pill-active'
                   : 'clay-pill'
               }`}
-              title="Institutional Analytics & Derivatives Suite"
+              title="Institutional Analytics & Tools Suite"
             >
               <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
-              <span>Institutional</span>
+              <span className="hidden sm:inline">Tools</span>
               <svg className={`h-3 w-3 text-slate-400 transition-transform ${isInstToolsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -442,7 +580,7 @@ export default function Header({
                 audioHaptics.tick();
                 setIsLayoutOpen((v) => !v);
               }}
-              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold transition ${
+              className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 text-xs font-semibold transition ${
                 isLayoutOpen || layout !== '1x1' ? 'clay-btn-active' : 'clay-btn'
               }`}
               title="Multi-Chart Layouts & Synchronization"
@@ -450,7 +588,8 @@ export default function Header({
               <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
               </svg>
-              <span>Layout ({layout})</span>
+              <span className="hidden sm:inline">Grid:</span>
+              <span>{layout}</span>
               <svg className={`h-3 w-3 text-slate-400 transition-transform ${isLayoutOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -588,10 +727,14 @@ export default function Header({
                 audioHaptics.tick();
                 onOpenSettings();
               }}
-              className="clay-btn px-2.5 py-1 text-xs font-semibold transition"
-              title="Settings, Billing, Theme & Telegram Notifications"
+              className="clay-btn px-2 sm:px-2.5 py-1 text-xs font-semibold transition hidden sm:flex items-center gap-1.5"
+              title="Settings, Themes, Language & Notifications"
             >
-              Settings
+              <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span className="hidden md:inline">Settings</span>
             </button>
           )}
 
@@ -602,12 +745,14 @@ export default function Header({
                 audioHaptics.tick();
                 onTogglePopout();
               }}
-              className={`px-2.5 py-1 text-xs font-semibold transition ${
+              className={`px-2 py-1 text-xs font-semibold transition hidden lg:flex items-center gap-1 ${
                 isPopoutActive ? 'clay-btn-active' : 'clay-btn'
               }`}
               title="Open Compact Pop-out Window (Picture-in-Picture)"
             >
-              Popout
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
             </button>
           )}
 
@@ -618,7 +763,7 @@ export default function Header({
                 audioHaptics.tick();
                 onOpenHotkeys();
               }}
-              className="clay-btn px-2 py-0.5 font-bold text-muted hover:text-white"
+              className="clay-btn px-2 py-0.5 font-bold text-muted hover:text-white hidden xl:inline-block"
               title="Keyboard Shortcuts Cheatsheet (?)"
             >
               [?]
@@ -632,44 +777,158 @@ export default function Header({
                 audioHaptics.tick();
                 onOpenSettings('PROFILE');
               }}
-              className="clay-pill-active px-2.5 py-0.5 text-xs font-bold transition flex items-center gap-1.5"
+              className="clay-pill-active px-2.5 py-0.5 text-xs font-bold transition hidden xl:flex items-center gap-1.5"
               title="Open Trader Profile & Subscription Details"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-black" />
               <span>PA [PRO+]</span>
             </button>
           )}
+
+          {/* Responsive Mobile / Tablet Overflow Menu */}
+          <div className="relative xl:hidden" ref={overflowRef}>
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setIsOverflowOpen((v) => !v);
+              }}
+              className={`p-1.5 rounded-[6px] border transition flex items-center justify-center ${
+                isOverflowOpen ? 'clay-pill-active' : 'clay-btn text-white'
+              }`}
+              title="Terminal Operations & Quick Access"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+              </svg>
+            </button>
+
+            {isOverflowOpen && (
+              <div className="absolute right-0 top-full mt-2 z-50 w-72 clay-popover p-3 shadow-2xl select-none font-mono text-xs space-y-2.5">
+                <div className="flex items-center justify-between border-b border-grid/60 pb-2">
+                  <span className="text-[10px] uppercase font-bold text-muted">Terminal Quick Menu</span>
+                  <span className="text-[10px] text-zinc-400">Mobile / Tablet</span>
+                </div>
+
+                {/* Profile Pill in Overflow */}
+                {onOpenSettings && (
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      onOpenSettings('PROFILE');
+                      setIsOverflowOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                      <div>
+                        <span className="font-bold text-white block">Trader Profile</span>
+                        <span className="text-[9px] text-muted">Institutional PA [PRO+]</span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-white bg-white/10 px-1.5 py-0.5 rounded">PRO+</span>
+                  </button>
+                )}
+
+                {/* System Status Indicators in Overflow */}
+                <div className="grid grid-cols-2 gap-1.5 text-[10px] border-y border-grid/60 py-2">
+                  <div className="flex items-center gap-1.5 text-muted">
+                    <span className={`h-1.5 w-1.5 rounded-full ${DOT[feed]}`} />
+                    <span>Ping: <strong className="text-white">{pingMs}ms</strong></span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-muted">
+                    <span className="text-white font-bold">[SANDBOX]</span>
+                  </div>
+                  {loadTelegramConfig().enabled && (
+                    <div className="col-span-2 text-emerald-400 text-[10px] flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      <span>Telegram Alerts Connected</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick Navigation Items */}
+                <div className="space-y-1">
+                  {onOpenSettings && (
+                    <button
+                      onClick={() => { audioHaptics.tick(); onOpenSettings(); setIsOverflowOpen(false); }}
+                      className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                    >
+                      <svg className="h-4 w-4 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span>Settings & Preferences</span>
+                    </button>
+                  )}
+                  {onOpenHotkeys && (
+                    <button
+                      onClick={() => { audioHaptics.tick(); onOpenHotkeys(); setIsOverflowOpen(false); }}
+                      className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                    >
+                      <svg className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                      </svg>
+                      <span>Keyboard Shortcuts (?)</span>
+                    </button>
+                  )}
+                  {onTogglePopout && (
+                    <button
+                      onClick={() => { audioHaptics.tick(); onTogglePopout(); setIsOverflowOpen(false); }}
+                      className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                    >
+                      <svg className="h-4 w-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      <span>Mini Pop-out Window</span>
+                    </button>
+                  )}
+                  {onOpenVault && (
+                    <button
+                      onClick={() => { audioHaptics.tick(); onOpenVault(); setIsOverflowOpen(false); }}
+                      className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                    >
+                      <svg className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      <span>Broker API Vault (MT5 / Crypto / India)</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Stale data warning indicator */}
         {(feed === 'closed' || feed === 'reconnecting') && (
-          <span className="rounded-[4px] border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-mono text-amber-400">
+          <span className="rounded-[4px] border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-mono text-amber-400 hidden sm:inline-block">
             [STALE FEED WARNING]
           </span>
         )}
 
-        {/* Telegram Webhook Active Badge */}
+        {/* Telegram Webhook Active Badge (Desktop) */}
         {loadTelegramConfig().enabled && (
           <button
             onClick={() => onOpenSettings?.('TELEGRAM')}
-            className="clay-badge px-2 py-0.5 text-[10px] font-bold text-white hover:bg-white hover:text-black transition"
+            className="clay-badge px-2 py-0.5 text-[10px] font-bold text-white hover:bg-white hover:text-black transition hidden xl:inline-block"
             title="Telegram Real-time Bot Alerts: Active"
           >
             [TG: ON]
           </button>
         )}
 
-        {/* Read-Only Sandbox Mode Badge */}
+        {/* Read-Only Sandbox Mode Badge (Desktop) */}
         <span
-          className="clay-badge px-2 py-0.5 text-[10px] font-bold text-white/80"
+          className="clay-badge px-2 py-0.5 text-[10px] font-bold text-white/80 hidden xl:inline-block"
           title="Secure Read-Only Sandbox: Paper Capital"
         >
           [SANDBOX]
         </span>
 
-        {/* WebSocket Latency Ping Meter */}
+        {/* WebSocket Latency Ping Meter (Desktop) */}
         <span
-          className="flex items-center gap-1.5 text-[11px] text-muted border-l border-grid pl-2"
+          className="hidden 2xl:flex items-center gap-1.5 text-[11px] text-muted border-l border-grid pl-2"
           title={`WebSocket Connection Health: ${status} | Ping: ${pingMs}ms`}
         >
           <span className={`h-2 w-2 rounded-full ${DOT[feed]}`} />

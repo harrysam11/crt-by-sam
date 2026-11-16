@@ -223,6 +223,75 @@ export default function RiskManagerModal({ isOpen, onClose }: RiskManagerModalPr
               </div>
             </div>
           </div>
+
+          {/* Prop Firm Rule Compliance Shield */}
+          <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className={`h-2.5 w-2.5 rounded-full ${riskRules.propFirmShieldEnabled ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                    Prop Firm Compliance Shield (FTMO / FundedNext / MFF Guardrail)
+                  </h3>
+                  <p className="text-[10px] text-muted mt-0.5">
+                    Automated pre-breach circuit breaker: locks order submission at a safe buffer before triggering official 5% daily / 10% max drawdown rules.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => updateRiskRules({ propFirmShieldEnabled: !riskRules.propFirmShieldEnabled })}
+                className={`px-3 py-1 text-xs font-bold rounded-lg border transition ${
+                  riskRules.propFirmShieldEnabled ? 'clay-pill-active' : 'clay-btn text-zinc-400'
+                }`}
+              >
+                {riskRules.propFirmShieldEnabled ? 'Shield Active' : 'Shield Disabled'}
+              </button>
+            </div>
+
+            {riskRules.propFirmShieldEnabled && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-grid/60">
+                <div>
+                  <label className="text-[10px] text-muted block mb-1">
+                    Daily Loss Pre-Breach Lockout (% of Start-of-Day Equity)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1.0"
+                      max="4.9"
+                      value={riskRules.propFirmDailyLossPct ?? 4.5}
+                      onChange={(e) => updateRiskRules({ propFirmDailyLossPct: parseFloat(e.target.value) || 4.5 })}
+                      className="w-32 rounded border border-grid bg-bg px-2.5 py-1.5 text-white"
+                    />
+                    <span className="text-[10px] text-zinc-400">
+                      Standard prop firm rule: 5.0%. Recommended buffer: 4.5% (-0.5% safety cushion).
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-muted block mb-1">
+                    Max Total Drawdown Lockout (% of Initial Balance)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="5.0"
+                      max="9.9"
+                      value={riskRules.propFirmMaxDrawdownPct ?? 9.0}
+                      onChange={(e) => updateRiskRules({ propFirmMaxDrawdownPct: parseFloat(e.target.value) || 9.0 })}
+                      className="w-32 rounded border border-grid bg-bg px-2.5 py-1.5 text-white"
+                    />
+                    <span className="text-[10px] text-zinc-400">
+                      Standard prop firm rule: 10.0%. Recommended buffer: 9.0% (-1.0% safety cushion).
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

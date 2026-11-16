@@ -3,6 +3,9 @@ export interface RiskRuleConfig {
   maxDailyTrades: number;        // e.g., 5 trades per session
   maxConsecutiveLosses: number;  // e.g., 3 consecutive losses
   coolDownDurationMs: number;    // e.g., 1800000 (30 mins lockout)
+  propFirmShieldEnabled?: boolean;
+  propFirmDailyLossPct?: number; // e.g. 4.5% safe buffer for 5% prop firm daily loss breach rule
+  propFirmMaxDrawdownPct?: number; // e.g. 9.0% safe buffer for 10% maximum trailing drawdown breach rule
 }
 
 export interface KillSwitchState {

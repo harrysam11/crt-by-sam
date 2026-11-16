@@ -28,6 +28,9 @@ const DEFAULT_RISK_RULES: RiskRuleConfig = {
   maxDailyTrades: 6,
   maxConsecutiveLosses: 3,
   coolDownDurationMs: 30 * 60 * 1000, // 30 minutes
+  propFirmShieldEnabled: true,
+  propFirmDailyLossPct: 4.5,
+  propFirmMaxDrawdownPct: 9.0,
 };
 
 const DEFAULT_KILL_SWITCH: KillSwitchState = {
