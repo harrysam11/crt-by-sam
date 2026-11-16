@@ -95,6 +95,7 @@ export default function DrawingOverlay({
   const [editingDrawing, setEditingDrawing] = useState<DrawingItem | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [hoveredNotes, setHoveredNotes] = useState<{ text: string; x: number; y: number } | null>(null);
+  const lastClickRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
 
   const [activeDrawing, setActiveDrawing] = useState<DrawingItem | null>(null);
   const [creationStep, setCreationStep] = useState<number>(0);
@@ -1057,6 +1058,7 @@ export default function DrawingOverlay({
       pushState(next);
       return next;
     });
+    setEditingDrawing((prev) => (prev && prev.id === id ? { ...prev, ...patch } : prev));
   };
 
   const deleteDrawing = (id: string) => {
@@ -1131,6 +1133,18 @@ export default function DrawingOverlay({
     }
 
     if (e.button !== 0) return;
+
+    // Instant double-click detection on drawing
+    const now = Date.now();
+    if (lastClickRef.current.id === item.id && now - lastClickRef.current.time < 380) {
+      lastClickRef.current = { id: '', time: 0 };
+      audioHaptics.tick();
+      setSelectedDrawingIds([item.id]);
+      setEditingDrawing(item);
+      setIsSettingsModalOpen(true);
+      return;
+    }
+    lastClickRef.current = { id: item.id, time: now };
 
     audioHaptics.tick();
     const isMulti = e.ctrlKey || e.metaKey;
@@ -1330,7 +1344,7 @@ export default function DrawingOverlay({
   // Window-level listener to deselect drawings when clicking empty chart space
   useEffect(() => {
     const handleGlobalPointerDown = (e: PointerEvent) => {
-      if (isDrawingTool || activeDrawing || creationStep > 0) return;
+      if (isDrawingTool || activeDrawing || creationStep > 0 || isSettingsModalOpen) return;
       if (selectedDrawingIds.length === 0) return;
 
       const target = e.target as HTMLElement | SVGElement | null;
@@ -1338,10 +1352,13 @@ export default function DrawingOverlay({
 
       if (
         target.closest('[data-drawing-element]') ||
+        target.closest('[data-drawing-context-bar]') ||
+        target.closest('[data-drawing-settings-modal]') ||
         target.closest('.clay-popover') ||
         target.closest('.clay-btn') ||
         target.closest('button') ||
-        target.closest('input')
+        target.closest('input') ||
+        target.closest('textarea')
       ) {
         return;
       }
@@ -1353,7 +1370,7 @@ export default function DrawingOverlay({
 
     window.addEventListener('pointerdown', handleGlobalPointerDown);
     return () => window.removeEventListener('pointerdown', handleGlobalPointerDown);
-  }, [selectedDrawingIds, isDrawingTool, activeDrawing, creationStep, setSelectedDrawingIds]);
+  }, [selectedDrawingIds, isDrawingTool, activeDrawing, creationStep, isSettingsModalOpen, setSelectedDrawingIds]);
 
   const singleSelectedDrawing =
     selectedDrawingIds.length === 1 ? drawings.find((d) => d.id === selectedDrawingIds[0]) ?? null : null;
@@ -1372,7 +1389,7 @@ export default function DrawingOverlay({
       onPointerUp={handlePointerUp}
       style={{ right: `${priceScaleWidth}px`, bottom: '26px' }}
       className={`absolute left-0 top-0 z-20 ${
-        isDrawingTool || activeDrawing || selectionBox || isCtrlHeld || isShiftHeld || isAltHeld || selectedDrawingIds.length > 0 || draggingHandle || draggingBody
+        isDrawingTool || activeDrawing || selectionBox || isCtrlHeld || isShiftHeld || isAltHeld || selectedDrawingIds.length > 0 || draggingHandle || draggingBody || isSettingsModalOpen
           ? `${activeTool === 'CURSOR_CROSSHAIR' ? 'cursor-crosshair' : activeTool === 'CURSOR_ARROW' ? 'cursor-default' : 'cursor-crosshair'} pointer-events-auto`
           : activeTool === 'CURSOR_ERASER'
           ? 'cursor-not-allowed pointer-events-auto'

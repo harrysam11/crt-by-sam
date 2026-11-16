@@ -147,7 +147,11 @@ export default function DrawingSettingsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 font-mono select-none">
+    <div
+      data-drawing-settings-modal="true"
+      onPointerDown={(e) => e.stopPropagation()}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 font-mono select-none pointer-events-auto"
+    >
       <div className="w-full max-w-lg rounded-xl border border-grid bg-[#0c0d14] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-grid px-4 py-3 bg-panel/60">

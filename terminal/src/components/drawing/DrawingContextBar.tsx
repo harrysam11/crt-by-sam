@@ -47,7 +47,7 @@ export default function DrawingContextBar({
 
   // Boundary safety clamp so context bar is never hidden behind top menubar
   const safeX = Math.max(16, Math.min((typeof window !== 'undefined' ? window.innerWidth : 1200) - 380, pos?.x ?? 280));
-  const safeY = Math.max(64, Math.min((typeof window !== 'undefined' ? window.innerHeight : 800) - 60, pos?.y ?? 75));
+  const safeY = Math.max(90, Math.min((typeof window !== 'undefined' ? window.innerHeight : 800) - 60, pos?.y ?? 110));
 
   const [templateNameInput, setTemplateNameInput] = useState('');
   const [showTemplatesMenu, setShowTemplatesMenu] = useState(false);
@@ -68,7 +68,7 @@ export default function DrawingContextBar({
       const dx = moveEv.clientX - startMouseX;
       const dy = moveEv.clientY - startMouseY;
       const newX = Math.max(16, Math.min(window.innerWidth - 380, startPosX + dx));
-      const newY = Math.max(64, Math.min(window.innerHeight - 60, startPosY + dy));
+      const newY = Math.max(90, Math.min(window.innerHeight - 60, startPosY + dy));
       setPos({ x: newX, y: newY });
     };
 
@@ -84,7 +84,7 @@ export default function DrawingContextBar({
 
   const handleResetPos = () => {
     audioHaptics.tick();
-    setPos({ x: 280, y: 75 });
+    setPos({ x: 280, y: 110 });
   };
 
   useEffect(() => {
@@ -124,13 +124,15 @@ export default function DrawingContextBar({
 
   return (
     <div
+      data-drawing-context-bar="true"
       style={{ left: `${safeX}px`, top: `${safeY}px` }}
       onPointerDown={(e) => {
+        e.stopPropagation();
         if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
         startDrag(e);
       }}
       onDoubleClick={handleResetPos}
-      className="clay-popover fixed z-50 flex items-center gap-1.5 px-2 py-1 font-mono text-xs select-none shadow-2xl backdrop-blur-md border border-white/[0.08] cursor-move"
+      className="clay-popover fixed z-50 flex items-center gap-1.5 px-2 py-1 font-mono text-xs select-none shadow-2xl backdrop-blur-md border border-white/[0.08] cursor-move pointer-events-auto"
       title="Drawing Context Toolbar (Drag to move, Double-click to reset)"
     >
       {/* Movable Drag Grip Handle */}
