@@ -20,6 +20,7 @@ import type { ActiveIndicatorInstance } from '../../services/indicators/types';
 import { INDICATOR_REGISTRY } from '../../services/indicators/registry';
 import { useIndicatorsStore } from '../../store/useIndicatorsStore';
 import { useLayoutStore } from '../../store/useLayoutStore';
+import { usePsychologyStore } from '../../store/usePsychologyStore';
 import type { Candle } from '../../types/terminal';
 import { audioHaptics } from '../../utils/notify';
 
@@ -43,6 +44,7 @@ export default function SubPaneChart({
   const seriesMapRef = useRef<Map<string, ISeriesApi<'Line' | 'Histogram'>>>(new Map());
 
   const themeMode = useLayoutStore((s) => s.themeMode);
+  const themeConfig = usePsychologyStore((s) => s.themeConfig);
   const [liveValues, setLiveValues] = useState<Record<string, number | null>>({});
 
   const toggleVisibility = useIndicatorsStore((s) => s.toggleVisibility);
@@ -56,10 +58,13 @@ export default function SubPaneChart({
     if (!containerRef.current) return;
 
     const isLight = themeMode === 'LIGHT' || document.documentElement.classList.contains('theme-light');
+    const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
+    const chartBgColor = isCustomBg ? 'transparent' : (isLight ? '#ffffff' : '#050508');
+
     const chart = createChart(containerRef.current, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: isLight ? '#ffffff' : '#050508' },
+        background: { type: ColorType.Solid, color: chartBgColor },
         textColor: isLight ? '#555555' : '#828290',
         fontSize: 10,
       },
@@ -171,14 +176,17 @@ export default function SubPaneChart({
     };
   }, [mainChartApi, mainSeriesApi]);
 
-  // Synchronize layout theme with themeMode
+  // Synchronize layout theme with themeMode and wallpaper skins
   useEffect(() => {
     const chart = chartApiRef.current;
     if (!chart) return;
     const isLight = themeMode === 'LIGHT';
+    const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
+    const chartBg = isCustomBg ? 'transparent' : (isLight ? '#ffffff' : '#050508');
+
     chart.applyOptions({
       layout: {
-        background: { type: ColorType.Solid, color: isLight ? '#ffffff' : '#050508' },
+        background: { type: ColorType.Solid, color: chartBg },
         textColor: isLight ? '#555555' : '#828290',
       },
       grid: {
@@ -200,7 +208,7 @@ export default function SubPaneChart({
         },
       },
     });
-  }, [themeMode]);
+  }, [themeMode, themeConfig.wallpaperType, themeConfig.mediaUrl]);
 
   // Compute and update plot data
   useEffect(() => {
@@ -269,10 +277,15 @@ export default function SubPaneChart({
     setLiveValues(latestValues);
   }, [candles, instance, definition]);
 
+  const isLight = themeMode === 'LIGHT';
+  const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
+
   return (
     <div
       style={{ height }}
-      className="relative w-full border-t border-grid bg-[#050508] select-none font-mono shrink-0"
+      className={`relative w-full border-t border-grid select-none font-mono shrink-0 ${
+        isCustomBg ? 'bg-transparent' : (isLight ? 'bg-white' : 'bg-[#050508]')
+      }`}
     >
       {/* Sub-Pane Legend HUD */}
       <div

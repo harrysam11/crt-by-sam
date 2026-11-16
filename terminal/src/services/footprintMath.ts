@@ -136,9 +136,9 @@ export function generateFootprintCandle(
 /**
  * Generate simulated or real-time DOM ladder levels centered on midPrice.
  */
-export function generateDOMSnapshot(midPrice: number, spread = 0.5, depth = 12): DOMLevel[] {
+export function generateDOMSnapshot(midPrice: number, spread?: number, depth = 14): DOMLevel[] {
   const levels: DOMLevel[] = [];
-  const tick = midPrice > 1000 ? 1 : midPrice > 10 ? 0.05 : 0.001;
+  const tick = spread && spread > 0 ? spread : getAssetTickSize(midPrice);
 
   for (let i = -depth; i <= depth; i++) {
     if (i === 0) continue;

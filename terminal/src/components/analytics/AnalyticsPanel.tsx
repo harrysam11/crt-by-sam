@@ -55,44 +55,16 @@ const SAMPLE_NEWS: NewsItem[] = [
   },
 ];
 
-interface SeasonalMonthData {
-  month: string;
-  winRate: number;
-  avgReturn: number;
-  fiveYearReturn: number;
-  tenYearReturn: number;
-  currentYearReturn?: number;
-}
-
-const SEASONAL_TENDENCY_MONTHS: SeasonalMonthData[] = [
-  { month: 'Jan', winRate: 54, avgReturn: 3.8, fiveYearReturn: 3.8, tenYearReturn: 4.2, currentYearReturn: 2.1 },
-  { month: 'Feb', winRate: 64, avgReturn: 9.4, fiveYearReturn: 13.2, tenYearReturn: 13.6, currentYearReturn: 11.5 },
-  { month: 'Mar', winRate: 48, avgReturn: -1.2, fiveYearReturn: 12.0, tenYearReturn: 12.4, currentYearReturn: 14.8 },
-  { month: 'Apr', winRate: 58, avgReturn: 6.5, fiveYearReturn: 18.5, tenYearReturn: 18.9, currentYearReturn: 18.2 },
-  { month: 'May', winRate: 45, avgReturn: -3.4, fiveYearReturn: 15.1, tenYearReturn: 15.5, currentYearReturn: 13.0 },
-  { month: 'Jun', winRate: 41, avgReturn: -4.1, fiveYearReturn: 11.0, tenYearReturn: 11.4, currentYearReturn: 8.5 },
-  { month: 'Jul', winRate: 60, avgReturn: 8.2, fiveYearReturn: 19.2, tenYearReturn: 19.6, currentYearReturn: 16.4 },
-  { month: 'Aug', winRate: 39, avgReturn: -6.5, fiveYearReturn: 12.7, tenYearReturn: 13.1, currentYearReturn: 11.2 },
-  { month: 'Sep', winRate: 32, avgReturn: -8.9, fiveYearReturn: 3.8, tenYearReturn: 4.2, currentYearReturn: 2.5 },
-  { month: 'Oct', winRate: 68, avgReturn: 14.2, fiveYearReturn: 18.0, tenYearReturn: 18.4, currentYearReturn: 17.8 },
-  { month: 'Nov', winRate: 72, avgReturn: 18.6, fiveYearReturn: 36.6, tenYearReturn: 37.0, currentYearReturn: 35.2 },
-  { month: 'Dec', winRate: 55, avgReturn: 5.4, fiveYearReturn: 42.0, tenYearReturn: 42.4, currentYearReturn: undefined },
-];
-
-const DAY_OF_WEEK_TENDENCY = [
-  { day: 'Mon', winRate: 54, avgReturn: 0.42, bias: 'BULLISH' },
-  { day: 'Tue', winRate: 59, avgReturn: 0.88, bias: 'BULLISH' },
-  { day: 'Wed', winRate: 49, avgReturn: -0.15, bias: 'NEUTRAL' },
-  { day: 'Thu', winRate: 63, avgReturn: 1.15, bias: 'STRONG BULL' },
-  { day: 'Fri', winRate: 46, avgReturn: -0.38, bias: 'BEARISH' },
-];
+import { computeSeasonalsFromCandles, MONTH_NAMES } from '../../services/seasonalsService';
 
 export default function AnalyticsPanel() {
   const symbol = useTerminalStore((s) => s.symbol);
   const candles = useTerminalStore((s) => s.candles);
-  const setActiveRightDrawer = useDrawingStore((s) => s.setActiveRightDrawer);
-
   const [activeTab, setActiveTab] = useState<'TECHNICALS' | 'SEASONALITY' | 'NEWS'>('TECHNICALS');
+
+  const seasonalsData = useMemo(() => {
+    return computeSeasonalsFromCandles(symbol, candles);
+  }, [symbol, candles]);
 
   const technicalData = useMemo(() => {
     if (!candles || candles.length < 20) {
@@ -294,7 +266,7 @@ export default function AnalyticsPanel() {
         <button
           onClick={() => {
             audioHaptics.tick();
-            setActiveRightDrawer(null);
+            useDrawingStore.getState().setActiveRightDrawer(null);
           }}
           className="clay-btn h-7 w-7 text-muted hover:text-white"
           aria-label="Close"
@@ -424,13 +396,15 @@ export default function AnalyticsPanel() {
             <div className="rounded-xl border border-grid bg-bg/50 p-3">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] uppercase font-bold text-muted">Seasonal Tendency Regime</span>
-                <span className="rounded bg-up/20 px-1.5 py-0.5 text-[9px] font-bold text-up">BULLISH WINDOW</span>
+                <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400">
+                  EMPIRICAL SAMPLE: {seasonalsData.years.length} YEARS
+                </span>
               </div>
               <h4 className="text-xs font-bold text-white mb-1">
-                {labelOf(symbol)} Q4 Institutional Expansion
+                {seasonalsData.summaryHeadline}
               </h4>
               <p className="text-[10px] text-muted leading-relaxed">
-                Historically, {labelOf(symbol)} demonstrates its strongest seasonal rally from Oct 15 through Nov 30 with a 72% positive win-rate.
+                {seasonalsData.summaryDescription}
               </p>
             </div>
 
@@ -440,21 +414,21 @@ export default function AnalyticsPanel() {
                 <span className="text-[10px] uppercase font-bold text-white">
                   Multi-Year Cumulative Tendency
                 </span>
-                <span className="text-[9px] text-muted">Jan - Dec</span>
+                <span className="text-[9px] text-muted">Jan - Dec Progression</span>
               </div>
 
               {/* Chart Legend */}
               <div className="flex items-center gap-3 text-[9px] text-muted mb-2">
                 <span className="flex items-center gap-1">
                   <span className="h-1.5 w-3 rounded-full bg-cyan-400" />
-                  <span>10Y Avg</span>
+                  <span>10Y Trend</span>
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="h-1.5 w-3 rounded-full bg-indigo-400" />
-                  <span>5Y Avg</span>
+                  <span>5Y Trend</span>
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="h-1.5 w-3 rounded-full bg-up" />
+                  <span className="h-1.5 w-3 rounded-full bg-emerald-400" />
                   <span>Current Year</span>
                 </span>
               </div>
@@ -469,8 +443,6 @@ export default function AnalyticsPanel() {
 
                   {/* Baseline 0% indicator */}
                   <text x="12" y="48" fill="#71717a" fontSize="8" fontFamily="monospace">0%</text>
-                  <text x="12" y="18" fill="#71717a" fontSize="8" fontFamily="monospace">+40%</text>
-                  <text x="12" y="78" fill="#71717a" fontSize="8" fontFamily="monospace">-20%</text>
 
                   {/* 10-Year Composite Trendline (Cyan) */}
                   <polyline
@@ -479,7 +451,7 @@ export default function AnalyticsPanel() {
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    points="20,50 42,46 64,38 86,40 108,35 130,42 152,44 174,34 196,44 218,48 240,32 262,20"
+                    points={seasonalsData.tenYearCurvePoints}
                   />
 
                   {/* 5-Year Composite Trendline (Indigo) */}
@@ -490,7 +462,7 @@ export default function AnalyticsPanel() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeDasharray="3 2"
-                    points="20,50 42,47 64,39 86,41 108,36 130,41 152,43 174,33 196,43 218,47 240,30 262,18"
+                    points={seasonalsData.fiveYearCurvePoints}
                   />
 
                   {/* Current Year Trajectory (Green) */}
@@ -500,61 +472,116 @@ export default function AnalyticsPanel() {
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    points="20,50 42,48 64,37 86,36 108,33 130,43 152,46 174,35 196,42 218,47 240,31"
+                    points={seasonalsData.currentYearCurvePoints}
                   />
 
-                  {/* Current Month Active Dot */}
-                  <circle cx="240" cy="31" r="3.5" fill="#4ade80" />
-
                   {/* Month X-Axis Ticks */}
-                  {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'].map((m, i) => (
+                  {MONTH_NAMES.map((m, i) => (
                     <text
-                      key={i}
-                      x={20 + i * 22}
+                      key={m}
+                      x={20 + i * 20}
                       y="96"
-                      fill="#71717a"
-                      fontSize="8"
+                      fill={i === seasonalsData.currentMonthIndex ? '#4ade80' : '#71717a'}
+                      fontWeight={i === seasonalsData.currentMonthIndex ? 'bold' : 'normal'}
+                      fontSize="7.5"
                       textAnchor="middle"
                       fontFamily="monospace"
                     >
-                      {m}
+                      {m[0]}
                     </text>
                   ))}
                 </svg>
               </div>
             </div>
 
-            {/* Monthly Seasonality Matrix Table */}
-            <div className="rounded-xl border border-grid bg-bg/50 p-3">
+            {/* TradingView-Style Monthly Returns Heatmap Matrix */}
+            <div className="rounded-xl border border-grid bg-bg/50 p-3 overflow-hidden">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">
-                  Monthly Win Rate & Avg Return
+                  Monthly Returns Matrix (%)
                 </h4>
-                <span className="text-[10px] text-up font-bold">10-Year Sample</span>
+                <span className="text-[10px] text-emerald-400 font-bold">
+                  {labelOf(symbol)} History
+                </span>
               </div>
 
-              <div className="space-y-1 text-[10px]">
-                {SEASONAL_TENDENCY_MONTHS.map((m) => {
-                  const isGreen = m.winRate >= 50;
-                  const isRetPos = m.avgReturn >= 0;
-                  return (
-                    <div key={m.month} className="flex items-center gap-2 py-0.5 border-b border-grid/20 last:border-0">
-                      <span className="w-7 text-muted font-bold">{m.month}</span>
-                      <div className="flex-1 h-2 rounded bg-grid overflow-hidden">
-                        <div
-                          className={`h-full ${isGreen ? 'bg-up' : 'bg-down'}`}
-                          style={{ width: `${m.winRate}%` }}
-                        />
-                      </div>
-                      <span className={`w-8 text-right font-semibold ${isGreen ? 'text-up' : 'text-down'}`}>
-                        {m.winRate}%
-                      </span>
-                      <span className={`w-12 text-right font-bold ${isRetPos ? 'text-up' : 'text-down'}`}>
-                        {isRetPos ? '+' : ''}{m.avgReturn.toFixed(1)}%
-                      </span>
-                    </div>
-                  );
-                })}
+              {/* Scrollable Matrix Table */}
+              <div className="overflow-x-auto scrollbar-none border border-grid/40 rounded">
+                <table className="w-full text-center border-collapse text-[9.5px]">
+                  <thead>
+                    <tr className="bg-white/[0.03] text-muted border-b border-grid/50 font-bold">
+                      <th className="py-1 px-1 text-left pl-1.5">Year</th>
+                      {MONTH_NAMES.map((m) => (
+                        <th key={m} className="py-1 px-0.5">{m}</th>
+                      ))}
+                      <th className="py-1 px-1 bg-white/[0.02]">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {seasonalsData.matrix.map((row) => (
+                      <tr key={row.year} className="border-b border-grid/20 hover:bg-white/[0.02]">
+                        <td className="py-1 px-1 text-left pl-1.5 font-bold text-slate-300">
+                          {row.year}
+                        </td>
+                        {row.months.map((val, idx) => {
+                          const isPos = val !== null && val > 0;
+                          const isNeg = val !== null && val < 0;
+                          const bg =
+                            val === null
+                              ? 'text-zinc-600'
+                              : val >= 10
+                              ? 'bg-emerald-500/25 text-emerald-300 font-bold'
+                              : val > 0
+                              ? 'bg-emerald-500/10 text-emerald-400 font-medium'
+                              : val <= -10
+                              ? 'bg-rose-500/25 text-rose-300 font-bold'
+                              : 'bg-rose-500/10 text-rose-400 font-medium';
+                          return (
+                            <td key={idx} className={`py-1 px-0.5 ${bg}`}>
+                              {val !== null ? `${isPos ? '+' : ''}${val.toFixed(1)}%` : '-'}
+                            </td>
+                          );
+                        })}
+                        <td className={`py-1 px-1 font-bold ${
+                          row.yearReturn === null
+                            ? 'text-zinc-500'
+                            : row.yearReturn >= 0
+                            ? 'text-emerald-400 bg-emerald-500/10'
+                            : 'text-rose-400 bg-rose-500/10'
+                        }`}>
+                          {row.yearReturn !== null ? `${row.yearReturn >= 0 ? '+' : ''}${row.yearReturn.toFixed(1)}%` : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {/* Summary Rows (Average and Win Rate) */}
+                  <tfoot className="border-t-2 border-grid bg-white/[0.02]">
+                    <tr className="font-bold">
+                      <td className="py-1 px-1 text-left pl-1.5 text-white">Avg</td>
+                      {seasonalsData.monthStats.map((st) => (
+                        <td
+                          key={st.monthName}
+                          className={`py-1 px-0.5 ${st.avgReturn >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}
+                        >
+                          {st.avgReturn >= 0 ? '+' : ''}{st.avgReturn.toFixed(1)}%
+                        </td>
+                      ))}
+                      <td className="text-muted">-</td>
+                    </tr>
+                    <tr className="text-muted font-bold text-[9px]">
+                      <td className="py-1 px-1 text-left pl-1.5">Win%</td>
+                      {seasonalsData.monthStats.map((st) => (
+                        <td
+                          key={st.monthName}
+                          className={`py-0.5 px-0.5 ${st.winRate >= 50 ? 'text-emerald-300' : 'text-rose-300'}`}
+                        >
+                          {st.winRate}%
+                        </td>
+                      ))}
+                      <td className="text-muted">-</td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
 
@@ -568,23 +595,27 @@ export default function AnalyticsPanel() {
               </div>
 
               <div className="space-y-1.5 text-[10px]">
-                {DAY_OF_WEEK_TENDENCY.map((d) => {
+                {seasonalsData.dayStats.map((d) => {
                   const isBull = d.avgReturn >= 0;
                   return (
-                    <div key={d.day} className="flex items-center justify-between py-0.5">
-                      <span className="w-8 font-bold text-white">{d.day}</span>
-                      <span className="text-muted">Win: <b className={d.winRate >= 50 ? 'text-up' : 'text-down'}>{d.winRate}%</b></span>
-                      <span className={`font-semibold ${isBull ? 'text-up' : 'text-down'}`}>
+                    <div key={d.dayName} className="flex items-center justify-between py-0.5 border-b border-grid/10 last:border-0">
+                      <span className="w-8 font-bold text-white">{d.dayName}</span>
+                      <span className="text-muted">
+                        Win: <b className={d.winRate >= 50 ? 'text-emerald-400' : 'text-rose-400'}>{d.winRate}%</b>
+                      </span>
+                      <span className={`font-semibold ${isBull ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {isBull ? '+' : ''}{d.avgReturn.toFixed(2)}%
                       </span>
                       <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
                         d.bias === 'STRONG BULL'
-                          ? 'bg-up/20 text-up'
+                          ? 'bg-emerald-500/20 text-emerald-400'
                           : d.bias === 'BULLISH'
-                          ? 'bg-up/10 text-up'
+                          ? 'bg-emerald-500/10 text-emerald-300'
+                          : d.bias === 'STRONG BEAR'
+                          ? 'bg-rose-500/25 text-rose-300'
                           : d.bias === 'BEARISH'
-                          ? 'bg-down/20 text-down'
-                          : 'bg-grid text-muted'
+                          ? 'bg-rose-500/15 text-rose-400'
+                          : 'bg-white/5 text-muted'
                       }`}>
                         {d.bias}
                       </span>

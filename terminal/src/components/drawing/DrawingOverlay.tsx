@@ -479,6 +479,18 @@ export default function DrawingOverlay({
     activeTool !== 'CURSOR_DOT' &&
     activeTool !== 'CURSOR_ERASER';
 
+  // Automatically free cursor and clear in-progress drawing states when cursor tool is selected
+  useEffect(() => {
+    if (!isDrawingTool) {
+      setActiveDrawing(null);
+      setCreationStep(0);
+      setSelectionBox(null);
+      setDraggingHandle(null);
+      setDraggingBody(null);
+      setDemonstrationDrawing(null);
+    }
+  }, [isDrawingTool, activeTool]);
+
   const drawingsRef = useRef(drawings);
   drawingsRef.current = drawings;
   const coordHelperRef = useRef(coordHelper);
@@ -1421,7 +1433,7 @@ export default function DrawingOverlay({
       onPointerUp={handlePointerUp}
       style={{ right: `${priceScaleWidth}px`, bottom: '26px' }}
       className={`absolute left-0 top-0 z-20 ${
-        isDrawingTool || activeDrawing || selectionBox || isCtrlHeld || isShiftHeld || isAltHeld || draggingHandle || draggingBody
+        isDrawingTool || activeDrawing || selectionBox || draggingHandle || draggingBody
           ? `${activeTool === 'CURSOR_CROSSHAIR' ? 'cursor-crosshair' : activeTool === 'CURSOR_ARROW' ? 'cursor-default' : 'cursor-crosshair'} pointer-events-auto`
           : activeTool === 'CURSOR_ERASER'
           ? 'cursor-not-allowed pointer-events-auto'
@@ -1497,7 +1509,9 @@ export default function DrawingOverlay({
               style={{ pointerEvents: 'all' }}
               onDoubleClick={(e) => {
                 e.stopPropagation();
+                e.preventDefault();
                 audioHaptics.tick();
+                setSelectedDrawingIds([item.id]);
                 setEditingDrawing(item);
                 setIsSettingsModalOpen(true);
               }}

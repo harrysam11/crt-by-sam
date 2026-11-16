@@ -13,12 +13,14 @@ export class CoordinateHelper {
   timeToX(time?: number, fallbackX: number = 0): number {
     if (!this.chartApi || time === undefined) return fallbackX;
     try {
-      const coord = this.chartApi.timeScale().timeToCoordinate(time as UTCTimestamp);
-      if (coord !== null) return coord;
+      const timeScale: any = this.chartApi.timeScale();
+      const coord = timeScale.timeToCoordinate(time as UTCTimestamp);
+      if (coord !== null && typeof coord === 'number' && !isNaN(coord)) {
+        return coord;
+      }
 
-      // Off-screen or future/past bars: use logical index conversion to preserve candle anchoring
+      // Continuous fractional logical index conversion so drawings never jump or snap to X=0 when offscreen
       if (this.candles && this.candles.length > 0) {
-        const timeScale: any = this.chartApi.timeScale();
         const cLen = this.candles.length;
         const firstTime = this.candles[0].time;
         const lastTime = this.candles[cLen - 1].time;
@@ -40,22 +42,35 @@ export class CoordinateHelper {
             else if (this.candles[mid].time > time) high = mid - 1;
             else break;
           }
+
+          let fractionalLogical = bestIdx;
+          if (bestIdx < cLen - 1 && this.candles[bestIdx].time < time) {
+            const nextTime = this.candles[bestIdx + 1].time;
+            const span = nextTime - this.candles[bestIdx].time;
+            if (span > 0) fractionalLogical = bestIdx + (time - this.candles[bestIdx].time) / span;
+          } else if (bestIdx > 0 && this.candles[bestIdx].time > time) {
+            const prevTime = this.candles[bestIdx - 1].time;
+            const span = this.candles[bestIdx].time - prevTime;
+            if (span > 0) fractionalLogical = bestIdx - (this.candles[bestIdx].time - time) / span;
+          }
+
           if (typeof timeScale.logicalToCoordinate === 'function') {
-            const lCoord = timeScale.logicalToCoordinate(bestIdx);
-            if (lCoord !== null) return lCoord;
+            const lCoord = timeScale.logicalToCoordinate(fractionalLogical);
+            if (lCoord !== null && typeof lCoord === 'number' && !isNaN(lCoord)) return lCoord;
           }
         } else if (time > lastTime) {
           const futureBars = (time - lastTime) / (step || 60);
           const logical = cLen - 1 + futureBars;
           if (typeof timeScale.logicalToCoordinate === 'function') {
             const lCoord = timeScale.logicalToCoordinate(logical);
-            if (lCoord !== null) return lCoord;
+            if (lCoord !== null && typeof lCoord === 'number' && !isNaN(lCoord)) return lCoord;
           }
         } else if (time < firstTime) {
           const pastBars = (time - firstTime) / (step || 60);
+          const logical = pastBars;
           if (typeof timeScale.logicalToCoordinate === 'function') {
-            const lCoord = timeScale.logicalToCoordinate(pastBars);
-            if (lCoord !== null) return lCoord;
+            const lCoord = timeScale.logicalToCoordinate(logical);
+            if (lCoord !== null && typeof lCoord === 'number' && !isNaN(lCoord)) return lCoord;
           }
         }
       }

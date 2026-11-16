@@ -66,9 +66,9 @@ export default function App() {
   const [isBottomCollapsed, setIsBottomCollapsed] = useState(() => {
     try {
       const saved = localStorage.getItem('crt_bottom_collapsed');
-      return saved !== null ? saved === 'true' : false; // Default to open/expanded
+      return saved !== null ? saved === 'true' : true; // Default to closed for maximum chart real estate
     } catch {
-      return false;
+      return true;
     }
   });
   const [isBottomMaximized, setIsBottomMaximized] = useState(false);
@@ -282,7 +282,7 @@ export default function App() {
                 />
               )}
               <div
-                style={{ height: isBottomMaximized ? '100%' : isBottomCollapsed ? 34 : bottomH }}
+                style={{ height: isBottomMaximized ? '100%' : isBottomCollapsed ? 38 : bottomH }}
                 className={`${isBottomMaximized ? 'flex-1 h-full' : 'shrink-0'} overflow-hidden transition-all duration-150 relative bg-panel z-10`}
               >
                 <PositionsTable

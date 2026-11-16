@@ -9,6 +9,7 @@ import { BreathingHalo } from '../../features/zen/ZenController';
 import { audioHaptics } from '../../utils/notify';
 import { loadTelegramConfig } from '../../services/telegramService';
 import { useLayoutStore, type ChartGridLayout } from '../../store/useLayoutStore';
+import { useDrawingStore } from '../../store/useDrawingStore';
 
 const DOT = { open: 'bg-up', connecting: 'bg-yellow-400', reconnecting: 'bg-yellow-400', closed: 'bg-down' } as const;
 
@@ -248,14 +249,14 @@ export default function Header({
         />
       </div>
 
-      <div className="flex items-center gap-2 whitespace-nowrap">
-        <span className="text-sm font-bold text-white tracking-wide">{labelOf(symbol)}</span>
-        <span className={`num text-base font-semibold ${dir === 'up' ? 'text-white' : dir === 'down' ? 'text-zinc-500' : 'text-white'}`}>
+      <div className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap min-w-0">
+        <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate">{labelOf(symbol)}</span>
+        <span className={`num text-xs sm:text-base font-semibold ${dir === 'up' ? 'text-white' : dir === 'down' ? 'text-zinc-500' : 'text-white'}`}>
           {fmtPrice(price, symbol)}
         </span>
-        <span className="text-xs text-muted font-medium">{inst?.currency}</span>
-        <span className="num text-xs font-semibold text-white bg-white/5 px-1.5 py-0.5 rounded-[4px] border border-white/10">{fmtPct(change)}</span>
-        {marketOpen === false && <span className="clay-badge px-2 py-0.5 text-xs text-zinc-400">Market closed</span>}
+        <span className="text-xs text-muted font-medium hidden sm:inline">{inst?.currency}</span>
+        <span className="num text-[10px] sm:text-xs font-semibold text-white bg-white/5 px-1 sm:px-1.5 py-0.5 rounded-[4px] border border-white/10">{fmtPct(change)}</span>
+        {marketOpen === false && <span className="clay-badge px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs text-zinc-400 hidden xs:inline">Closed</span>}
 
         {/* Kill-Switch alert badge */}
         {killSwitch.isLocked && (
@@ -470,6 +471,35 @@ export default function Header({
 
             {isInstToolsOpen && (
               <div className="absolute right-0 top-full mt-2 z-50 w-64 clay-popover p-2 shadow-2xl select-none font-mono text-xs">
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    useDrawingStore.getState().setActiveRightDrawer((prev) => (prev === 'DOM' ? null : 'DOM'));
+                    setIsInstToolsOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                >
+                  <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  <span>Depth of Market (DOM) Ladder</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    useDrawingStore.getState().setActiveRightDrawer((prev) => (prev === 'ANALYTICS' ? null : 'ANALYTICS'));
+                    setIsInstToolsOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                >
+                  <svg className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                  </svg>
+                  <span>Seasonal Tendencies Matrix</span>
+                </button>
+
+                <span className="my-1 h-px w-full bg-grid/60 block" />
                 {onOpenCalendar && (
                   <button
                     onClick={() => { audioHaptics.tick(); onOpenCalendar(); setIsInstToolsOpen(false); }}
@@ -849,6 +879,54 @@ export default function Header({
 
                 {/* Quick Navigation Items */}
                 <div className="space-y-1">
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      useDrawingStore.getState().setActiveRightDrawer((prev) => (prev === 'DOM' ? null : 'DOM'));
+                      setIsOverflowOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <span>Depth of Market (DOM) Ladder</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      useDrawingStore.getState().setActiveRightDrawer((prev) => (prev === 'ANALYTICS' ? null : 'ANALYTICS'));
+                      setIsOverflowOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                    </svg>
+                    <span>Seasonal Tendencies Matrix</span>
+                  </button>
+                  {onOpenScreener && (
+                    <button
+                      onClick={() => { audioHaptics.tick(); onOpenScreener(); setIsOverflowOpen(false); }}
+                      className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                    >
+                      <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      <span>Multi-Market Screener</span>
+                    </button>
+                  )}
+                  {onOpenCalendar && (
+                    <button
+                      onClick={() => { audioHaptics.tick(); onOpenCalendar(); setIsOverflowOpen(false); }}
+                      className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                    >
+                      <svg className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span>Economic Calendar Matrix</span>
+                    </button>
+                  )}
                   {onOpenSettings && (
                     <button
                       onClick={() => { audioHaptics.tick(); onOpenSettings(); setIsOverflowOpen(false); }}

@@ -127,8 +127,8 @@ export default function PositionsTable({
   return (
     <div className="flex h-full flex-col bg-panel font-mono select-none">
       {/* Tab Strip */}
-      <div className="flex shrink-0 items-center justify-between border-b border-grid/50 px-3 py-1.5 bg-[#09090d]/60">
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+      <div className="flex shrink-0 items-center justify-between border-b border-grid/50 px-3 py-1.5 bg-[#09090d]/80">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none min-w-0 flex-1 py-0.5">
           <button className={tabCls(tab === 'positions')} onClick={() => handleTabClick('positions')}>
             Positions ({open.length})
           </button>
@@ -150,7 +150,7 @@ export default function PositionsTable({
         </div>
 
         {/* Quick Toolbar */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
           {tab === 'journal' && (
             <button
               onClick={copyTradesCsv}
@@ -181,7 +181,7 @@ export default function PositionsTable({
                 audioHaptics.tick();
                 onToggleMaximize();
               }}
-              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-white/10 transition"
+              className="p-1 rounded-[5px] border border-white/10 bg-white/[0.04] text-slate-300 hover:text-white hover:bg-white/15 transition"
               title={isMaximized ? 'Restore Bottom Panel Size' : 'Maximize Bottom Panel to Full Height'}
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -201,15 +201,15 @@ export default function PositionsTable({
                 audioHaptics.tick();
                 onToggleCollapse();
               }}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs transition ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] text-xs transition border ${
                 isCollapsed
-                  ? 'clay-pill-active font-bold text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-white/10'
+                  ? 'border-white bg-white text-black font-bold shadow-sm'
+                  : 'border-white/10 bg-white/[0.04] text-slate-300 hover:text-white hover:bg-white/15'
               }`}
               title={isCollapsed ? 'Expand Bottom Panel (Show Positions & Orders)' : 'Collapse Bottom Panel'}
             >
-              <span className="text-[10px] hidden sm:inline">{isCollapsed ? 'Expand' : 'Collapse'}</span>
-              <svg className={`h-3.5 w-3.5 transition-transform duration-150 ${isCollapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <span className="text-[10.5px] font-medium hidden sm:inline">{isCollapsed ? 'Expand' : 'Collapse'}</span>
+              <svg className={`h-3 w-3 transition-transform duration-150 ${isCollapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>

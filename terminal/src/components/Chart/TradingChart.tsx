@@ -1744,39 +1744,51 @@ export default function TradingChart({
         wickDownColor: 'rgba(255, 255, 255, 0.25)',
       });
     } else if (chartStyle === 'HOLLOW_CANDLE') {
+      const isLight = themeMode === 'LIGHT';
+      const defaultUp = isLight ? '#089981' : '#ffffff';
+      const defaultDown = isLight ? '#f23645' : '#101015';
+      const upCol = chartSettings.candleUpColor && chartSettings.candleUpColor !== '#ffffff' ? chartSettings.candleUpColor : defaultUp;
+      const downCol = chartSettings.candleDownColor && chartSettings.candleDownColor !== '#101015' ? chartSettings.candleDownColor : defaultDown;
+
       a.candles.applyOptions({
         upColor: 'transparent',
-        downColor: chartSettings.candleDownColor || '#101015',
+        downColor: downCol,
         borderVisible: true,
-        borderUpColor: chartSettings.candleUpColor || '#ffffff',
+        borderUpColor: upCol,
         borderDownColor: borderDown,
         wickVisible: true,
-        wickUpColor: chartSettings.candleUpColor || '#ffffff',
+        wickUpColor: upCol,
         wickDownColor: borderDown,
       });
     } else {
+      const isLight = themeMode === 'LIGHT';
+      const defaultUp = isLight ? '#089981' : '#ffffff';
+      const defaultDown = isLight ? '#f23645' : '#101015';
+      const upCol = chartSettings.candleUpColor && chartSettings.candleUpColor !== '#ffffff' ? chartSettings.candleUpColor : defaultUp;
+      const downCol = chartSettings.candleDownColor && chartSettings.candleDownColor !== '#101015' ? chartSettings.candleDownColor : defaultDown;
+
       a.candles.applyOptions({
-        upColor: chartSettings.candleUpColor || '#ffffff',
-        downColor: chartSettings.candleDownColor || '#101015',
+        upColor: upCol,
+        downColor: downCol,
         borderVisible: true,
-        borderUpColor: chartSettings.candleUpColor || '#ffffff',
+        borderUpColor: upCol,
         borderDownColor: borderDown,
         wickVisible: true,
-        wickUpColor: chartSettings.candleUpColor || '#ffffff',
+        wickUpColor: upCol,
         wickDownColor: borderDown,
       });
       a.barSeries.applyOptions({
-        upColor: chartSettings.candleUpColor || '#ffffff',
+        upColor: upCol,
         downColor: borderDown,
       });
       a.lineSeries.applyOptions({
-        color: chartSettings.candleUpColor || '#ffffff',
+        color: upCol,
       });
       a.areaSeries.applyOptions({
-        lineColor: chartSettings.candleUpColor || '#ffffff',
+        lineColor: upCol,
       });
     }
-  }, [chartStyle, chartSettings]);
+  }, [chartStyle, chartSettings, themeMode]);
 
   // Dynamic Pine Script Indicator Series rendering
   useEffect(() => {
@@ -2877,7 +2889,21 @@ export default function TradingChart({
           <div
             ref={box}
             className="absolute inset-0 z-10"
-            onDoubleClick={() => {
+            onDoubleClick={(e) => {
+              const target = e.target as HTMLElement | SVGElement | null;
+              if (
+                target &&
+                (target.closest('[data-drawing-element]') ||
+                  target.closest('[data-drawing-context-bar]') ||
+                  target.closest('[data-drawing-settings-modal]') ||
+                  target.tagName.toLowerCase() === 'svg' ||
+                  target.tagName.toLowerCase() === 'path' ||
+                  target.tagName.toLowerCase() === 'line' ||
+                  target.tagName.toLowerCase() === 'circle' ||
+                  target.tagName.toLowerCase() === 'rect')
+              ) {
+                return;
+              }
               audioHaptics.tick();
               setIsChartSettingsOpen(true);
             }}
@@ -3076,14 +3102,14 @@ export default function TradingChart({
     </div>
 
       {/* TradingView Bottom Range & Scale Bar */}
-      <div className="h-8 shrink-0 border-t border-grid/60 bg-[#0c0d14] px-2.5 flex items-center justify-between text-[11px] text-slate-300 select-none font-mono z-10 overflow-x-auto scrollbar-none">
+      <div className="h-8 shrink-0 border-t border-grid bg-panel/95 backdrop-blur-md px-2.5 flex items-center justify-between text-[11px] text-slate-300 select-none font-mono z-10 overflow-x-auto scrollbar-none">
         {/* Left: Time Range Presets */}
         <div className="flex items-center gap-1 shrink-0 overflow-x-auto scrollbar-none">
           {(['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', 'ALL'] as const).map((r) => (
             <button
               key={r}
               onClick={() => handleSelectTimeRange(r)}
-              className="px-1.5 sm:px-2 py-0.5 rounded-[4px] clay-btn text-[9.5px] sm:text-[10px] font-medium transition"
+              className="px-1.5 sm:px-2 py-0.5 rounded-[4px] bg-white/[0.04] hover:bg-white/15 text-slate-300 hover:text-white border border-white/10 text-[9.5px] sm:text-[10px] font-semibold transition cursor-pointer"
             >
               {r}
             </button>
@@ -3099,7 +3125,7 @@ export default function TradingChart({
               const nextTz = tzs[(tzs.indexOf(timezone) + 1) % tzs.length];
               setTimezone(nextTz);
             }}
-            className="px-2 py-0.5 rounded-[4px] clay-btn font-mono text-slate-300 hover:text-white transition"
+            className="px-2 py-0.5 rounded-[4px] bg-white/[0.04] hover:bg-white/15 text-slate-300 hover:text-white border border-white/10 font-mono transition cursor-pointer"
             title={`Timezone: ${timezone} (Click to toggle)`}
           >
             {timezone === 'UTC' ? 'UTC' : timezone === 'Asia/Kolkata' ? 'IST' : timezone === 'America/New_York' ? 'EDT' : timezone === 'Europe/London' ? 'GMT' : 'JST'}
@@ -3109,7 +3135,7 @@ export default function TradingChart({
               audioHaptics.tick();
               api.current?.candles.priceScale().applyOptions({ autoScale: true });
             }}
-            className="px-2 py-0.5 rounded-[4px] clay-pill-active text-[10px] font-semibold transition"
+            className="px-2 py-0.5 rounded-[4px] bg-white text-black font-bold text-[10px] shadow-sm transition cursor-pointer"
             title="Auto scale (or double-click price scale)"
           >
             auto
@@ -3119,8 +3145,10 @@ export default function TradingChart({
               audioHaptics.tick();
               handleSetScaleMode('NORMAL');
             }}
-            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-semibold transition ${
-              scaleMode === 'NORMAL' ? 'clay-pill-active' : 'clay-pill'
+            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-semibold transition cursor-pointer ${
+              scaleMode === 'NORMAL'
+                ? 'bg-white text-black font-bold shadow-sm'
+                : 'bg-white/[0.04] text-slate-300 hover:text-white border border-white/10'
             }`}
             title="Linear / Normal scale"
           >
@@ -3131,8 +3159,10 @@ export default function TradingChart({
               audioHaptics.tick();
               handleSetScaleMode('LOGARITHMIC');
             }}
-            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-semibold transition ${
-              scaleMode === 'LOGARITHMIC' ? 'clay-pill-active' : 'clay-pill'
+            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-semibold transition cursor-pointer ${
+              scaleMode === 'LOGARITHMIC'
+                ? 'bg-white text-black font-bold shadow-sm'
+                : 'bg-white/[0.04] text-slate-300 hover:text-white border border-white/10'
             }`}
             title="Logarithmic scale"
           >
@@ -3143,8 +3173,10 @@ export default function TradingChart({
               audioHaptics.tick();
               handleSetScaleMode('PERCENTAGE');
             }}
-            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-semibold transition ${
-              scaleMode === 'PERCENTAGE' ? 'clay-pill-active' : 'clay-pill'
+            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-semibold transition cursor-pointer ${
+              scaleMode === 'PERCENTAGE'
+                ? 'bg-white text-black font-bold shadow-sm'
+                : 'bg-white/[0.04] text-slate-300 hover:text-white border border-white/10'
             }`}
             title="Percentage scale"
           >

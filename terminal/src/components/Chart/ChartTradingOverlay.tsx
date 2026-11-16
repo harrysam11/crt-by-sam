@@ -30,7 +30,7 @@ type DragTarget =
   | { type: 'TP'; symbol: string; initialPrice: number };
 
 export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: ChartTradingOverlayProps) {
-  const currentPrice = useTerminalStore((s) => s.currentPrice);
+  const currentPrice = useTerminalStore((s) => s.prices[symbol] ?? (s.symbol === symbol ? s.currentPrice : 0));
   const position = useTerminalStore((s) => s.positions[symbol]);
   const orders = useTerminalStore((s) => s.orders.filter((o) => o.status === 'PENDING' && o.symbol === symbol));
   const alerts = useTerminalStore((s) => s.alerts.filter((a) => !a.triggered && a.active !== false && a.symbol === symbol));

@@ -14,9 +14,11 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useDerivativesStore } from '../../store/useDerivativesStore';
 import { useTerminalStore } from '../../store/useTerminalStore';
 import { useDrawingStore } from '../../store/useDrawingStore';
-import { generateDOMSnapshot, generateFootprintCandle } from '../../services/footprintMath';
+import { wsManager } from '../../services/websocket';
+import { generateDOMSnapshot, generateFootprintCandle, getAssetTickSize } from '../../services/footprintMath';
 import { fmtPrice, fmtQty, labelOf } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
+import type { DOMLevel } from '../../types/derivatives';
 
 export default function FootprintDOM() {
   const symbol = useTerminalStore((s) => s.symbol);
@@ -43,17 +45,49 @@ export default function FootprintDOM() {
   const ladderRef = useRef<HTMLDivElement>(null);
   const [autoCenter, setAutoCenter] = useState<boolean>(true);
 
-  // Generate DOM levels when price updates
+  // Live orderbook depth synchronization from WebSocket, with fallback to proportional DOM levels
   useEffect(() => {
-    if (!currentPrice || currentPrice <= 0) return;
-    const levels = generateDOMSnapshot(currentPrice, 0.5, 12);
-    setDomLevels(levels);
-  }, [currentPrice, setDomLevels]);
+    let hasLiveDepth = false;
+
+    const unsub = wsManager.onDepth((depthSnapshot) => {
+      if (depthSnapshot.symbol === symbol && depthSnapshot.bids.length > 0 && depthSnapshot.asks.length > 0) {
+        hasLiveDepth = true;
+        const levels: DOMLevel[] = [];
+        const topAsks = [...depthSnapshot.asks].slice(0, 14).reverse();
+        topAsks.forEach((a) => {
+          levels.push({
+            price: a.price,
+            bidSize: 0,
+            askSize: a.qty,
+            totalVolume: a.qty,
+          });
+        });
+        const topBids = depthSnapshot.bids.slice(0, 14);
+        topBids.forEach((b) => {
+          levels.push({
+            price: b.price,
+            bidSize: b.qty,
+            askSize: 0,
+            totalVolume: b.qty,
+          });
+        });
+        setDomLevels(levels);
+      }
+    });
+
+    if (!hasLiveDepth && currentPrice && currentPrice > 0) {
+      const tick = getAssetTickSize(currentPrice);
+      const levels = generateDOMSnapshot(currentPrice, tick, 14);
+      setDomLevels(levels);
+    }
+
+    return () => unsub();
+  }, [symbol, currentPrice, setDomLevels]);
 
   // Generate footprint candles from latest candles
   useEffect(() => {
     if (!candles.length) return;
-    const latest = candles.slice(-5).map((c) => generateFootprintCandle(c, 7));
+    const latest = candles.slice(-8).map((c) => generateFootprintCandle(c, 1));
     setFootprintCandles(latest);
   }, [candles, setFootprintCandles]);
 

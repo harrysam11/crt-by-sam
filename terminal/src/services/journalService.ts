@@ -74,11 +74,7 @@ export async function captureChartScreenshot(
           }
         }
 
-        // Stamp subtle institutional watermark
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-        ctx.font = '11px monospace';
-        ctx.fillText(`CRT Terminal Snapshot • ${new Date().toLocaleString()}`, 14, height - 12);
-
+        // Clean TradingView-style export (zero text watermark overlay)
         return offscreen.toDataURL('image/png', 0.95);
       }
     } catch (e) {
@@ -120,12 +116,8 @@ export async function captureChartScreenshot(
     }
   });
 
-  // Stamp timestamp watermark
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-  ctx.font = '11px monospace';
-  ctx.fillText(`CRT Terminal Snapshot • ${new Date().toLocaleString()}`, 12, height - 12);
-
-  return offscreen.toDataURL('image/png', 0.85);
+  // Clean TradingView-style export (zero text watermark overlay)
+  return offscreen.toDataURL('image/png', 0.95);
 }
 
 export const captureMultiCanvasSnapshot = captureChartScreenshot;
