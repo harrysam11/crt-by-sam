@@ -2679,15 +2679,17 @@ export default function TradingChart({
           <GhostOverlay chartApi={chartApi} seriesApi={seriesApi} />
 
           {/* Deep Institutional Studies Overlay (Big Trades, GEX, Deep Zones) */}
-          <DeepStudiesOverlay
-            chartApi={chartApi}
-            seriesApi={seriesApi}
-            candles={effectiveCandles}
-            symbol={symbol}
-            currentPrice={currentPrice}
-            containerWidth={boxDimensions.w}
-            containerHeight={boxDimensions.h}
-          />
+          {activeInstances.some((i) => (i.indicatorId === 'big_trades' || i.indicatorId === 'gex' || i.indicatorId === 'deep_effort') && i.visible) && (
+            <DeepStudiesOverlay
+              chartApi={chartApi}
+              seriesApi={seriesApi}
+              candles={effectiveCandles}
+              symbol={symbol}
+              currentPrice={currentPrice}
+              containerWidth={boxDimensions.w}
+              containerHeight={boxDimensions.h}
+            />
+          )}
 
           {/* TradingView-Style SVG Drawing Tools Canvas Layer */}
           <DrawingOverlay

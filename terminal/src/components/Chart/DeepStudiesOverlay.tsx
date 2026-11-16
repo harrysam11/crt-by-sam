@@ -11,6 +11,7 @@ import type { IChartApi, ISeriesApi, SeriesType, UTCTimestamp } from 'lightweigh
 import type { Candle } from '../../types/terminal';
 import { DeepStudiesEngine, type BigTradeBubble, type GexLevels, type DeepZone } from '../../services/orderflow/deepStudies';
 import { fmtPrice, fmtUsd } from '../../utils/formatters';
+import { useIndicatorsStore } from '../../store/useIndicatorsStore';
 
 interface DeepStudiesOverlayProps {
   chartApi: IChartApi | null;
@@ -39,11 +40,11 @@ export interface DeepStudiesSettings {
 }
 
 export const DEFAULT_DEEP_STUDIES_SETTINGS: DeepStudiesSettings = {
-  showBigTrades: true,
-  minBigTradeUsd: 250000,
-  showGexLevels: true,
-  showDeepZones: true,
-  showEffortResult: true,
+  showBigTrades: false,
+  minBigTradeUsd: 5000000,
+  showGexLevels: false,
+  showDeepZones: false,
+  showEffortResult: false,
   bigTradeBuyColor: '#22c55e',
   bigTradeSellColor: '#ef4444',
   absorptionRingColor: '#f59e0b',
@@ -65,6 +66,11 @@ export default function DeepStudiesOverlay({
 }: DeepStudiesOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  const activeInstances = useIndicatorsStore((s) => s.activeInstances);
+  const isBigTradesActive = activeInstances.some((i) => i.indicatorId === 'big_trades' && i.visible);
+  const isGexActive = activeInstances.some((i) => i.indicatorId === 'gex' && i.visible);
+  const isZonesActive = activeInstances.some((i) => i.indicatorId === 'deep_effort' && i.visible);
+
   // Settings from localStorage with reset support
   const [settings, setSettings] = useState<DeepStudiesSettings>(() => {
     try {
@@ -75,24 +81,28 @@ export default function DeepStudiesOverlay({
     }
   });
 
+  const showBigTrades = isBigTradesActive || settings.showBigTrades;
+  const showGex = isGexActive || settings.showGexLevels;
+  const showZones = isZonesActive || settings.showDeepZones;
+
   const [hoveredTrade, setHoveredTrade] = useState<BigTradeBubble | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
 
   // Compute studies
   const bigTrades = useMemo(() => {
-    if (!settings.showBigTrades) return [];
+    if (!showBigTrades) return [];
     return DeepStudiesEngine.calculateBigTrades(candles, settings.minBigTradeUsd);
-  }, [candles, settings.showBigTrades, settings.minBigTradeUsd]);
+  }, [candles, showBigTrades, settings.minBigTradeUsd]);
 
   const gexLevels = useMemo(() => {
-    if (!settings.showGexLevels) return null;
+    if (!showGex) return null;
     return DeepStudiesEngine.calculateGexLevels(currentPrice, symbol);
-  }, [currentPrice, symbol, settings.showGexLevels]);
+  }, [currentPrice, symbol, showGex]);
 
   const deepZones = useMemo(() => {
-    if (!settings.showDeepZones) return [];
+    if (!showZones) return [];
     return DeepStudiesEngine.calculateDeepZones(candles);
-  }, [candles, settings.showDeepZones]);
+  }, [candles, showZones]);
 
   // Main 60 FPS Render loop
   useEffect(() => {
@@ -111,7 +121,7 @@ export default function DeepStudiesOverlay({
     const timeScale = chartApi.timeScale();
 
     // 1. Render Deep Zones (Supply & Demand Order Blocks)
-    if (settings.showDeepZones) {
+    if (showZones) {
       for (const zone of deepZones) {
         const startX = timeScale.timeToCoordinate(zone.startTime as UTCTimestamp);
         if (startX === null || startX > containerWidth) continue;
@@ -150,7 +160,7 @@ export default function DeepStudiesOverlay({
     }
 
     // 2. Render GEX Levels (Call Wall, Put Wall, Gamma Flip)
-    if (settings.showGexLevels && gexLevels && gexLevels.callWallPrice > 0) {
+    if (showGex && gexLevels && gexLevels.callWallPrice > 0) {
       const levelsToDraw = [
         { label: `CALL WALL $${gexLevels.callWallPrice}`, price: gexLevels.callWallPrice, color: settings.callWallColor },
         { label: `PUT WALL $${gexLevels.putWallPrice}`, price: gexLevels.putWallPrice, color: settings.putWallColor },
@@ -180,7 +190,7 @@ export default function DeepStudiesOverlay({
     }
 
     // 3. Render Big Trades Bubbles
-    if (settings.showBigTrades) {
+    if (showBigTrades) {
       for (const trade of bigTrades) {
         const x = timeScale.timeToCoordinate(trade.time as UTCTimestamp);
         const y = seriesApi.priceToCoordinate(trade.price);
@@ -216,7 +226,14 @@ export default function DeepStudiesOverlay({
     gexLevels,
     deepZones,
     settings,
+    showBigTrades,
+    showGex,
+    showZones,
   ]);
+
+  if (!showBigTrades && !showGex && !showZones) {
+    return null;
+  }
 
   return (
     <div className="pointer-events-none absolute inset-0 z-15 overflow-hidden font-mono select-none">

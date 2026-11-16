@@ -62,7 +62,7 @@ export class DeepStudiesEngine {
    */
   public static calculateBigTrades(
     candles: Candle[],
-    minUsdThreshold: number = 250000
+    minUsdThreshold: number = 5000000
   ): BigTradeBubble[] {
     if (!candles || candles.length === 0) return [];
 
@@ -73,17 +73,18 @@ export class DeepStudiesEngine {
       const c = candles[i];
       const usdSize = c.volume * c.close;
 
-      if (usdSize >= minUsdThreshold || c.volume >= avgVol * 2.2) {
+      // Real institutional whale trade: massive USD value AND volume spike
+      if (usdSize >= minUsdThreshold && c.volume >= avgVol * 3.0) {
         const isBull = c.close >= c.open;
         const bodySize = Math.abs(c.close - c.open);
         const totalRange = Math.max(0.0001, c.high - c.low);
 
         // Absorption: Massive volume with tiny price progress (Effort vs Result divergence)
-        const isAbsorption = c.volume >= avgVol * 2.5 && bodySize / totalRange < 0.28;
+        const isAbsorption = c.volume >= avgVol * 4.0 && bodySize / totalRange < 0.25;
 
-        // Size radius between 6px and 26px
+        // Size radius subtle between 4px and 12px
         const normalized = Math.min(1, usdSize / (minUsdThreshold * 5));
-        const radius = Math.round(6 + normalized * 20);
+        const radius = Math.round(4 + normalized * 8);
 
         bubbles.push({
           id: `bt_${c.time}_${i}`,
