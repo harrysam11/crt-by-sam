@@ -13,6 +13,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useDerivativesStore } from '../../store/useDerivativesStore';
 import { useTerminalStore } from '../../store/useTerminalStore';
+import { useDrawingStore } from '../../store/useDrawingStore';
 import { generateDOMSnapshot, generateFootprintCandle } from '../../services/footprintMath';
 import { fmtPrice, fmtQty, labelOf } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
@@ -65,8 +66,6 @@ export default function FootprintDOM() {
       }
     }
   }, [currentPrice, autoCenter]);
-
-  if (!isDomVisible && !isFootprintVisible) return null;
 
   const currentPos = positions[symbol];
   const pendingOrders = orders.filter((o) => o.symbol === symbol && o.status === 'PENDING');
@@ -160,6 +159,7 @@ export default function FootprintDOM() {
         <button
           onClick={() => {
             audioHaptics.tick();
+            useDrawingStore.getState().setActiveRightDrawer(null);
             if (isDomVisible) toggleDom();
             if (isFootprintVisible) toggleFootprint();
           }}

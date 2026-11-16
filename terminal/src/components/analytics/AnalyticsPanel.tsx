@@ -1,7 +1,15 @@
-import React, { useState } from 'react';
-import { useDerivativesStore } from '../../store/useDerivativesStore';
+import React, { useState, useMemo } from 'react';
 import { useTerminalStore } from '../../store/useTerminalStore';
-import { labelOf } from '../../utils/formatters';
+import { useDrawingStore } from '../../store/useDrawingStore';
+import { audioHaptics } from '../../utils/notify';
+import { labelOf, fmtPrice } from '../../utils/formatters';
+import {
+  calcRSI,
+  calcMACD,
+  calcEMA,
+  calcBollingerBands,
+  calcSMA,
+} from '../../services/indicators/calculations';
 
 interface NewsItem {
   id: string;
@@ -64,22 +72,217 @@ const MONTH_SEASONALITY = [
 
 export default function AnalyticsPanel() {
   const symbol = useTerminalStore((s) => s.symbol);
-  const isAnalyticsVisible = useDerivativesStore((s) => s.isAnalyticsVisible);
-  const toggleAnalytics = useDerivativesStore((s) => s.toggleAnalytics);
+  const candles = useTerminalStore((s) => s.candles);
+  const setActiveRightDrawer = useDrawingStore((s) => s.setActiveRightDrawer);
 
   const [activeTab, setActiveTab] = useState<'TECHNICALS' | 'SEASONALITY' | 'NEWS'>('TECHNICALS');
 
-  if (!isAnalyticsVisible) return null;
+  const technicalData = useMemo(() => {
+    if (!candles || candles.length < 20) {
+      return null;
+    }
+    const closes = candles.map((c) => c.close);
+    const lastCandle = candles[candles.length - 1];
+
+    // RSI 14
+    const rsiArr = calcRSI(closes, 14);
+    const rsiVal = rsiArr[rsiArr.length - 1];
+
+    // MACD 12, 26, 9
+    const macdData = calcMACD(closes, 12, 26, 9);
+    const macdVal = macdData.macd[macdData.macd.length - 1];
+    const signalVal = macdData.signal[macdData.signal.length - 1];
+    const histVal = macdData.histogram[macdData.histogram.length - 1];
+
+    // EMA 50 & 200
+    const ema50Arr = calcEMA(closes, Math.min(50, closes.length));
+    const ema200Arr = calcEMA(closes, Math.min(200, closes.length));
+    const ema50Val = ema50Arr[ema50Arr.length - 1];
+    const ema200Val = ema200Arr[ema200Arr.length - 1];
+
+    // Bollinger Bands 20, 2
+    const bbData = calcBollingerBands(closes, 20, 2);
+    const bbUpper = bbData.upper[bbData.upper.length - 1];
+    const bbLower = bbData.lower[bbData.lower.length - 1];
+    const bbMiddle = bbData.middle[bbData.middle.length - 1];
+
+    // SMA 20
+    const sma20Arr = calcSMA(closes, 20);
+    const sma20Val = sma20Arr[sma20Arr.length - 1];
+
+    // Pivot Points (Classical)
+    const pivot = (lastCandle.high + lastCandle.low + lastCandle.close) / 3;
+    const r1 = 2 * pivot - lastCandle.low;
+    const s1 = 2 * pivot - lastCandle.high;
+    const r2 = pivot + (lastCandle.high - lastCandle.low);
+    const s2 = pivot - (lastCandle.high - lastCandle.low);
+
+    // Scoring signals: Buy, Neutral, Sell
+    let buy = 0;
+    let sell = 0;
+    let neutral = 0;
+
+    // 1. RSI Signal
+    let rsiLabel = 'Neutral';
+    let rsiColor = 'text-amber-300';
+    if (rsiVal !== null) {
+      if (rsiVal > 70) {
+        rsiLabel = 'Overbought';
+        rsiColor = 'text-down';
+        sell++;
+      } else if (rsiVal < 30) {
+        rsiLabel = 'Oversold';
+        rsiColor = 'text-up';
+        buy++;
+      } else if (rsiVal >= 55) {
+        rsiLabel = 'Bullish';
+        rsiColor = 'text-up';
+        buy++;
+      } else if (rsiVal <= 45) {
+        rsiLabel = 'Bearish';
+        rsiColor = 'text-down';
+        sell++;
+      } else {
+        rsiLabel = 'Neutral';
+        rsiColor = 'text-amber-300';
+        neutral++;
+      }
+    }
+
+    // 2. MACD Signal
+    let macdLabel = 'Neutral';
+    let macdColor = 'text-amber-300';
+    if (macdVal !== null && signalVal !== null) {
+      if (macdVal > signalVal) {
+        macdLabel = histVal !== null && histVal > 0 ? 'Bullish Exp.' : 'Bullish Cross';
+        macdColor = 'text-up';
+        buy++;
+      } else {
+        macdLabel = histVal !== null && histVal < 0 ? 'Bearish Exp.' : 'Bearish Cross';
+        macdColor = 'text-down';
+        sell++;
+      }
+    }
+
+    // 3. EMA 50 / 200 Cross
+    let emaLabel = 'Neutral';
+    let emaColor = 'text-amber-300';
+    if (ema50Val !== null && ema200Val !== null) {
+      if (ema50Val > ema200Val) {
+        emaLabel = 'Golden Cross (Bullish)';
+        emaColor = 'text-up';
+        buy++;
+      } else {
+        emaLabel = 'Death Cross (Bearish)';
+        emaColor = 'text-down';
+        sell++;
+      }
+    }
+
+    // 4. Price vs EMA 50
+    if (ema50Val !== null) {
+      if (lastCandle.close > ema50Val) buy++;
+      else sell++;
+    }
+
+    // 5. Price vs BB Middle
+    let bbLabel = 'Neutral';
+    if (bbUpper !== null && bbLower !== null && bbMiddle !== null) {
+      if (lastCandle.close >= bbUpper) {
+        bbLabel = 'Upper Expansion';
+        buy++;
+      } else if (lastCandle.close <= bbLower) {
+        bbLabel = 'Lower Compression';
+        sell++;
+      } else if (lastCandle.close > bbMiddle) {
+        bbLabel = 'Above Mid Band';
+        buy++;
+      } else {
+        bbLabel = 'Below Mid Band';
+        sell++;
+      }
+    }
+
+    // 6. Price vs Pivot
+    if (lastCandle.close > pivot) buy++;
+    else sell++;
+
+    // 7. Price vs SMA 20
+    if (sma20Val !== null) {
+      if (lastCandle.close > sma20Val) buy++;
+      else sell++;
+    }
+
+    const total = buy + sell + neutral || 1;
+    let gaugeText = 'NEUTRAL';
+    let gaugeColor = 'text-amber-400';
+    if (buy >= sell + 3) {
+      gaugeText = 'STRONG BUY';
+      gaugeColor = 'text-up';
+    } else if (buy > sell) {
+      gaugeText = 'BUY';
+      gaugeColor = 'text-up';
+    } else if (sell >= buy + 3) {
+      gaugeText = 'STRONG SELL';
+      gaugeColor = 'text-down';
+    } else if (sell > buy) {
+      gaugeText = 'SELL';
+      gaugeColor = 'text-down';
+    }
+
+    const buyPct = Math.round((buy / total) * 100);
+    const sellPct = Math.round((sell / total) * 100);
+    const neutralPct = Math.max(0, 100 - buyPct - sellPct);
+
+    return {
+      lastCandle,
+      rsiVal,
+      rsiLabel,
+      rsiColor,
+      macdVal,
+      macdLabel,
+      macdColor,
+      ema50Val,
+      ema200Val,
+      emaLabel,
+      emaColor,
+      bbUpper,
+      bbLower,
+      bbMiddle,
+      bbLabel,
+      pivot,
+      r1,
+      s1,
+      r2,
+      s2,
+      buy,
+      sell,
+      neutral,
+      buyPct,
+      sellPct,
+      neutralPct,
+      gaugeText,
+      gaugeColor,
+    };
+  }, [candles]);
 
   return (
-    <div className="flex h-full w-80 shrink-0 flex-col border-l border-grid bg-panel text-xs select-none">
+    <div className="flex h-full w-full shrink-0 flex-col bg-panel text-xs select-none">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-grid px-3 py-2 bg-bg/50">
         <div className="flex items-center gap-2">
           <span className="flex h-2 w-2 rounded-full bg-accent" />
           <h3 className="font-bold uppercase tracking-wider text-white">Institutional Analytics</h3>
         </div>
-        <button onClick={toggleAnalytics} className="text-muted hover:text-white" aria-label="Close">
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            setActiveRightDrawer(null);
+          }}
+          className="clay-btn h-7 w-7 text-muted hover:text-white"
+          aria-label="Close"
+          title="Close Analytics"
+        >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -91,7 +294,10 @@ export default function AnalyticsPanel() {
         {(['TECHNICALS', 'SEASONALITY', 'NEWS'] as const).map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => {
+              audioHaptics.tick();
+              setActiveTab(tab);
+            }}
             className={`flex-1 py-1.5 text-center font-semibold transition ${
               activeTab === tab ? 'border-b-2 border-accent text-white' : 'text-muted hover:text-white'
             }`}
@@ -108,16 +314,27 @@ export default function AnalyticsPanel() {
             {/* Master Meter Gauge */}
             <div className="rounded-xl border border-grid bg-bg/50 p-4 text-center">
               <span className="text-[10px] uppercase tracking-wider text-muted">Summary Gauge</span>
-              <div className="my-2 text-lg font-extrabold text-up">STRONG BUY</div>
+              <div className={`my-2 text-lg font-extrabold ${technicalData?.gaugeColor || 'text-white'}`}>
+                {technicalData?.gaugeText || 'CALCULATING...'}
+              </div>
               <div className="flex h-2 overflow-hidden rounded-full bg-grid">
-                <div className="w-[15%] bg-down" />
-                <div className="w-[20%] bg-amber-400" />
-                <div className="w-[65%] bg-up" />
+                <div
+                  className="bg-down transition-all duration-300"
+                  style={{ width: `${technicalData?.sellPct ?? 0}%` }}
+                />
+                <div
+                  className="bg-amber-400 transition-all duration-300"
+                  style={{ width: `${technicalData?.neutralPct ?? 100}%` }}
+                />
+                <div
+                  className="bg-up transition-all duration-300"
+                  style={{ width: `${technicalData?.buyPct ?? 0}%` }}
+                />
               </div>
               <div className="mt-2 flex justify-between text-[10px] text-muted font-mono">
-                <span>Sell (2)</span>
-                <span>Neutral (3)</span>
-                <span>Buy (11)</span>
+                <span>Sell ({technicalData?.sell ?? 0})</span>
+                <span>Neutral ({technicalData?.neutral ?? 0})</span>
+                <span>Buy ({technicalData?.buy ?? 0})</span>
               </div>
             </div>
 
@@ -125,28 +342,62 @@ export default function AnalyticsPanel() {
             <div className="rounded-xl border border-grid bg-bg/50 p-3">
               <h4 className="text-[11px] font-bold text-white mb-2 uppercase tracking-wider">Oscillators & Trend</h4>
               <div className="space-y-2 font-mono text-[11px]">
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-muted">RSI (14)</span>
-                  <span className="text-amber-300 font-semibold">58.4 (Neutral)</span>
+                  <span className={`font-semibold ${technicalData?.rsiColor || 'text-white'}`}>
+                    {technicalData?.rsiVal !== null && technicalData?.rsiVal !== undefined
+                      ? `${technicalData.rsiVal.toFixed(1)} (${technicalData.rsiLabel})`
+                      : 'N/A'}
+                  </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-muted">MACD (12, 26, 9)</span>
-                  <span className="text-up font-semibold">+142.5 (Bullish Cross)</span>
+                  <span className={`font-semibold ${technicalData?.macdColor || 'text-white'}`}>
+                    {technicalData?.macdVal !== null && technicalData?.macdVal !== undefined
+                      ? `${technicalData.macdVal >= 0 ? '+' : ''}${technicalData.macdVal.toFixed(1)} (${technicalData.macdLabel})`
+                      : 'N/A'}
+                  </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-muted">EMA 50 / 200</span>
-                  <span className="text-up font-semibold">Golden Cross (Buy)</span>
+                  <span className={`font-semibold ${technicalData?.emaColor || 'text-white'}`}>
+                    {technicalData?.emaLabel || 'N/A'}
+                  </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-muted">Bollinger Bands</span>
-                  <span className="text-white">Upper Band Expansion</span>
+                  <span className="text-white font-semibold">
+                    {technicalData?.bbLabel || 'N/A'}
+                  </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-muted">Pivot Point (R1)</span>
-                  <span className="text-white">$96,450</span>
+                  <span className="text-white font-semibold">
+                    {technicalData?.r1 !== undefined ? fmtPrice(technicalData.r1, symbol) : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted">Pivot Point (S1)</span>
+                  <span className="text-white font-semibold">
+                    {technicalData?.s1 !== undefined ? fmtPrice(technicalData.s1, symbol) : 'N/A'}
+                  </span>
                 </div>
               </div>
             </div>
+
+            {/* Price reference card */}
+            {technicalData?.lastCandle && (
+              <div className="rounded-xl border border-grid bg-bg/30 p-2.5 font-mono text-[10px] text-muted space-y-1">
+                <div className="flex justify-between">
+                  <span>Current Spot</span>
+                  <span className="text-white font-bold">{fmtPrice(technicalData.lastCandle.close, symbol)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Pivot Center (P)</span>
+                  <span className="text-amber-300">{fmtPrice(technicalData.pivot, symbol)}</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

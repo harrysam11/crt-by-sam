@@ -667,6 +667,17 @@ export default function TradingChart({
     useDrawingStore.getState().setActiveIndicatorsTelemetry(activeIndicatorsList);
   }, [activeIndicatorsList]);
 
+  const box = useRef<HTMLDivElement>(null);
+  const ohlc = useRef<HTMLDivElement>(null);
+  const api = useRef<Api | null>(null);
+  const live = useRef<LiveInd>({ closes: [], lastTime: 0, emaPrev: null, lastEma: null });
+  const hovering = useRef(false);
+
+  // Expose chart APIs to state for overlay layers (Ghost / Canvas drag & drop)
+  const [chartApi, setChartApi] = useState<IChartApi | null>(null);
+  const [seriesApi, setSeriesApi] = useState<ISeriesApi<SeriesType> | null>(null);
+  const [boxDimensions, setBoxDimensions] = useState<{ w: number; h: number }>({ w: 800, h: 500 });
+
   // Effective candles respecting Bar Replay slice
   const effectiveCandles = useMemo(() => {
     if (!isReplayActive) return activeCandles;
@@ -676,32 +687,50 @@ export default function TradingChart({
   // Replay playback interval timer
   useEffect(() => {
     if (!isReplayActive || !isReplayPlaying) return;
+    const targetCandles = activeCandles.length ? activeCandles : candles;
     const interval = setInterval(() => {
       setReplayIndex((prev) => {
-        if (prev >= candles.length - 1) {
+        if (prev >= targetCandles.length - 1) {
           setIsReplayPlaying(false);
           return prev;
         }
         audioHaptics.tick();
         const next = prev + 1;
-        if (candles[next]) {
-          useTerminalStore.getState().updatePriceTick(symbol, candles[next].close);
+        if (targetCandles[next]) {
+          useTerminalStore.getState().updatePriceTick(symbol, targetCandles[next].close);
         }
         return next;
       });
+      if (chartApi) {
+        try {
+          chartApi.timeScale().scrollToRealTime();
+        } catch {}
+      }
     }, replaySpeedMs);
     return () => clearInterval(interval);
-  }, [isReplayActive, isReplayPlaying, replaySpeedMs, candles, symbol]);
+  }, [isReplayActive, isReplayPlaying, replaySpeedMs, activeCandles, candles, symbol, chartApi]);
 
   const startReplay = () => {
     audioHaptics.tick();
     setIsReplayActive(true);
-    const startIdx = Math.max(0, candles.length - 40);
+    const targetCandles = activeCandles.length ? activeCandles : candles;
+    const startIdx = Math.max(0, targetCandles.length - 40);
     setReplayIndex(startIdx);
     setIsReplayPlaying(false);
-    if (candles[startIdx]) {
-      useTerminalStore.getState().updatePriceTick(symbol, candles[startIdx].close);
+    if (targetCandles[startIdx]) {
+      useTerminalStore.getState().updatePriceTick(symbol, targetCandles[startIdx].close);
     }
+    setTimeout(() => {
+      if (chartApi) {
+        try {
+          chartApi.timeScale().setVisibleLogicalRange({
+            from: Math.max(0, startIdx - 80),
+            to: startIdx + 8,
+          });
+          chartApi.timeScale().scrollToRealTime();
+        } catch {}
+      }
+    }, 50);
   };
 
   const exitReplay = () => {
@@ -709,17 +738,30 @@ export default function TradingChart({
     setIsReplayActive(false);
     setIsReplayPlaying(false);
     setIsSelectingCutPoint(false);
+    setTimeout(() => {
+      if (chartApi) {
+        try {
+          chartApi.timeScale().scrollToRealTime();
+        } catch {}
+      }
+    }, 50);
   };
 
   const handleStepForward = () => {
     audioHaptics.tick();
+    const targetCandles = activeCandles.length ? activeCandles : candles;
     setReplayIndex((prev) => {
-      const next = Math.min(candles.length - 1, prev + 1);
-      if (candles[next]) {
-        useTerminalStore.getState().updatePriceTick(symbol, candles[next].close);
+      const next = Math.min(targetCandles.length - 1, prev + 1);
+      if (targetCandles[next]) {
+        useTerminalStore.getState().updatePriceTick(symbol, targetCandles[next].close);
       }
       return next;
     });
+    if (chartApi) {
+      try {
+        chartApi.timeScale().scrollToRealTime();
+      } catch {}
+    }
   };
 
   const handleToggleIndicator = (key: string) => {
@@ -769,16 +811,7 @@ export default function TradingChart({
     closeAllMenus();
   };
 
-  const box = useRef<HTMLDivElement>(null);
-  const ohlc = useRef<HTMLDivElement>(null);
-  const api = useRef<Api | null>(null);
-  const live = useRef<LiveInd>({ closes: [], lastTime: 0, emaPrev: null, lastEma: null });
-  const hovering = useRef(false);
 
-  // Expose chart APIs to state for overlay layers (Ghost / Canvas drag & drop)
-  const [chartApi, setChartApi] = useState<IChartApi | null>(null);
-  const [seriesApi, setSeriesApi] = useState<ISeriesApi<SeriesType> | null>(null);
-  const [boxDimensions, setBoxDimensions] = useState<{ w: number; h: number }>({ w: 800, h: 500 });
 
   // Trade Execution Hover Details Tooltip State & Cache
   interface HoveredExecution {
@@ -1499,6 +1532,22 @@ export default function TradingChart({
     if (isInitialLoad) {
       hasFittedSymbolRef.current[symbol] = true;
       a.chart.timeScale().fitContent();
+    } else if (isReplayActive) {
+      try {
+        const curLen = displayCandles.length;
+        const currentRange = a.chart.timeScale().getVisibleLogicalRange();
+        if (
+          !currentRange ||
+          currentRange.from > curLen ||
+          currentRange.to < 0 ||
+          currentRange.to > curLen + 40
+        ) {
+          a.chart.timeScale().setVisibleLogicalRange({
+            from: Math.max(0, curLen - 80),
+            to: curLen + 8,
+          });
+        }
+      } catch {}
     }
     const lastBar = displayCandles[n - 1];
     writeOhlc(lastBar);
@@ -2722,25 +2771,56 @@ export default function TradingChart({
         <div className="relative min-h-0 flex-1 h-full overflow-hidden flex flex-col">
           {/* Main Price Chart Pane */}
           <div
-            className="relative flex-1 min-h-0 w-full overflow-hidden"
+            className={`relative flex-1 min-h-0 w-full overflow-hidden ${isSelectingCutPoint ? 'cursor-crosshair' : ''}`}
             onClick={(e) => {
               if (!isSelectingCutPoint || !chartApi || !box.current) return;
               const rect = box.current.getBoundingClientRect();
               const x = e.clientX - rect.left;
-              const time = chartApi.timeScale().coordinateToTime(x);
-              if (time) {
-                const idx = candles.findIndex((c) => c.time >= (time as number));
-                if (idx !== -1) {
-                  audioHaptics.tick();
-                  setReplayIndex(idx);
-                  setIsSelectingCutPoint(false);
-                  if (candles[idx]) {
-                    useTerminalStore.getState().updatePriceTick(symbol, candles[idx].close);
-                  }
+              const targetCandles = activeCandles.length ? activeCandles : candles;
+              if (!targetCandles.length) return;
+
+              // Use logical coordinate for exact bar mapping
+              const logical = chartApi.timeScale().coordinateToLogical(x);
+              let idx = -1;
+              if (logical !== null && Number.isFinite(logical)) {
+                idx = Math.max(0, Math.min(targetCandles.length - 1, Math.round(logical)));
+              } else {
+                const time = chartApi.timeScale().coordinateToTime(x);
+                if (time) {
+                  idx = targetCandles.findIndex((c) => c.time >= (time as number));
+                  if (idx === -1 && targetCandles.length) idx = targetCandles.length - 1;
                 }
+              }
+
+              if (idx !== -1) {
+                audioHaptics.tick();
+                setIsReplayActive(true);
+                setReplayIndex(idx);
+                setIsSelectingCutPoint(false);
+                if (targetCandles[idx]) {
+                  useTerminalStore.getState().updatePriceTick(symbol, targetCandles[idx].close);
+                }
+
+                // Smoothly anchor the viewport to the cut candle so the chart NEVER disappears
+                setTimeout(() => {
+                  try {
+                    chartApi.timeScale().setVisibleLogicalRange({
+                      from: Math.max(0, idx - 80),
+                      to: idx + 8,
+                    });
+                    chartApi.timeScale().scrollToRealTime();
+                  } catch {}
+                }, 40);
               }
             }}
           >
+          {/* Floating Cut Tool Hint Pill */}
+          {isSelectingCutPoint && (
+            <div className="clay-popover absolute top-12 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-1.5 font-mono text-xs text-white border border-accent/60 shadow-2xl pointer-events-none animate-pulse">
+              <span className="h-2 w-2 rounded-full bg-accent" />
+              <span className="font-semibold">Click any candle on chart to cut history at that point</span>
+            </div>
+          )}
           {/* Institutional TradingView-Grade In-Chart Legend HUD */}
           <ChartLegendHUD
             symbol={symbol}
