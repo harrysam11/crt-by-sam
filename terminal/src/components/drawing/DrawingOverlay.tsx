@@ -313,13 +313,38 @@ export default function DrawingOverlay({
       setSelectedDrawingIds([]);
       setActiveDrawing(null);
     });
+    const unsubReload = drawingEvents.onReloadDrawings((newDrawings) => {
+      if (newDrawings) {
+        setDrawings(newDrawings);
+        pushState(newDrawings);
+      } else {
+        try {
+          const stored = localStorage.getItem(`crt_drawings_${symbol}`);
+          const loaded: DrawingItem[] = stored ? JSON.parse(stored) : [];
+          setDrawings(loaded);
+          pushState(loaded);
+        } catch {}
+      }
+    });
+
+    const handleCustomEvent = (e: Event) => {
+      const custom = e as CustomEvent<{ symbol: string; drawings: DrawingItem[] }>;
+      if (custom.detail && custom.detail.symbol === symbol) {
+        setDrawings(custom.detail.drawings);
+        pushState(custom.detail.drawings);
+      }
+    };
+    window.addEventListener('crt_drawings_updated', handleCustomEvent);
+
     return () => {
       unsubUpdate();
       unsubDelete();
       unsubOpenSettings();
       unsubClear();
+      unsubReload();
+      window.removeEventListener('crt_drawings_updated', handleCustomEvent);
     };
-  }, [drawings, pushState, setSelectedDrawingIds]);
+  }, [drawings, pushState, setSelectedDrawingIds, symbol]);
 
   // Reload drawings when symbol switches
   useEffect(() => {
@@ -1703,8 +1728,6 @@ export default function DrawingOverlay({
         }}
         onSave={(id, patch) => {
           updateDrawing(id, patch);
-          setIsSettingsModalOpen(false);
-          setEditingDrawing(null);
         }}
         onDelete={(id) => {
           deleteDrawing(id);

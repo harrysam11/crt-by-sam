@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { positionPnlUsd, useTerminalStore } from '../../store/useTerminalStore';
 import { useExecutionEngineStore } from '../../store/useExecutionEngineStore';
+import { useGuardianStore } from '../../store/useGuardianStore';
 import { fmtPnl, fmtPrice, fmtQty, fmtTime, labelOf, pnlClass } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
 import AlertsTab from './AlertsTab';
@@ -51,9 +52,13 @@ export default function PositionsTable({
   const closePartial = useTerminalStore((s) => s.closePartialPosition);
   const flip = useTerminalStore((s) => s.flipPosition);
   const snapBE = useTerminalStore((s) => s.snapBreakEven);
+  const setTrailingStop = useTerminalStore((s) => s.setTrailingStop);
   const closeAll = useTerminalStore((s) => s.closeAllPositions);
   const cancel = useTerminalStore((s) => s.cancelOrder);
   const setSymbol = useTerminalStore((s) => s.setSymbol);
+
+  // TradeXGuardian Emergency Lock state
+  const guardianEmergencyLocked = useGuardianStore((s) => s.emergencyLocked);
 
   // Quantum Bulk Actions from Store
   const bulkClosePositions = useTerminalStore((s) => s.bulkClosePositions);
@@ -471,9 +476,28 @@ export default function PositionsTable({
                         <button
                           onClick={() => {
                             audioHaptics.tick();
+                            const val = window.prompt(`Set Trailing Stop % for ${p.symbol}:`, '1.5');
+                            if (val) {
+                              const pct = parseFloat(val);
+                              if (pct > 0) setTrailingStop(p.symbol, pct);
+                            }
+                          }}
+                          className="rounded border border-grid px-1.5 py-0.5 text-[11px] text-muted hover:border-emerald-400 hover:text-emerald-300 transition"
+                          title="Attach Trailing Stop Loss order that ratchets with favorable price movement"
+                        >
+                          Trail
+                        </button>
+                        <button
+                          disabled={guardianEmergencyLocked}
+                          onClick={() => {
+                            if (guardianEmergencyLocked) {
+                              audioHaptics.error();
+                              return;
+                            }
+                            audioHaptics.tick();
                             flip(p.symbol);
                           }}
-                          className="rounded border border-grid px-1.5 py-0.5 text-[11px] text-muted hover:border-amber-400 hover:text-amber-300 transition"
+                          className="rounded border border-grid px-1.5 py-0.5 text-[11px] text-muted hover:border-amber-400 hover:text-amber-300 transition disabled:opacity-40 disabled:cursor-not-allowed"
                           title="Reverse Position Direction at Market"
                         >
                           Flip

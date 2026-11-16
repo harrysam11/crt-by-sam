@@ -159,7 +159,7 @@ export function computeActiveSessions(now: Date = new Date()): {
   const activeKillzones: KillzoneInfo[] = KILLZONES.map((kz) => ({
     ...kz,
     isActive: isHourInRange(utcHours, kz.startHourUtc, kz.endHourUtc),
-  }));
+  })).filter((kz) => kz.isActive);
 
   const activeLondon = sessions.find((s) => s.id === 'LONDON')?.isActive;
   const activeNy = sessions.find((s) => s.id === 'NEW_YORK')?.isActive;

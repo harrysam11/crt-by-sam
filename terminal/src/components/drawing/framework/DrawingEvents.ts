@@ -5,6 +5,7 @@ type ToolSelectListener = (tool: ToolType) => void;
 type UpdateDrawingListener = (id: string, patch: Partial<DrawingItem>) => void;
 type DeleteDrawingListener = (id: string) => void;
 type OpenDrawingSettingsListener = (drawing: DrawingItem) => void;
+type ReloadDrawingsListener = (drawings?: DrawingItem[]) => void;
 
 class DrawingEventEmitter {
   private undoListeners = new Set<DrawingEventListener>();
@@ -14,6 +15,7 @@ class DrawingEventEmitter {
   private updateDrawingListeners = new Set<UpdateDrawingListener>();
   private deleteDrawingListeners = new Set<DeleteDrawingListener>();
   private openDrawingSettingsListeners = new Set<OpenDrawingSettingsListener>();
+  private reloadDrawingsListeners = new Set<ReloadDrawingsListener>();
 
   onUndo(fn: DrawingEventListener): () => void {
     this.undoListeners.add(fn);
@@ -50,6 +52,11 @@ class DrawingEventEmitter {
     return () => this.openDrawingSettingsListeners.delete(fn);
   }
 
+  onReloadDrawings(fn: ReloadDrawingsListener): () => void {
+    this.reloadDrawingsListeners.add(fn);
+    return () => this.reloadDrawingsListeners.delete(fn);
+  }
+
   undo(): void {
     this.undoListeners.forEach((fn) => fn());
   }
@@ -76,6 +83,10 @@ class DrawingEventEmitter {
 
   emitOpenDrawingSettings(drawing: DrawingItem): void {
     this.openDrawingSettingsListeners.forEach((fn) => fn(drawing));
+  }
+
+  emitReloadDrawings(drawings?: DrawingItem[]): void {
+    this.reloadDrawingsListeners.forEach((fn) => fn(drawings));
   }
 }
 

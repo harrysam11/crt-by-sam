@@ -168,6 +168,12 @@ export default function DrawingSettingsModal({
 
   const supportsExtend = ['TRENDLINE', 'RAY'].includes(drawing.type);
 
+  const applyLiveChange = (fieldPatch: Partial<DrawingItem>) => {
+    if (drawing) {
+      onSave(drawing.id, fieldPatch);
+    }
+  };
+
   const handleApply = () => {
     audioHaptics.tick();
     const patch: Partial<DrawingItem> = {
@@ -296,7 +302,10 @@ export default function DrawingSettingsModal({
                     {PRESET_COLORS.map((c) => (
                       <button
                         key={c}
-                        onClick={() => setColor(c)}
+                        onClick={() => {
+                          setColor(c);
+                          applyLiveChange({ color: c });
+                        }}
                         style={{ backgroundColor: c }}
                         className={`h-5 w-5 rounded-full border transition ${
                           color === c ? 'border-white scale-110 shadow-md' : 'border-black/50 hover:scale-105'
@@ -306,7 +315,11 @@ export default function DrawingSettingsModal({
                     <input
                       type="color"
                       value={color}
-                      onChange={(e) => setColor(e.target.value)}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        setColor(next);
+                        applyLiveChange({ color: next });
+                      }}
                       className="h-5 w-5 rounded-full cursor-pointer bg-transparent border-0 p-0"
                       title="Custom Color"
                     />
@@ -315,7 +328,11 @@ export default function DrawingSettingsModal({
                   {/* Width */}
                   <select
                     value={lineWidth}
-                    onChange={(e) => setLineWidth(Number(e.target.value))}
+                    onChange={(e) => {
+                      const next = Number(e.target.value);
+                      setLineWidth(next);
+                      applyLiveChange({ lineWidth: next });
+                    }}
                     className="clay-inset px-2.5 py-1.5 text-xs text-white rounded bg-slate-900 border border-grid focus:outline-none"
                   >
                     <option value={1}>1 px</option>
@@ -327,7 +344,11 @@ export default function DrawingSettingsModal({
                   {/* Style */}
                   <select
                     value={lineStyle}
-                    onChange={(e) => setLineStyle(e.target.value as any)}
+                    onChange={(e) => {
+                      const next = e.target.value as any;
+                      setLineStyle(next);
+                      applyLiveChange({ lineStyle: next });
+                    }}
                     className="clay-inset px-2.5 py-1.5 text-xs text-white rounded bg-slate-900 border border-grid focus:outline-none"
                   >
                     <option value="solid">Solid</option>
@@ -345,7 +366,14 @@ export default function DrawingSettingsModal({
                       <input
                         type="checkbox"
                         checked={hasFill}
-                        onChange={(e) => setHasFill(e.target.checked)}
+                        onChange={(e) => {
+                          const next = e.target.checked;
+                          setHasFill(next);
+                          applyLiveChange({
+                            fillColor: next ? fillColor : undefined,
+                            fillOpacity: next ? fillOpacity : undefined,
+                          });
+                        }}
                         className="rounded border-grid text-accent focus:ring-0"
                       />
                       <span>Background Fill</span>
@@ -358,7 +386,10 @@ export default function DrawingSettingsModal({
                         {PRESET_COLORS.map((c) => (
                           <button
                             key={c}
-                            onClick={() => setFillColor(c)}
+                            onClick={() => {
+                              setFillColor(c);
+                              applyLiveChange({ fillColor: c });
+                            }}
                             style={{ backgroundColor: c }}
                             className={`h-5 w-5 rounded-full border transition ${
                               fillColor === c ? 'border-white scale-110 shadow-md' : 'border-black/50 hover:scale-105'
@@ -374,7 +405,11 @@ export default function DrawingSettingsModal({
                           max="1"
                           step="0.05"
                           value={fillOpacity}
-                          onChange={(e) => setFillOpacity(parseFloat(e.target.value))}
+                          onChange={(e) => {
+                            const next = parseFloat(e.target.value);
+                            setFillOpacity(next);
+                            applyLiveChange({ fillOpacity: next });
+                          }}
                           className="flex-1 accent-accent"
                         />
                         <span className="text-slate-200 text-[10px] w-8 font-mono">{Math.round(fillOpacity * 100)}%</span>
@@ -393,7 +428,11 @@ export default function DrawingSettingsModal({
                       <input
                         type="checkbox"
                         checked={extendLeft}
-                        onChange={(e) => setExtendLeft(e.target.checked)}
+                        onChange={(e) => {
+                          const next = e.target.checked;
+                          setExtendLeft(next);
+                          applyLiveChange({ extendLeft: next });
+                        }}
                         className="rounded border-grid text-accent focus:ring-0"
                       />
                       <span>Extend Left</span>
@@ -402,7 +441,11 @@ export default function DrawingSettingsModal({
                       <input
                         type="checkbox"
                         checked={extendRight}
-                        onChange={(e) => setExtendRight(e.target.checked)}
+                        onChange={(e) => {
+                          const next = e.target.checked;
+                          setExtendRight(next);
+                          applyLiveChange({ extendRight: next });
+                        }}
                         className="rounded border-grid text-accent focus:ring-0"
                       />
                       <span>Extend Right</span>
@@ -619,7 +662,11 @@ export default function DrawingSettingsModal({
                   <input
                     type="checkbox"
                     checked={locked}
-                    onChange={(e) => setLocked(e.target.checked)}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setLocked(next);
+                      applyLiveChange({ locked: next });
+                    }}
                     className="rounded border-grid text-accent focus:ring-0"
                   />
                   <div>
@@ -632,7 +679,11 @@ export default function DrawingSettingsModal({
                   <input
                     type="checkbox"
                     checked={hidden}
-                    onChange={(e) => setHidden(e.target.checked)}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setHidden(next);
+                      applyLiveChange({ hidden: next });
+                    }}
                     className="rounded border-grid text-accent focus:ring-0"
                   />
                   <div>

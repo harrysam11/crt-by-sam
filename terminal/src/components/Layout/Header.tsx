@@ -4,6 +4,7 @@ import { usePsychologyStore } from '../../store/usePsychologyStore';
 import { useJournalStore } from '../../store/useJournalStore';
 import { useDerivativesStore } from '../../store/useDerivativesStore';
 import { useTradingModeStore } from '../../store/useTradingModeStore';
+import { useGuardianStore } from '../../store/useGuardianStore';
 import { getInstrument } from '../../services/instruments';
 import { fmtPct, fmtPnl, fmtPrice, fmtUsd, labelOf, pnlClass } from '../../utils/formatters';
 import { BreathingHalo } from '../../features/zen/ZenController';
@@ -28,6 +29,7 @@ interface HeaderProps {
   onOpenCalendar?: () => void;
   onOpenScreener?: () => void;
   onOpenSessions?: () => void;
+  onOpenGuardian?: () => void;
   onOpenSettings?: (tab?: 'PROFILE' | 'BILLING' | 'THEME' | 'LANGUAGE' | 'TELEGRAM') => void;
   onTogglePopout?: () => void;
   isPopoutActive?: boolean;
@@ -47,6 +49,7 @@ export default function Header({
   onOpenCalendar,
   onOpenScreener,
   onOpenSessions,
+  onOpenGuardian,
   onOpenSettings,
   onTogglePopout,
   isPopoutActive,
@@ -164,6 +167,11 @@ export default function Header({
   const tradingMode = useTradingModeStore((s) => s.mode);
   const toggleTradingMode = useTradingModeStore((s) => s.toggleMode);
   const [showLiveWarning, setShowLiveWarning] = useState(false);
+
+  // TradeXGuardian Store
+  const guardianEmergencyLocked = useGuardianStore((s) => s.emergencyLocked);
+  const guardianDisciplineScore = useGuardianStore((s) => s.disciplineScore);
+  const guardianEnabled = useGuardianStore((s) => s.enabled);
 
   // Institutional Market Sessions & Killzones Real-Time Engine
   const [sessionData, setSessionData] = useState(() => computeActiveSessions());
@@ -299,31 +307,35 @@ export default function Header({
           className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold border transition hidden xl:inline-flex items-center gap-1.5 cursor-pointer ${
             sessionData.isLondonNyOverlap
               ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
-              : sessionData.activeKillzones.length > 0
+              : sessionData.activeKillzones.filter(k => k.isActive).length > 0
               ? 'border-amber-500/50 bg-amber-500/15 text-amber-300'
               : sessionData.activeCount > 0
               ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300'
               : 'clay-badge text-zinc-400'
           }`}
           title={
-            `Active Sessions: ${sessionData.sessions.filter(s => s.isActive).map(s => s.name).join(', ') || 'Inter-Session'}` +
-            (sessionData.activeKillzones.length > 0 ? ` | Killzone: ${sessionData.activeKillzones.map(k => k.name).join(', ')}` : '') +
-            ` (UTC ${sessionData.currentUtcTimeString}) - Click to open Sessions & DB Backup`
+            `Sessions: ${sessionData.sessions.filter(s => s.isActive).map(s => s.name).join(', ') || 'Inter-Session'}` +
+            (sessionData.activeKillzones.filter(k => k.isActive).length > 0 ? ` | KZ: ${sessionData.activeKillzones.filter(k => k.isActive).map(k => k.name).join(', ')}` : '') +
+            ` | UTC: ${sessionData.currentUtcTimeString} | Click to open Sessions`
           }
         >
           <span className={`h-1.5 w-1.5 rounded-full ${
             sessionData.isLondonNyOverlap ? 'bg-emerald-400 animate-pulse' :
-            sessionData.activeKillzones.length > 0 ? 'bg-amber-400 animate-pulse' :
+            sessionData.activeKillzones.filter(k => k.isActive).length > 0 ? 'bg-amber-400 animate-pulse' :
             sessionData.activeCount > 0 ? 'bg-cyan-400' : 'bg-zinc-500'
           }`} />
           <span>
             {sessionData.isLondonNyOverlap
               ? 'LON / NY [OVERLAP]'
-              : sessionData.activeKillzones.length > 0
-              ? `${sessionData.activeKillzones[0].name.toUpperCase()}`
-              : sessionData.sessions.find(s => s.isActive)
-              ? `${sessionData.sessions.find(s => s.isActive)?.name.toUpperCase()}`
-              : `${sessionInfo.name}: ${sessionInfo.remaining}`}
+              : sessionData.activeKillzones.filter(k => k.isActive).length > 0
+              ? `${sessionData.activeKillzones.filter(k => k.isActive)[0].name.toUpperCase()}${
+                  sessionData.sessions.filter(s => s.isActive).length > 0
+                    ? ` | ${sessionData.sessions.filter(s => s.isActive).map(s => s.name.split(' ')[0].toUpperCase()).join('+')}`
+                    : ''
+                }`
+              : sessionData.sessions.filter(s => s.isActive).length > 0
+              ? sessionData.sessions.filter(s => s.isActive).map(s => s.name.split(' ')[0].toUpperCase()).join(' + ')
+              : `Next: ${sessionInfo.name} in ${sessionInfo.remaining}`}
           </span>
         </button>
       </div>
@@ -474,6 +486,18 @@ export default function Header({
                     className="clay-btn py-1 text-center font-bold text-[11px] text-white"
                   >
                     Broker Vault
+                  </button>
+                )}
+                {onOpenGuardian && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenGuardian(); setIsAccountOpen(false); }}
+                    className={`py-1 text-center font-bold text-[11px] rounded border transition ${
+                      guardianEmergencyLocked
+                        ? 'border-red-500/50 bg-red-500/15 text-red-400 animate-pulse'
+                        : 'clay-btn text-white'
+                    }`}
+                  >
+                    {guardianEmergencyLocked ? '[GUARDIAN LOCKED]' : 'TradeXGuardian'}
                   </button>
                 )}
               </div>
@@ -629,6 +653,22 @@ export default function Header({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                     <span>Risk Manager & Margin</span>
+                  </button>
+                )}
+                {onOpenGuardian && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenGuardian(); setIsInstToolsOpen(false); }}
+                    className="flex w-full items-center justify-between px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                  >
+                    <div className="flex items-center gap-2">
+                      <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      <span>TradeXGuardian Protection</span>
+                    </div>
+                    <span className={`text-[10px] font-bold px-1 rounded ${guardianDisciplineScore >= 80 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                      {guardianDisciplineScore}%
+                    </span>
                   </button>
                 )}
                 {onOpenTax && (
@@ -814,6 +854,28 @@ export default function Header({
               </div>
             )}
           </div>
+
+          {/* TradeXGuardian Capital Protection Pill */}
+          {onOpenGuardian && (
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                onOpenGuardian();
+              }}
+              className={`px-2 py-1 text-xs font-semibold rounded-[6px] border transition hidden md:flex items-center gap-1.5 ${
+                guardianEmergencyLocked
+                  ? 'border-red-500/60 bg-red-500/20 text-red-400 animate-pulse'
+                  : 'clay-btn text-white'
+              }`}
+              title={`TradeXGuardian Protection System | Discipline Score: ${guardianDisciplineScore}%`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${guardianEmergencyLocked ? 'bg-red-400 animate-pulse' : guardianEnabled ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
+              <span className="hidden xl:inline">Guardian</span>
+              <span className={`text-[10px] font-bold ${guardianDisciplineScore >= 80 ? 'text-emerald-400' : guardianDisciplineScore >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                {guardianDisciplineScore}%
+              </span>
+            </button>
+          )}
 
           {/* Settings & Account Center */}
           {onOpenSettings && (
@@ -1099,6 +1161,22 @@ export default function Header({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7C5 4 4 5 4 7zm0 4h16M8 4v3m8-3v3" />
                       </svg>
                       <span>Trading Sessions & DB Backup</span>
+                    </button>
+                  )}
+                  {onOpenGuardian && (
+                    <button
+                      onClick={() => { audioHaptics.tick(); onOpenGuardian(); setIsOverflowOpen(false); }}
+                      className="flex w-full items-center justify-between px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                    >
+                      <div className="flex items-center gap-2">
+                        <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        <span>TradeXGuardian Protection</span>
+                      </div>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${guardianDisciplineScore >= 80 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                        {guardianDisciplineScore}%
+                      </span>
                     </button>
                   )}
 

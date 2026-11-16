@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { freeMargin, LEVERAGES, useTerminalStore } from '../../store/useTerminalStore';
 import { usePsychologyStore } from '../../store/usePsychologyStore';
 import { useDerivativesStore } from '../../store/useDerivativesStore';
+import { useGuardianStore, type GuardianCheckResult } from '../../store/useGuardianStore';
 import { getInstrument, toUsd } from '../../services/instruments';
 import { fmtPrice, fmtQty, fmtUsd, labelOf } from '../../utils/formatters';
 import { logTradeToJournal } from '../../services/journalService';
 import { calculateDerivativesMargin } from '../../services/deltaExchange';
 import { audioHaptics } from '../../utils/notify';
+import GuardianConfirmModal from '../guardian/GuardianConfirmModal';
 import type { OrderSide } from '../../types/terminal';
 
 // Global declaration for Risk HUD auto-fill
@@ -27,12 +29,19 @@ export default function ExecutionPanel() {
   const price = useTerminalStore((s) => s.currentPrice);
   const placeOrder = useTerminalStore((s) => s.placeOrder);
   const trades = useTerminalStore((s) => s.trades);
+  const positions = useTerminalStore((s) => s.positions);
   const equity = useTerminalStore((s) => s.balance + Object.values(s.positions).reduce((a, p) => a + p.unrealizedPnl, 0));
+  const balance = useTerminalStore((s) => s.balance);
   const free = useTerminalStore((s) => freeMargin(s));
 
   // Psychology Kill-Switch & Rules
   const killSwitch = usePsychologyStore((s) => s.killSwitch);
   const checkRiskTriggers = usePsychologyStore((s) => s.checkRiskTriggers);
+
+  // TradeXGuardian
+  const guardianCheck = useGuardianStore((s) => s.checkTrade);
+  const guardianEnabled = useGuardianStore((s) => s.enabled);
+  const guardianEmergencyLocked = useGuardianStore((s) => s.emergencyLocked);
 
   // Derivatives Contract & Leverage
   const selectedContract = useDerivativesStore((s) => s.selectedContract);
@@ -44,6 +53,13 @@ export default function ExecutionPanel() {
   const [tp, setTp] = useState('');
   const [lev, setLev] = useState(10);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Guardian modal state
+  const [guardianModal, setGuardianModal] = useState<{
+    isOpen: boolean;
+    result: GuardianCheckResult;
+    side: OrderSide;
+  } | null>(null);
 
   // Expose setter for RiskHUD
   useEffect(() => {
@@ -116,36 +132,7 @@ export default function ExecutionPanel() {
     setMsg({ ok: true, text: `TP snapped to ${multiplier}R (${targetPrice.toFixed(2)})` });
   };
 
-  const submit = async (side: OrderSide) => {
-    audioHaptics.tick();
-
-    // 1. Guard against Kill-Switch lockout
-    if (killSwitch.isLocked) {
-      audioHaptics.error();
-      setMsg({ ok: false, text: 'Kill-Switch is locked. Order blocked.' });
-      return;
-    }
-
-    // 2. Evaluate session risk triggers
-    const today = new Date().setHours(0, 0, 0, 0);
-    const todayTrades = trades.filter((t) => t.time >= today);
-    const realizedLossToday = Math.abs(
-      todayTrades.filter((t) => t.pnl < 0).reduce((acc, t) => acc + t.pnl, 0)
-    );
-
-    let streak = 0;
-    for (let i = todayTrades.length - 1; i >= 0; i--) {
-      if (todayTrades[i].pnl < 0) streak++;
-      else break;
-    }
-
-    if (checkRiskTriggers(realizedLossToday, todayTrades.length, streak)) {
-      audioHaptics.error();
-      setMsg({ ok: false, text: 'Session risk limit reached. Lockout triggered!' });
-      return;
-    }
-
-    // 3. Place order into store
+  const executeOrder = async (side: OrderSide) => {
     const r = placeOrder({
       symbol,
       side,
@@ -160,8 +147,6 @@ export default function ExecutionPanel() {
     if (r.ok) {
       audioHaptics.fill();
       setMsg({ ok: true, text: r.warning ?? `${side === 'BUY' ? 'Buy' : 'Sell'} ${type.toLowerCase()} order placed.` });
-
-      // 4. Auto capture chart snapshot into Journal
       try {
         await logTradeToJournal({
           tradeId: `trade-${Date.now()}`,
@@ -181,8 +166,110 @@ export default function ExecutionPanel() {
     }
   };
 
+  const submit = async (side: OrderSide) => {
+    audioHaptics.tick();
+
+    // 1. Guard against Kill-Switch lockout
+    if (killSwitch.isLocked) {
+      audioHaptics.error();
+      setMsg({ ok: false, text: 'Kill-Switch is locked. Order blocked.' });
+      return;
+    }
+
+    // 2. TradeXGuardian emergency lock
+    if (guardianEmergencyLocked) {
+      audioHaptics.error();
+      setMsg({ ok: false, text: '[GUARDIAN] Emergency lock active — all trading blocked.' });
+      return;
+    }
+
+    // 3. Evaluate psychology session risk triggers
+    const today = new Date().setHours(0, 0, 0, 0);
+    const todayTrades = trades.filter((t) => t.time >= today);
+    const realizedLossToday = Math.abs(
+      todayTrades.filter((t) => t.pnl < 0).reduce((acc, t) => acc + t.pnl, 0)
+    );
+    let streak = 0;
+    for (let i = todayTrades.length - 1; i >= 0; i--) {
+      if (todayTrades[i].pnl < 0) streak++;
+      else break;
+    }
+    if (checkRiskTriggers(realizedLossToday, todayTrades.length, streak)) {
+      audioHaptics.error();
+      setMsg({ ok: false, text: 'Session risk limit reached. Lockout triggered!' });
+      return;
+    }
+
+    // 4. TradeXGuardian full check
+    if (guardianEnabled) {
+      const lastTrade = todayTrades.length > 0 ? todayTrades[todayTrades.length - 1] : undefined;
+      const prevLot = lastTrade ? lastTrade.qty : undefined;
+      const guardianResult = guardianCheck({
+        symbol,
+        side,
+        qty: q ?? 0,
+        entryPrice: entry ?? price ?? 0,
+        stopLoss: slN,
+        takeProfit: tpN,
+        leverage: lev,
+        accountEquity: equity,
+        currentBalance: balance,
+        openPositionsCount: Object.keys(positions).length,
+        tradesTodayCount: todayTrades.length,
+        dailyRealizedLoss: realizedLossToday,
+        consecutiveLosses: streak,
+        lastTradeTimestamp: lastTrade?.time,
+        previousLotSize: prevLot,
+      });
+
+      // Apply suggested SL/TP if no SL set and guardian provided suggestions
+      if (guardianResult.suggestedSl !== undefined && !slN) {
+        setSl(String(+guardianResult.suggestedSl.toFixed(5)));
+      }
+      if (guardianResult.suggestedTp !== undefined && !tpN) {
+        setTp(String(+guardianResult.suggestedTp.toFixed(5)));
+      }
+
+      // If blocked or confirmations needed → show guardian modal
+      if (guardianResult.blocked || guardianResult.confirmations.length > 0 || guardianResult.warnings.length > 0) {
+        audioHaptics.error();
+        setGuardianModal({ isOpen: true, result: guardianResult, side });
+        return;
+      }
+    }
+
+    // 5. All checks passed → execute
+    await executeOrder(side);
+  };
+
   return (
     <div className="shrink-0 border-t border-grid bg-panel p-3 font-mono text-xs">
+      {/* Guardian Confirmation Modal */}
+      {guardianModal?.isOpen && (
+        <GuardianConfirmModal
+          isOpen={guardianModal.isOpen}
+          result={guardianModal.result}
+          symbol={symbol}
+          side={guardianModal.side}
+          qty={q ?? 0}
+          onProceed={async () => {
+            setGuardianModal(null);
+            await executeOrder(guardianModal.side);
+          }}
+          onCancel={() => {
+            setGuardianModal(null);
+            setMsg({ ok: false, text: 'Order cancelled by Guardian risk check.' });
+          }}
+        />
+      )}
+
+      {/* Guardian Emergency Lock banner */}
+      {guardianEmergencyLocked && (
+        <div className="mb-2 rounded border border-red-500/60 bg-red-500/20 p-2 text-center text-xs font-bold text-red-300 animate-pulse">
+          [GUARDIAN EMERGENCY LOCK] All trading blocked.
+        </div>
+      )}
+
       {/* Kill-Switch lockout banner */}
       {killSwitch.isLocked && (
         <div className="mb-2 rounded border border-red-500/50 bg-red-500/20 p-2 text-center text-xs font-bold text-red-300">
@@ -317,14 +404,14 @@ export default function ExecutionPanel() {
       <div className="mt-2.5 grid grid-cols-2 gap-2">
         <button
           onClick={() => submit('BUY')}
-          disabled={killSwitch.isLocked}
+          disabled={killSwitch.isLocked || guardianEmergencyLocked}
           className="rounded bg-up py-2 font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Buy / Long
         </button>
         <button
           onClick={() => submit('SELL')}
-          disabled={killSwitch.isLocked}
+          disabled={killSwitch.isLocked || guardianEmergencyLocked}
           className="rounded bg-down py-2 font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Sell / Short

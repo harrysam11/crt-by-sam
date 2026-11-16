@@ -9,6 +9,7 @@ import React, { useState, useMemo } from 'react';
 import type { DrawingItem } from './types';
 import { audioHaptics } from '../../utils/notify';
 import { useDrawingStore } from '../../store/useDrawingStore';
+import { drawingEvents } from './framework/DrawingEvents';
 
 interface ManageDrawingsModalProps {
   isOpen: boolean;
@@ -56,8 +57,9 @@ export default function ManageDrawingsModal({
     try {
       localStorage.setItem(`crt_drawings_${symbol}`, JSON.stringify(next));
     } catch {}
-    // Trigger storage event so DrawingOverlay updates
-    window.dispatchEvent(new Event('storage'));
+    useDrawingStore.getState().setActiveSymbolDrawings(next);
+    drawingEvents.emitReloadDrawings(next);
+    window.dispatchEvent(new CustomEvent('crt_drawings_updated', { detail: { symbol, drawings: next } }));
   };
 
   const filteredDrawings = useMemo(() => {

@@ -28,6 +28,7 @@ import PopoutWindow from './components/popout/PopoutWindow';
 import MiniTerminalPopout from './components/popout/MiniTerminalPopout';
 import ObjectTreePanel from './components/Chart/ObjectTreePanel';
 import DataWindowPanel from './components/Chart/DataWindowPanel';
+import GuardianModal from './components/guardian/GuardianModal';
 import { useMarketFeed } from './hooks/useMarketFeed';
 import { useKeyboardHotkeys } from './hooks/useKeyboardHotkeys';
 import { useTerminalStore } from './store/useTerminalStore';
@@ -126,6 +127,7 @@ export default function App() {
   const [settingsTab, setSettingsTab] = useState<'PROFILE' | 'BILLING' | 'THEME' | 'LANGUAGE' | 'TELEGRAM'>('PROFILE');
   const [isSessionManagerOpen, setIsSessionManagerOpen] = useState(false);
   const [isPopoutOpen, setIsPopoutOpen] = useState(false);
+  const [isGuardianOpen, setIsGuardianOpen] = useState(false);
 
   // Global Keyboard Hotkeys Listener
   useKeyboardHotkeys({
@@ -161,6 +163,12 @@ export default function App() {
 
       {/* Overtrading Hard-Lock Kill-Switch Overlay */}
       <KillSwitchOverlay />
+
+      {/* TradeXGuardian Capital Protection System */}
+      <GuardianModal
+        isOpen={isGuardianOpen}
+        onClose={() => setIsGuardianOpen(false)}
+      />
 
       {/* Trade Psychology & Screenshot Journal Review Drawer */}
       <JournalModal />
@@ -262,6 +270,7 @@ export default function App() {
           onOpenCalendar={() => setIsCalendarOpen(true)}
           onOpenScreener={() => setIsScreenerOpen(true)}
           onOpenSessions={() => setIsSessionManagerOpen(true)}
+          onOpenGuardian={() => setIsGuardianOpen(true)}
           onOpenSettings={(tab) => {
             if (tab) setSettingsTab(tab);
             setIsSettingsOpen(true);
