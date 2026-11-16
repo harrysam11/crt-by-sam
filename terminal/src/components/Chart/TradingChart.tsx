@@ -621,23 +621,21 @@ export default function TradingChart({
       });
     }
 
-    // 25+ Framework Active Overlay Indicators (SMA, EMA, VWAP, BB, Ichimoku, Supertrend, etc.)
-    activeInstances
-      .filter((inst) => inst.overlay)
-      .forEach((inst) => {
-        const primaryStyle = Object.values(inst.styles)[0];
-        const val = overlayValues[inst.instanceId];
-        list.push({
-          id: inst.instanceId,
-          name: `${inst.name}`,
-          color: primaryStyle?.color || '#38bdf8',
-          value: val !== null && val !== undefined ? val.toFixed(2) : undefined,
-          visible: inst.visible,
-          onToggleVisible: () => toggleInstanceVisibility(inst.instanceId),
-          onOpenSettings: () => openSettings(inst),
-          onRemove: () => removeInstance(inst.instanceId),
-        });
+    // 25+ Framework Active Indicators (both overlay and sub-pane oscillators)
+    activeInstances.forEach((inst) => {
+      const primaryStyle = Object.values(inst.styles)[0];
+      const val = overlayValues[inst.instanceId];
+      list.push({
+        id: inst.instanceId,
+        name: `${inst.name}`,
+        color: primaryStyle?.color || '#38bdf8',
+        value: val !== null && val !== undefined ? val.toFixed(2) : undefined,
+        visible: inst.visible,
+        onToggleVisible: () => toggleInstanceVisibility(inst.instanceId),
+        onOpenSettings: () => openSettings(inst),
+        onRemove: () => removeInstance(inst.instanceId),
       });
+    });
 
     return list;
   }, [
@@ -1551,8 +1549,11 @@ export default function TradingChart({
           currentRange.to < 0 ||
           currentRange.to > curLen + 40
         ) {
+          const span = currentRange && Number.isFinite(currentRange.to - currentRange.from)
+            ? Math.max(50, Math.round(currentRange.to - currentRange.from))
+            : 80;
           a.chart.timeScale().setVisibleLogicalRange({
-            from: Math.max(0, curLen - 80),
+            from: Math.max(0, curLen - span),
             to: curLen + 8,
           });
         }
@@ -2822,11 +2823,15 @@ export default function TradingChart({
                   useTerminalStore.getState().updatePriceTick(symbol, targetCandles[idx].close);
                 }
 
-                // Smoothly anchor the viewport to the cut candle so the chart NEVER disappears
+                // Smoothly anchor the viewport to the cut candle while preserving zoom level
                 setTimeout(() => {
                   try {
+                    const curRange = chartApi.timeScale().getVisibleLogicalRange();
+                    const span = curRange && Number.isFinite(curRange.to - curRange.from)
+                      ? Math.max(50, Math.round(curRange.to - curRange.from))
+                      : 80;
                     chartApi.timeScale().setVisibleLogicalRange({
-                      from: Math.max(0, idx - 80),
+                      from: Math.max(0, idx - span),
                       to: idx + 8,
                     });
                   } catch {}

@@ -127,6 +127,8 @@ export default function VolumeProfileOverlay({
   if (!isVisible || !profileData || !seriesApi) return null;
 
   const maxProfileWidth = 140; // Max width in pixels on the right
+  const priceScaleWidth = (chartApi as any)?.priceScale?.('right')?.width?.() || 68;
+  const rightOffset = Math.max(60, priceScaleWidth + 2);
   const pocY = seriesApi.priceToCoordinate(profileData.pocPrice);
   const vahY = seriesApi.priceToCoordinate(profileData.vah);
   const valY = seriesApi.priceToCoordinate(profileData.val);
@@ -148,7 +150,7 @@ export default function VolumeProfileOverlay({
             <g key={idx}>
               {/* Total Volume Bar */}
               <rect
-                x={containerWidth - barW - 60} // Docked before the price scale
+                x={containerWidth - barW - rightOffset} // Docked before the price scale
                 y={y - rowH / 2}
                 width={barW}
                 height={Math.max(1, rowH - 1)}
@@ -156,7 +158,7 @@ export default function VolumeProfileOverlay({
               />
               {/* Buy Volume Portion */}
               <rect
-                x={containerWidth - barW - 60}
+                x={containerWidth - barW - rightOffset}
                 y={y - rowH / 2}
                 width={barW * (bin.totalVol > 0 ? bin.buyVol / bin.totalVol : 0.5)}
                 height={Math.max(1, rowH - 1)}
@@ -172,15 +174,15 @@ export default function VolumeProfileOverlay({
             <line
               x1={0}
               y1={vahY}
-              x2={containerWidth - 60}
+              x2={containerWidth - rightOffset}
               y2={vahY}
               stroke="#38bdf8"
               strokeWidth={1}
               strokeDasharray="4 3"
               strokeOpacity={0.7}
             />
-            <rect x={containerWidth - 110} y={vahY - 8} width="45" height="14" rx="2" fill="#0b0e14" stroke="#38bdf8" strokeWidth={0.8} />
-            <text x={containerWidth - 88} y={vahY + 3} textAnchor="middle" fill="#38bdf8" fontSize="8" fontWeight="bold">
+            <rect x={containerWidth - rightOffset - 48} y={vahY - 8} width="45" height="14" rx="2" fill="#0b0e14" stroke="#38bdf8" strokeWidth={0.8} />
+            <text x={containerWidth - rightOffset - 26} y={vahY + 3} textAnchor="middle" fill="#38bdf8" fontSize="8" fontWeight="bold">
               VAH
             </text>
           </g>
@@ -192,15 +194,15 @@ export default function VolumeProfileOverlay({
             <line
               x1={0}
               y1={valY}
-              x2={containerWidth - 60}
+              x2={containerWidth - rightOffset}
               y2={valY}
               stroke="#38bdf8"
               strokeWidth={1}
               strokeDasharray="4 3"
               strokeOpacity={0.7}
             />
-            <rect x={containerWidth - 110} y={valY - 8} width="45" height="14" rx="2" fill="#0b0e14" stroke="#38bdf8" strokeWidth={0.8} />
-            <text x={containerWidth - 88} y={valY + 3} textAnchor="middle" fill="#38bdf8" fontSize="8" fontWeight="bold">
+            <rect x={containerWidth - rightOffset - 48} y={valY - 8} width="45" height="14" rx="2" fill="#0b0e14" stroke="#38bdf8" strokeWidth={0.8} />
+            <text x={containerWidth - rightOffset - 26} y={valY + 3} textAnchor="middle" fill="#38bdf8" fontSize="8" fontWeight="bold">
               VAL
             </text>
           </g>
@@ -212,13 +214,13 @@ export default function VolumeProfileOverlay({
             <line
               x1={0}
               y1={pocY}
-              x2={containerWidth - 60}
+              x2={containerWidth - rightOffset}
               y2={pocY}
               stroke="#ef4444"
               strokeWidth={1.5}
             />
-            <rect x={containerWidth - 110} y={pocY - 9} width="48" height="16" rx="2" fill="#ef4444" />
-            <text x={containerWidth - 86} y={pocY + 3} textAnchor="middle" fill="#ffffff" fontSize="8.5" fontWeight="bold">
+            <rect x={containerWidth - rightOffset - 48} y={pocY - 9} width="48" height="16" rx="2" fill="#ef4444" />
+            <text x={containerWidth - rightOffset - 24} y={pocY + 3} textAnchor="middle" fill="#ffffff" fontSize="8.5" fontWeight="bold">
               POC
             </text>
           </g>

@@ -972,6 +972,37 @@ export default function Header({
                       <span>Broker API Vault (MT5 / Crypto / India)</span>
                     </button>
                   )}
+
+                  {/* Multi-Chart Grid Layout Picker for Mobile */}
+                  <div className="border-t border-grid/60 pt-2 mt-1">
+                    <span className="text-[10px] uppercase font-bold text-muted block mb-1 px-1">
+                      Multi-Chart Grid Layout ({layout})
+                    </span>
+                    <div className="grid grid-cols-2 gap-1 px-1">
+                      {[
+                        { id: '1x1', label: '1x1' },
+                        { id: '1x2', label: '1x2 (Dual)' },
+                        { id: '2x1', label: '2x1 (Stacked)' },
+                        { id: '2x2', label: '2x2 (Quad)' },
+                      ].map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            audioHaptics.tick();
+                            setLayout(item.id as ChartGridLayout);
+                            setIsOverflowOpen(false);
+                          }}
+                          className={`px-2 py-1 rounded text-center text-[10px] font-semibold transition ${
+                            layout === item.id
+                              ? 'clay-pill-active'
+                              : 'bg-white/5 hover:bg-white/10 text-slate-300'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

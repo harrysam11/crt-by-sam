@@ -164,7 +164,7 @@ export default function ChartLegendHUD({
               </svg>
             </button>
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-              Indicators ({indicators.filter((i) => i.visible).length})
+              Indicators ({indicators.filter((i) => i.visible && i.id !== 'vol').length})
             </span>
             {onClearAllIndicators && (
               <button

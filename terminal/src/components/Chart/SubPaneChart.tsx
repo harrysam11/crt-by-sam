@@ -277,6 +277,8 @@ export default function SubPaneChart({
     setLiveValues(latestValues);
   }, [candles, instance, definition]);
 
+  if (!instance.visible) return null;
+
   const isLight = themeMode === 'LIGHT';
   const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
 

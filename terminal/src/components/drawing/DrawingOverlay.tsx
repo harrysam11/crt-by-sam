@@ -307,12 +307,19 @@ export default function DrawingOverlay({
       setEditingDrawing(drawing);
       setIsSettingsModalOpen(true);
     });
+    const unsubClear = drawingEvents.onClear(() => {
+      setDrawings([]);
+      pushState([]);
+      setSelectedDrawingIds([]);
+      setActiveDrawing(null);
+    });
     return () => {
       unsubUpdate();
       unsubDelete();
       unsubOpenSettings();
+      unsubClear();
     };
-  }, [drawings]);
+  }, [drawings, pushState, setSelectedDrawingIds]);
 
   // Reload drawings when symbol switches
   useEffect(() => {
@@ -1178,9 +1185,9 @@ export default function DrawingOverlay({
 
     if (e.button !== 0) return;
 
-    // Instant double-click detection on drawing
+    // Instant double-click detection on drawing (standard 500ms window)
     const now = Date.now();
-    if (lastClickRef.current.id === item.id && now - lastClickRef.current.time < 380) {
+    if (lastClickRef.current.id === item.id && now - lastClickRef.current.time < 500) {
       lastClickRef.current = { id: '', time: 0 };
       audioHaptics.tick();
       setSelectedDrawingIds([item.id]);

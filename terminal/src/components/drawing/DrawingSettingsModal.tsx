@@ -10,7 +10,7 @@
  * ZERO EMOJI POLICY strictly enforced.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { DrawingItem } from './types';
 import { audioHaptics } from '../../utils/notify';
 import { fmtPrice } from '../../utils/formatters';
@@ -71,6 +71,60 @@ export default function DrawingSettingsModal({
   // Locks & Visibility
   const [locked, setLocked] = useState(false);
   const [hidden, setHidden] = useState(false);
+
+  // Movable Dialog Window position state
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const isDraggingRef = useRef(false);
+
+  // Initialize position to comfortable center-right view on first open so chart stays visible
+  useEffect(() => {
+    if (isOpen && pos === null) {
+      const initX = typeof window !== 'undefined' ? Math.max(20, Math.min(window.innerWidth - 500, Math.round((window.innerWidth - 480) / 2))) : 280;
+      const initY = typeof window !== 'undefined' ? Math.max(50, Math.min(window.innerHeight - 560, 90)) : 90;
+      setPos({ x: initX, y: initY });
+    }
+  }, [isOpen]);
+
+  // Escape key listener to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  const startDrag = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button, input, select, textarea')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    isDraggingRef.current = true;
+    const startMouseX = e.clientX;
+    const startMouseY = e.clientY;
+    const startPosX = pos?.x ?? 280;
+    const startPosY = pos?.y ?? 90;
+
+    const handlePointerMove = (moveEv: PointerEvent) => {
+      if (!isDraggingRef.current) return;
+      const dx = moveEv.clientX - startMouseX;
+      const dy = moveEv.clientY - startMouseY;
+      const newX = Math.max(8, Math.min(window.innerWidth - 300, startPosX + dx));
+      const newY = Math.max(40, Math.min(window.innerHeight - 150, startPosY + dy));
+      setPos({ x: newX, y: newY });
+    };
+
+    const handlePointerUp = () => {
+      isDraggingRef.current = false;
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+  };
 
   useEffect(() => {
     if (!drawing) return;
@@ -150,30 +204,40 @@ export default function DrawingSettingsModal({
     <div
       data-drawing-settings-modal="true"
       onPointerDown={(e) => e.stopPropagation()}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 font-mono select-none pointer-events-auto"
+      style={{
+        left: `${pos?.x ?? 280}px`,
+        top: `${pos?.y ?? 90}px`,
+      }}
+      className="fixed z-50 w-[490px] max-w-[94vw] rounded-xl border border-grid bg-[#0c0d14]/95 backdrop-blur-md shadow-2xl overflow-hidden flex flex-col max-h-[85vh] font-mono select-none pointer-events-auto ring-1 ring-white/10"
     >
-      <div className="w-full max-w-lg rounded-xl border border-grid bg-[#0c0d14] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-grid px-4 py-3 bg-panel/60">
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-            <h3 className="text-sm font-bold tracking-wide text-white uppercase">
-              {drawing.type.replace('_', ' ')} Settings
-            </h3>
-            <span className="text-[10px] text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-grid">
-              {symbol}
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded p-1 text-slate-400 hover:text-white hover:bg-slate-800 transition"
-            title="Close (Esc)"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      {/* Header (Draggable Handle) */}
+      <div
+        onPointerDown={startDrag}
+        className="flex items-center justify-between border-b border-grid px-4 py-2.5 bg-panel/80 cursor-move select-none"
+        title="Click and drag to move settings anywhere on screen"
+      >
+        <div className="flex items-center gap-2 pointer-events-none">
+          <svg className="h-3.5 w-3.5 text-slate-400 mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+          </svg>
+          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+          <h3 className="text-sm font-bold tracking-wide text-white uppercase">
+            {drawing.type.replace('_', ' ')} Settings
+          </h3>
+          <span className="text-[10px] text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-grid">
+            {symbol}
+          </span>
         </div>
+        <button
+          onClick={onClose}
+          className="rounded p-1 text-slate-400 hover:text-white hover:bg-slate-800 transition"
+          title="Close (Esc)"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
 
         {/* Tab Navigation */}
         <div className="flex items-center border-b border-grid bg-[#10111a] px-4 text-xs font-semibold">
@@ -619,7 +683,6 @@ export default function DrawingSettingsModal({
             >
               Apply & Save
             </button>
-          </div>
         </div>
       </div>
     </div>
