@@ -210,7 +210,7 @@ export const useDrawingStore = create<DrawingState>()(
       setIsLegendHudVisible: (v) => set({ isLegendHudVisible: v }),
       toggleLegendHud: () => set((s) => ({ isLegendHudVisible: !s.isLegendHudVisible })),
 
-      activeRightDrawer: 'WATCHLIST',
+      activeRightDrawer: null,
       setActiveRightDrawer: (drawerOrUpdater) =>
         set((s) => ({
           activeRightDrawer:
@@ -245,6 +245,7 @@ export const useDrawingStore = create<DrawingState>()(
         magnetConfig: state.magnetConfig,
         templates: state.templates,
         isLegendHudVisible: state.isLegendHudVisible,
+        activeRightDrawer: state.activeRightDrawer,
       }),
     }
   )

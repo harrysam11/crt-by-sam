@@ -12,6 +12,7 @@ import {
   LineStyle,
   type IChartApi,
   type ISeriesApi,
+  type SeriesType,
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts';
@@ -25,6 +26,7 @@ interface SubPaneChartProps {
   instance: ActiveIndicatorInstance;
   candles: Candle[];
   mainChartApi: IChartApi | null;
+  mainSeriesApi?: ISeriesApi<SeriesType> | null;
   height?: number;
 }
 
@@ -32,6 +34,7 @@ export default function SubPaneChart({
   instance,
   candles,
   mainChartApi,
+  mainSeriesApi,
   height = 130,
 }: SubPaneChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -88,9 +91,13 @@ export default function SubPaneChart({
 
     chartApiRef.current = chart;
 
-    // Time scale synchronization with main chart
+    let syncTimeScale: (() => void) | null = null;
+    let onMainCrosshair: ((param: any) => void) | null = null;
+    let onSubCrosshair: ((param: any) => void) | null = null;
+
+    // Time scale and Crosshair synchronization with main chart
     if (mainChartApi) {
-      const syncTimeScale = () => {
+      syncTimeScale = () => {
         try {
           const mainRange = mainChartApi.timeScale().getVisibleLogicalRange();
           if (mainRange) {
@@ -100,14 +107,66 @@ export default function SubPaneChart({
       };
       mainChartApi.timeScale().subscribeVisibleLogicalRangeChange(syncTimeScale);
       syncTimeScale();
+
+      // Main chart crosshair -> Sub-pane crosshair sync
+      onMainCrosshair = (param: any) => {
+        if (!param || !param.time) {
+          try {
+            chart.clearCrosshairPosition();
+          } catch {}
+        } else {
+          const firstSeries = seriesMapRef.current.values().next().value;
+          if (firstSeries) {
+            try {
+              const y = param.point ? param.point.y : 0;
+              const price = firstSeries.coordinateToPrice ? (firstSeries.coordinateToPrice(y) ?? 0) : 0;
+              chart.setCrosshairPosition(price, param.time, firstSeries);
+            } catch {}
+          }
+        }
+      };
+      mainChartApi.subscribeCrosshairMove(onMainCrosshair);
+
+      // Sub-pane crosshair -> Main chart crosshair sync
+      onSubCrosshair = (param: any) => {
+        if (!param || !param.time) {
+          try {
+            mainChartApi.clearCrosshairPosition();
+          } catch {}
+        } else if (mainSeriesApi) {
+          try {
+            const y = param.point ? param.point.y : 0;
+            const price = mainSeriesApi.coordinateToPrice ? (mainSeriesApi.coordinateToPrice(y) ?? 0) : 0;
+            mainChartApi.setCrosshairPosition(price, param.time, mainSeriesApi);
+          } catch {}
+        }
+      };
+      chart.subscribeCrosshairMove(onSubCrosshair);
     }
 
     return () => {
+      if (mainChartApi) {
+        if (syncTimeScale) {
+          try {
+            mainChartApi.timeScale().unsubscribeVisibleLogicalRangeChange(syncTimeScale);
+          } catch {}
+        }
+        if (onMainCrosshair) {
+          try {
+            mainChartApi.unsubscribeCrosshairMove(onMainCrosshair);
+          } catch {}
+        }
+      }
+      if (onSubCrosshair) {
+        try {
+          chart.unsubscribeCrosshairMove(onSubCrosshair);
+        } catch {}
+      }
       chart.remove();
       chartApiRef.current = null;
       seriesMapRef.current.clear();
     };
-  }, [mainChartApi]);
+  }, [mainChartApi, mainSeriesApi]);
 
   // Compute and update plot data
   useEffect(() => {
@@ -182,7 +241,15 @@ export default function SubPaneChart({
       className="relative w-full border-t border-grid bg-[#050508] select-none font-mono shrink-0"
     >
       {/* Sub-Pane Legend HUD */}
-      <div className="absolute left-3 top-1.5 z-20 flex items-center gap-2 bg-panel/80 px-2 py-0.5 rounded border border-grid/60 backdrop-blur-sm text-[10.5px]">
+      <div
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          audioHaptics.tick();
+          openSettings(instance);
+        }}
+        className="absolute left-3 top-1.5 z-20 flex items-center gap-2 bg-panel/80 px-2 py-0.5 rounded border border-grid/60 backdrop-blur-sm text-[10.5px] cursor-pointer hover:bg-panel transition select-none"
+        title="Double-click to open indicator settings"
+      >
         <span className="font-bold text-slate-200">{instance.name}</span>
 
         {/* Live values */}

@@ -45,11 +45,62 @@ export default function App() {
   const isAnalyticsVisible = useDerivativesStore((s) => s.isAnalyticsVisible);
   const isChartMaximized = useLayoutStore((s) => s.isChartMaximized);
 
-  const [rightW, setRightW] = useState(300);
-  const [bottomH, setBottomH] = useState(160);
-  const [isBottomCollapsed, setIsBottomCollapsed] = useState(false);
+  const [rightW, setRightW] = useState(() => {
+    try {
+      const saved = localStorage.getItem('crt_right_w');
+      return saved ? Number(saved) : 300;
+    } catch {
+      return 300;
+    }
+  });
+  const [bottomH, setBottomH] = useState(() => {
+    try {
+      const saved = localStorage.getItem('crt_bottom_h');
+      return saved ? Number(saved) : 160;
+    } catch {
+      return 160;
+    }
+  });
+  const [isBottomCollapsed, setIsBottomCollapsed] = useState(() => {
+    try {
+      const saved = localStorage.getItem('crt_bottom_collapsed');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
   const activeRightDrawer = useDrawingStore((s) => s.activeRightDrawer);
   const setActiveRightDrawer = useDrawingStore((s) => s.setActiveRightDrawer);
+
+  const handleToggleBottomCollapse = () => {
+    setIsBottomCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('crt_bottom_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleResizeRightW = (delta: number) => {
+    setRightW((prev) => {
+      const next = clamp(prev - delta, 260, 520);
+      try {
+        localStorage.setItem('crt_right_w', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleResizeBottomH = (delta: number) => {
+    setBottomH((prev) => {
+      const next = clamp(prev - delta, 100, 420);
+      try {
+        localStorage.setItem('crt_bottom_h', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Modal visibility states
   const [isOptionChainOpen, setIsOptionChainOpen] = useState(false);
@@ -219,7 +270,7 @@ export default function App() {
           {!isChartMaximized && (
             <>
               {!isBottomCollapsed && (
-                <Splitter dir="h" onDrag={(d) => setBottomH((h) => clamp(h - d, 100, 420))} />
+                <Splitter dir="h" onDrag={handleResizeBottomH} />
               )}
               <div
                 style={{ height: isBottomCollapsed ? 34 : bottomH }}
@@ -227,7 +278,7 @@ export default function App() {
               >
                 <PositionsTable
                   isCollapsed={isBottomCollapsed}
-                  onToggleCollapse={() => setIsBottomCollapsed((v) => !v)}
+                  onToggleCollapse={handleToggleBottomCollapse}
                 />
               </div>
             </>
@@ -237,7 +288,7 @@ export default function App() {
         {/* Collapsible Right Slideout Drawer */}
         {!isChartMaximized && activeRightDrawer && (
           <>
-            <Splitter dir="v" onDrag={(d) => setRightW((w) => clamp(w - d, 260, 520))} />
+            <Splitter dir="v" onDrag={handleResizeRightW} />
             <div style={{ width: rightW }} className="shrink-0 flex flex-col h-full overflow-hidden bg-panel border-l border-grid z-10 shadow-2xl">
               {activeRightDrawer === 'WATCHLIST' && <Watchlist />}
               {activeRightDrawer === 'DOM' && <FootprintDOM />}

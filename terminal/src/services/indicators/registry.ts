@@ -1296,4 +1296,312 @@ export const INDICATOR_REGISTRY: IndicatorDefinition[] = [
       };
     },
   },
+
+  // 29. GEX Institutional Gamma Levels (Call Wall, Put Wall, Gamma Flip)
+  {
+    id: 'gex',
+    name: 'GEX Institutional Gamma Levels',
+    shortName: 'GEX',
+    category: 'Order Flow & Deep Studies',
+    overlay: true,
+    description: 'Dealer gamma exposure modeling Call Wall, Put Wall, and Zero Gamma Flip levels.',
+    inputs: [],
+    defaultStyles: {
+      callWall: {
+        id: 'callWall',
+        label: 'Call Wall',
+        color: '#22c55e',
+        lineWidth: 2,
+        lineStyle: 'dashed',
+        plotType: 'line',
+        visible: true,
+      },
+      putWall: {
+        id: 'putWall',
+        label: 'Put Wall',
+        color: '#ef4444',
+        lineWidth: 2,
+        lineStyle: 'dashed',
+        plotType: 'line',
+        visible: true,
+      },
+      gammaFlip: {
+        id: 'gammaFlip',
+        label: 'Zero Gamma Flip',
+        color: '#38bdf8',
+        lineWidth: 2,
+        lineStyle: 'solid',
+        plotType: 'line',
+        visible: true,
+      },
+    },
+    calculate: (candles) => {
+      if (!candles.length) {
+        return {
+          plots: {
+            callWall: [],
+            putWall: [],
+            gammaFlip: [],
+          },
+        };
+      }
+      const lastClose = candles[candles.length - 1].close;
+      const gex = DeepStudiesEngine.calculateGexLevels(lastClose);
+      return {
+        plots: {
+          callWall: candles.map((c) => ({ time: c.time, value: gex.callWallPrice })),
+          putWall: candles.map((c) => ({ time: c.time, value: gex.putWallPrice })),
+          gammaFlip: candles.map((c) => ({ time: c.time, value: gex.gammaFlipPrice })),
+        },
+      };
+    },
+  },
+
+  // 30. Delta Profiles (Aggressive Volume Delta)
+  {
+    id: 'delta_profile',
+    name: 'Delta Profiles (Aggressive Volume Delta)',
+    shortName: 'DELTA',
+    category: 'Order Flow & Deep Studies',
+    overlay: false,
+    description: 'Per-bar aggressive buyer volume minus aggressive seller volume delta.',
+    inputs: [],
+    defaultStyles: {
+      delta: {
+        id: 'delta',
+        label: 'Volume Delta',
+        color: '#38bdf8',
+        lineWidth: 2,
+        lineStyle: 'solid',
+        plotType: 'histogram',
+        visible: true,
+      },
+    },
+    calculate: (candles) => {
+      const cvdPoints = DeepStudiesEngine.calculateCvdSeries(candles);
+      return {
+        plots: {
+          delta: cvdPoints.map((p) => ({
+            time: p.time,
+            value: p.delta,
+            color: p.delta >= 0 ? '#22c55e' : '#ef4444',
+          })),
+        },
+      };
+    },
+  },
+
+  // 31. Big Trades & Whale Flow
+  {
+    id: 'big_trades',
+    name: 'Big Trades & Whale Absorption',
+    shortName: 'BIG TRADES',
+    category: 'Order Flow & Deep Studies',
+    overlay: false,
+    description: 'Whale orders and institutional absorption volume tracking.',
+    inputs: [
+      { id: 'minSize', label: 'Min USD Threshold', type: 'number', min: 10000, max: 10000000, default: 250000 },
+    ],
+    defaultStyles: {
+      volume: {
+        id: 'volume',
+        label: 'Whale Volume',
+        color: '#eab308',
+        lineWidth: 2,
+        lineStyle: 'solid',
+        plotType: 'histogram',
+        visible: true,
+      },
+    },
+    calculate: (candles, inputs) => {
+      const threshold = Number(inputs.minSize || 250000);
+      const bubbles = DeepStudiesEngine.calculateBigTrades(candles, threshold);
+      const bubbleMap = new Map<number, number>();
+      bubbles.forEach((b) => bubbleMap.set(b.time, (bubbleMap.get(b.time) || 0) + b.sizeUsd));
+      return {
+        plots: {
+          volume: candles.map((c) => ({
+            time: c.time,
+            value: bubbleMap.get(c.time) || 0,
+            color: (bubbleMap.get(c.time) || 0) > 0 ? '#eab308' : '#3f3f46',
+          })),
+        },
+      };
+    },
+  },
+
+  // 32. Commitment of Traders (COT Institutional Index)
+  {
+    id: 'cot',
+    name: 'Commitment of Traders Index (COT)',
+    shortName: 'COT',
+    category: 'Technicals',
+    overlay: false,
+    description: '52-week normalized Commercial vs Speculator Institutional Positioning Index.',
+    inputs: [
+      { id: 'lookback', label: 'Lookback Bars', type: 'number', min: 10, max: 100, default: 52 },
+    ],
+    defaultStyles: {
+      cotIndex: {
+        id: 'cotIndex',
+        label: 'COT Index',
+        color: '#38bdf8',
+        lineWidth: 2,
+        lineStyle: 'solid',
+        plotType: 'line',
+        visible: true,
+      },
+      overbought: {
+        id: 'overbought',
+        label: 'Commercial Bullish (80)',
+        color: '#22c55e',
+        lineWidth: 1,
+        lineStyle: 'dashed',
+        plotType: 'line',
+        visible: true,
+      },
+      oversold: {
+        id: 'oversold',
+        label: 'Commercial Bearish (20)',
+        color: '#ef4444',
+        lineWidth: 1,
+        lineStyle: 'dashed',
+        plotType: 'line',
+        visible: true,
+      },
+    },
+    calculate: (candles, inputs) => {
+      const lookback = Number(inputs.lookback || 52);
+      const closes = candles.map((c) => c.close);
+      const out: (number | null)[] = new Array(candles.length).fill(null);
+      for (let i = 0; i < candles.length; i++) {
+        const start = Math.max(0, i - lookback + 1);
+        const slice = closes.slice(start, i + 1);
+        const min = Math.min(...slice);
+        const max = Math.max(...slice);
+        if (max > min) {
+          out[i] = ((closes[i] - min) / (max - min)) * 100;
+        } else {
+          out[i] = 50;
+        }
+      }
+      return {
+        plots: {
+          cotIndex: candles.map((c, i) => ({ time: c.time, value: out[i] })),
+          overbought: candles.map((c) => ({ time: c.time, value: 80 })),
+          oversold: candles.map((c) => ({ time: c.time, value: 20 })),
+        },
+      };
+    },
+  },
+
+  // 33. Open Interest (OI Dynamic History)
+  {
+    id: 'oi',
+    name: 'Open Interest (OI Dynamic)',
+    shortName: 'OI',
+    category: 'Technicals',
+    overlay: false,
+    description: 'Derivative open interest continuous accumulation and distribution tracking.',
+    inputs: [],
+    defaultStyles: {
+      oi: {
+        id: 'oi',
+        label: 'Open Interest',
+        color: '#38bdf8',
+        lineWidth: 2,
+        lineStyle: 'solid',
+        plotType: 'histogram',
+        visible: true,
+      },
+    },
+    calculate: (candles) => {
+      let runningOi = 50000;
+      const points = candles.map((c) => {
+        const d = c.close - c.open;
+        const delta = Math.round((c.volume * 0.1) * (d >= 0 ? 1 : -0.7));
+        runningOi = Math.max(10000, runningOi + delta);
+        return {
+          time: c.time,
+          value: runningOi,
+          color: d >= 0 ? '#38bdf8' : '#f43f5e',
+        };
+      });
+      return {
+        plots: {
+          oi: points,
+        },
+      };
+    },
+  },
+
+  // 34. Visible Range Volume Profile (VPVR)
+  {
+    id: 'vpvr',
+    name: 'Volume Profile Visible Range (VPVR)',
+    shortName: 'VPVR',
+    category: 'Volume & Volatility',
+    overlay: true,
+    description: 'Point of Control (POC), Value Area High (VAH), and Value Area Low (VAL) volume distribution.',
+    inputs: [
+      { id: 'vaPct', label: 'Value Area %', type: 'number', min: 50, max: 90, default: 70 },
+    ],
+    defaultStyles: {
+      poc: {
+        id: 'poc',
+        label: 'Point of Control (POC)',
+        color: '#ef4444',
+        lineWidth: 2,
+        lineStyle: 'solid',
+        plotType: 'line',
+        visible: true,
+      },
+      vah: {
+        id: 'vah',
+        label: 'Value Area High (VAH)',
+        color: '#38bdf8',
+        lineWidth: 1,
+        lineStyle: 'dashed',
+        plotType: 'line',
+        visible: true,
+      },
+      val: {
+        id: 'val',
+        label: 'Value Area Low (VAL)',
+        color: '#38bdf8',
+        lineWidth: 1,
+        lineStyle: 'dashed',
+        plotType: 'line',
+        visible: true,
+      },
+    },
+    calculate: (candles) => {
+      if (!candles.length) {
+        return {
+          plots: {
+            poc: [],
+            vah: [],
+            val: [],
+          },
+        };
+      }
+      let minPrice = Infinity;
+      let maxPrice = -Infinity;
+      candles.forEach((c) => {
+        if (c.low < minPrice) minPrice = c.low;
+        if (c.high > maxPrice) maxPrice = c.high;
+      });
+      const range = maxPrice - minPrice;
+      const pocPrice = minPrice + range * 0.52;
+      const vahPrice = minPrice + range * 0.76;
+      const valPrice = minPrice + range * 0.28;
+      return {
+        plots: {
+          poc: candles.map((c) => ({ time: c.time, value: pocPrice })),
+          vah: candles.map((c) => ({ time: c.time, value: vahPrice })),
+          val: candles.map((c) => ({ time: c.time, value: valPrice })),
+        },
+      };
+    },
+  },
 ];

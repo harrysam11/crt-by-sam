@@ -356,14 +356,12 @@ export default function DrawingOverlay({
 
     timeScale.subscribeVisibleLogicalRangeChange(triggerUpdate);
     timeScale.subscribeVisibleTimeRangeChange(triggerUpdate);
-    chartApi.subscribeCrosshairMove(triggerUpdate);
 
     return () => {
       if (rafId !== null) cancelAnimationFrame(rafId);
       try {
         timeScale.unsubscribeVisibleLogicalRangeChange(triggerUpdate);
         timeScale.unsubscribeVisibleTimeRangeChange(triggerUpdate);
-        chartApi.unsubscribeCrosshairMove(triggerUpdate);
       } catch {}
     };
   }, [chartApi]);
@@ -466,6 +464,11 @@ export default function DrawingOverlay({
     activeTool !== 'CURSOR_DOT' &&
     activeTool !== 'CURSOR_ERASER';
 
+  const drawingsRef = useRef(drawings);
+  drawingsRef.current = drawings;
+  const coordHelperRef = useRef(coordHelper);
+  coordHelperRef.current = coordHelper;
+
   // Native chart container listener for right-click drag selection
   useEffect(() => {
     const parent = containerRef.current?.parentElement;
@@ -514,15 +517,17 @@ export default function DrawingOverlay({
 
         if (maxX - minX > 5 || maxY - minY > 5) {
           const matchedIds: string[] = [];
-          for (const d of drawings) {
+          const curDrawings = drawingsRef.current;
+          const curHelper = coordHelperRef.current;
+          for (const d of curDrawings) {
             const tool = ToolFactory.create(d);
-            const handles = tool.getHandles(coordHelper);
+            const handles = tool.getHandles(curHelper);
             const handleMatch = handles.some((h) => h.x >= minX && h.x <= maxX && h.y >= minY && h.y <= maxY);
             if (handleMatch) {
               matchedIds.push(d.id);
             } else {
-              const p1X = coordHelper.timeToX(d.p1.time, d.p1.x);
-              const p1Y = coordHelper.priceToY(d.p1.price, d.p1.y);
+              const p1X = curHelper.timeToX(d.p1.time, d.p1.x);
+              const p1Y = curHelper.priceToY(d.p1.price, d.p1.y);
               if (p1X >= minX && p1X <= maxX && p1Y >= minY && p1Y <= maxY) {
                 matchedIds.push(d.id);
               }
@@ -558,7 +563,7 @@ export default function DrawingOverlay({
       window.removeEventListener('mouseup', onMouseUp);
       parent.removeEventListener('contextmenu', onContextMenu, true);
     };
-  }, [drawings, coordHelper, setSelectedDrawingIds]);
+  }, [setSelectedDrawingIds]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
@@ -1367,8 +1372,8 @@ export default function DrawingOverlay({
       onPointerUp={handlePointerUp}
       style={{ right: `${priceScaleWidth}px`, bottom: '26px' }}
       className={`absolute left-0 top-0 z-20 ${
-        isDrawingTool || activeDrawing || selectionBox || isCtrlHeld || isShiftHeld || isAltHeld
-          ? 'cursor-crosshair pointer-events-auto'
+        isDrawingTool || activeDrawing || selectionBox || isCtrlHeld || isShiftHeld || isAltHeld || selectedDrawingIds.length > 0 || draggingHandle || draggingBody
+          ? `${activeTool === 'CURSOR_CROSSHAIR' ? 'cursor-crosshair' : activeTool === 'CURSOR_ARROW' ? 'cursor-default' : 'cursor-crosshair'} pointer-events-auto`
           : activeTool === 'CURSOR_ERASER'
           ? 'cursor-not-allowed pointer-events-auto'
           : 'pointer-events-none'

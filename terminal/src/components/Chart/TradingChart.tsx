@@ -2218,9 +2218,9 @@ export default function TradingChart({
           >
             <span className="font-bold text-[#38bdf8]">fx</span>
             <span className="hidden sm:inline">Indicators</span>
-            {activeIndicatorsList.length > 0 && (
+            {activeIndicatorsList.filter((i) => i.id !== 'vol').length > 0 && (
               <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-white text-black text-[10px] font-bold">
-                {activeIndicatorsList.length}
+                {activeIndicatorsList.filter((i) => i.id !== 'vol').length}
               </span>
             )}
           </button>
@@ -2822,6 +2822,7 @@ export default function TradingChart({
               instance={inst}
               candles={effectiveCandles}
               mainChartApi={chartApi}
+              mainSeriesApi={seriesApi}
             />
           ))}
       </div>

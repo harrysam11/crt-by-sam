@@ -182,7 +182,13 @@ export default function ChartLegendHUD({
               {indicators.map((ind) => (
                 <div
                   key={ind.id}
-                  className="group flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-slate-900/80 transition w-fit"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    audioHaptics.tick();
+                    ind.onOpenSettings?.();
+                  }}
+                  className="group flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-slate-900/80 transition w-fit cursor-pointer select-none"
+                  title="Double-click to configure indicator settings"
                 >
                   {/* Indicator Color Dot */}
                   <span
