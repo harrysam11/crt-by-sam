@@ -20,7 +20,7 @@ const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Ma
 
 export interface PlaceOrderRequest {
   symbol: string; side: OrderSide; type: 'MARKET' | 'LIMIT'; qty: number; leverage: number;
-  price?: number; stopLoss?: number; takeProfit?: number;
+  price?: number; stopLoss?: number; takeProfit?: number; trailStopPct?: number;
 }
 export interface PlaceResult { ok: boolean; error?: string; warning?: string }
 
@@ -81,6 +81,7 @@ interface TerminalState {
   closeLosingPositions: () => void;
   bulkCancelOrders: (orderIds: string[]) => void;
   bulkShiftOrderPrices: (orderIds: string[], offsetPct: number) => void;
+  setTrailingStop: (symbol: string, trailPct: number) => void;
   resetAccount: () => void;
 }
 
@@ -134,6 +135,29 @@ function runEngine(book: Book, symbol: string, price: number): Partial<Book> | n
   if (hasPending) {
     orders = orders.map((o) => {
       if (o.status !== 'PENDING' || o.symbol !== symbol) return o;
+
+      // --- Trailing Stop ratchet update ---
+      if (o.type === 'TRAILING_STOP' && o.trailPct !== undefined) {
+        const pos = positions[symbol];
+        if (!pos) return o;
+        const isLong = pos.side === 'LONG';
+        const pct = o.trailPct / 100;
+        // advance high-water mark
+        const prevHw = o.trailHighWater ?? (isLong ? price : price);
+        const newHw = isLong ? Math.max(prevHw, price) : Math.min(prevHw, price);
+        const newTrigger = isLong ? newHw * (1 - pct) : newHw * (1 + pct);
+        const hit = isLong ? price <= newTrigger : price >= newTrigger;
+        if (!hit) return { ...o, trailHighWater: newHw, triggerPrice: newTrigger };
+        // triggered — treat as stop loss fill
+        const qty = Math.min(o.qty, pos.size);
+        const r = applyFill(positions, balance, symbol, o.side, qty, price, o.leverage ?? 1);
+        positions = r.positions;
+        balance = r.balance;
+        if (r.trade) trades = [...trades, r.trade];
+        touched = true;
+        return { ...o, qty, price, triggerPrice: newTrigger, status: 'FILLED' as const, timestamp: Date.now() };
+      }
+
       let fill = false;
       let fillPrice = price;
       let qty = o.qty;
@@ -329,6 +353,8 @@ export const useTerminalStore = create<TerminalState>()(
             return { ok: false, error: `Stop loss must be ${buy ? 'below' : 'above'} the entry price.` };
           if (req.takeProfit !== undefined && (buy ? req.takeProfit <= ref : req.takeProfit >= ref))
             return { ok: false, error: `Take profit must be ${buy ? 'above' : 'below'} the entry price.` };
+          if (req.trailStopPct !== undefined && !(req.trailStopPct > 0 && req.trailStopPct < 100))
+            return { ok: false, error: 'Trailing stop % must be between 0.01 and 99.99.' };
 
           const now = Date.now();
           const main: Order = {
@@ -341,6 +367,14 @@ export const useTerminalStore = create<TerminalState>()(
             ({ id: uid(), symbol: req.symbol, side: exitSide, type, price: 0, triggerPrice: trigger, qty: req.qty, status: 'PENDING', timestamp: now, reduceOnly: true });
           if (req.stopLoss !== undefined) exits.push(exit('STOP_LOSS', req.stopLoss));
           if (req.takeProfit !== undefined) exits.push(exit('TAKE_PROFIT', req.takeProfit));
+          if (req.trailStopPct !== undefined) {
+            const tslInitial = buy ? ref * (1 - req.trailStopPct / 100) : ref * (1 + req.trailStopPct / 100);
+            exits.push({
+              id: uid(), symbol: req.symbol, side: exitSide, type: 'TRAILING_STOP',
+              price: 0, triggerPrice: tslInitial, qty: req.qty, status: 'PENDING', timestamp: now,
+              reduceOnly: true, trailPct: req.trailStopPct, trailHighWater: ref,
+            });
+          }
 
           let { positions, balance, trades } = s;
           if (req.type === 'MARKET') {
@@ -771,6 +805,31 @@ export const useTerminalStore = create<TerminalState>()(
         },
 
         removeAlert: (id) => set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) })),
+
+        setTrailingStop: (symbol, trailPct) => {
+          const s = get();
+          const pos = s.positions[symbol];
+          const mark = s.prices[symbol];
+          if (!pos || !mark) return;
+          if (!(trailPct > 0 && trailPct < 100)) return;
+          const exitSide: OrderSide = pos.side === 'LONG' ? 'SELL' : 'BUY';
+          const isLong = pos.side === 'LONG';
+          const triggerPrice = isLong ? mark * (1 - trailPct / 100) : mark * (1 + trailPct / 100);
+          // Cancel existing trailing stops for this symbol
+          const others = s.orders.map((o) =>
+            o.status === 'PENDING' && o.symbol === symbol && o.type === 'TRAILING_STOP'
+              ? { ...o, status: 'CANCELLED' as const }
+              : o
+          );
+          const tslOrder: Order = {
+            id: uid(), symbol, side: exitSide, type: 'TRAILING_STOP',
+            price: 0, triggerPrice, qty: pos.size, status: 'PENDING',
+            timestamp: Date.now(), reduceOnly: true,
+            trailPct, trailHighWater: mark,
+          };
+          set({ orders: trimOrders([...others, tslOrder]) });
+          notifyAlert('Trailing Stop Set', `${labelOf(symbol)} TSL @ ${trailPct}% — trigger: ${fmtPrice(triggerPrice, symbol)}`);
+        },
 
         resetAccount: () => set({ positions: {}, orders: [], trades: [], balance: START_BALANCE }),
       };

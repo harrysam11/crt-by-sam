@@ -5,7 +5,7 @@ export type ChartStyle = 'CANDLE' | 'BAR' | 'HOLLOW_CANDLE' | 'HEIKIN_ASHI' | 'L
 export type PriceScaleType = 'NORMAL' | 'LOGARITHMIC' | 'PERCENTAGE';
 export type ChartTimezone = 'UTC' | 'America/New_York' | 'Europe/London' | 'Asia/Kolkata' | 'Asia/Tokyo' | 'Asia/Hong_Kong';
 export type OrderSide = 'BUY' | 'SELL';
-export type OrderType = 'MARKET' | 'LIMIT' | 'STOP_LOSS' | 'TAKE_PROFIT';
+export type OrderType = 'MARKET' | 'LIMIT' | 'STOP_LOSS' | 'TAKE_PROFIT' | 'TRAILING_STOP';
 export type OrderStatus = 'PENDING' | 'FILLED' | 'CANCELLED';
 export type ConnectionStatus = 'connecting' | 'open' | 'reconnecting' | 'closed';
 
@@ -38,6 +38,8 @@ export interface Order {
   timestamp: number;
   reduceOnly?: boolean; // SL/TP only act on an existing opposite position
   leverage?: number;
+  trailPct?: number;      // TRAILING_STOP: distance in % from peak price
+  trailHighWater?: number; // TRAILING_STOP: running high/low watermark (auto-updated each tick)
 }
 
 export interface Position {

@@ -41,6 +41,7 @@ export default function Watchlist() {
   const renameList = useWatchlistStore((s) => s.renameList);
   const addSymbolToList = useWatchlistStore((s) => s.addSymbolToList);
   const removeSymbolFromList = useWatchlistStore((s) => s.removeSymbolFromList);
+  const importSymbolsToList = useWatchlistStore((s) => s.importSymbolsToList);
   const flags = useWatchlistStore((s) => s.flags);
   const setFlag = useWatchlistStore((s) => s.setFlag);
   const cycleFlag = useWatchlistStore((s) => s.cycleFlag);
@@ -55,6 +56,9 @@ export default function Watchlist() {
   const [newListName, setNewListName] = useState('');
   const [flagPickerSymbol, setFlagPickerSymbol] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<AssetCategory | null>(null);
+  const [isCsvImportOpen, setIsCsvImportOpen] = useState(false);
+  const [csvText, setCsvText] = useState('');
+  const [csvNotice, setCsvNotice] = useState<string | null>(null);
 
   const listMenuRef = useRef<HTMLDivElement>(null);
   const flagMenuRef = useRef<HTMLDivElement>(null);
@@ -133,6 +137,18 @@ export default function Watchlist() {
     setNewListName('');
     setIsCreatingList(false);
     setIsListMenuOpen(false);
+  };
+
+  const handleCsvImport = () => {
+    if (!csvText.trim()) return;
+    audioHaptics.tick();
+    const result = importSymbolsToList(activeListId, csvText);
+    setCsvNotice(`Added ${result.added} symbol${result.added !== 1 ? 's' : ''}${result.skipped > 0 ? `, ${result.skipped} skipped (duplicates/invalid)` : ''}.`);
+    setCsvText('');
+    setTimeout(() => {
+      setIsCsvImportOpen(false);
+      setCsvNotice(null);
+    }, 2000);
   };
 
   return (
@@ -306,10 +322,24 @@ export default function Watchlist() {
             onClick={() => {
               audioHaptics.tick();
               setIsSearching((v) => !v);
+              setIsCsvImportOpen(false);
             }}
             className="clay-btn px-2.5 py-1 text-[11px] text-muted hover:text-white"
           >
             {isSearching ? 'Close' : '+ Add'}
+          </button>
+
+          {/* CSV Import Trigger */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setIsCsvImportOpen((v) => !v);
+              setIsSearching(false);
+            }}
+            className={`clay-btn px-2 py-1 text-[11px] transition ${isCsvImportOpen ? 'text-amber-400' : 'text-muted hover:text-white'}`}
+            title="Import symbols from CSV / paste list"
+          >
+            CSV
           </button>
 
           {/* Hide / Collapse Side Pane */}
@@ -337,6 +367,41 @@ export default function Watchlist() {
             setIsSearching(false);
           }}
         />
+      )}
+
+      {/* CSV Bulk Import Drawer */}
+      {isCsvImportOpen && (
+        <div className="border-b border-grid/60 bg-[#09090d]/80 p-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between text-[10px] text-muted uppercase font-bold">
+            <span>Bulk Import Symbols</span>
+            <button onClick={() => setIsCsvImportOpen(false)} className="text-muted hover:text-white text-xs">x</button>
+          </div>
+          <textarea
+            value={csvText}
+            onChange={(e) => setCsvText(e.target.value)}
+            placeholder={"Paste symbols separated by comma, space, or newline.\nExample: BTCUSDT, ETHUSDT\nRELIANCE.NS"}
+            rows={4}
+            className="clay-inset w-full px-2 py-1.5 text-[11px] text-white placeholder-zinc-600 focus:outline-none resize-none"
+          />
+          {csvNotice && (
+            <p className="text-emerald-400 text-[11px]">{csvNotice}</p>
+          )}
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => { setIsCsvImportOpen(false); setCsvText(''); setCsvNotice(null); }}
+              className="clay-btn px-2.5 py-1 text-[11px] text-muted hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCsvImport}
+              disabled={!csvText.trim()}
+              className="clay-pill-active px-3 py-1 text-[11px] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Import
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Category Pills Strip */}

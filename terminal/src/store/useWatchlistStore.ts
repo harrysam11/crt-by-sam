@@ -73,6 +73,7 @@ interface WatchlistState {
   addSymbolToList: (listId: string, symbol: string) => void;
   removeSymbolFromList: (listId: string, symbol: string) => void;
   setFlagFilter: (filter: WatchlistFlagFilter) => void;
+  importSymbolsToList: (listId: string, raw: string) => { added: number; skipped: number };
 }
 
 const CYCLE_ORDER: WatchlistFlagColor[] = ['NONE', 'RED', 'BLUE', 'GREEN', 'ORANGE', 'PURPLE'];
@@ -162,6 +163,24 @@ export const useWatchlistStore = create<WatchlistState>()(
       },
 
       setFlagFilter: (flagFilter) => set({ flagFilter }),
+
+      importSymbolsToList: (listId, raw) => {
+        const tokens = raw
+          .split(/[\r\n,;\s]+/)
+          .map((t) => t.trim().toUpperCase())
+          .filter((t) => t.length > 0 && t.length <= 20 && /^[A-Z0-9.\-^=]+$/.test(t));
+        const list = get().lists.find((l) => l.id === listId);
+        if (!list) return { added: 0, skipped: 0 };
+        const existing = new Set(list.symbols);
+        const toAdd = [...new Set(tokens)].filter((t) => !existing.has(t));
+        if (toAdd.length === 0) return { added: 0, skipped: tokens.length };
+        set((state) => ({
+          lists: state.lists.map((l) =>
+            l.id === listId ? { ...l, symbols: [...l.symbols, ...toAdd] } : l
+          ),
+        }));
+        return { added: toAdd.length, skipped: tokens.length - toAdd.length };
+      },
     }),
     {
       name: 'crt-watchlist-store-v1',

@@ -9,7 +9,7 @@ import ScriptStudio from '../../features/pine/ScriptStudio';
 import BulkBracketModal from './BulkBracketModal';
 import ExecutionEngineTab from './ExecutionEngineTab';
 
-const TYPE_LABEL = { MARKET: 'Market', LIMIT: 'Limit', STOP_LOSS: 'Stop loss', TAKE_PROFIT: 'Take profit' } as const;
+const TYPE_LABEL = { MARKET: 'Market', LIMIT: 'Limit', STOP_LOSS: 'Stop loss', TAKE_PROFIT: 'Take profit', TRAILING_STOP: 'Trail Stop' } as const;
 type Tab = 'positions' | 'orders' | 'algos' | 'journal' | 'alerts' | 'pine';
 
 export interface PositionsTableProps {

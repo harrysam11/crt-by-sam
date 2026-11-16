@@ -3,6 +3,7 @@ import { useTerminalStore } from '../../store/useTerminalStore';
 import { usePsychologyStore } from '../../store/usePsychologyStore';
 import { useJournalStore } from '../../store/useJournalStore';
 import { useDerivativesStore } from '../../store/useDerivativesStore';
+import { useTradingModeStore } from '../../store/useTradingModeStore';
 import { getInstrument } from '../../services/instruments';
 import { fmtPct, fmtPnl, fmtPrice, fmtUsd, labelOf, pnlClass } from '../../utils/formatters';
 import { BreathingHalo } from '../../features/zen/ZenController';
@@ -158,6 +159,11 @@ export default function Header({
   useEffect(() => {
     return audioHaptics.subscribeMute((m) => setIsMuted(m));
   }, []);
+
+  // Paper / Live Trading Mode
+  const tradingMode = useTradingModeStore((s) => s.mode);
+  const toggleTradingMode = useTradingModeStore((s) => s.toggleMode);
+  const [showLiveWarning, setShowLiveWarning] = useState(false);
 
   // Institutional Market Sessions & Killzones Real-Time Engine
   const [sessionData, setSessionData] = useState(() => computeActiveSessions());
@@ -827,6 +833,32 @@ export default function Header({
             </button>
           )}
 
+          {/* Paper / Live Trading Mode Toggle */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              if (tradingMode === 'PAPER') {
+                setShowLiveWarning(true);
+                setTimeout(() => setShowLiveWarning(false), 3000);
+              }
+              toggleTradingMode();
+            }}
+            className={`relative px-2.5 py-1 text-xs font-bold rounded-[6px] border transition hidden sm:flex items-center gap-1.5 ${
+              tradingMode === 'LIVE'
+                ? 'border-red-500/60 bg-red-500/15 text-red-400 hover:bg-red-500/25 animate-pulse'
+                : 'border-zinc-600/40 bg-zinc-800/40 text-zinc-400 hover:text-white hover:border-zinc-500/60'
+            }`}
+            title={tradingMode === 'PAPER' ? 'Paper Trading (simulated) — click to switch to LIVE' : 'LIVE mode — orders route to broker API — click to return to Paper'}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${tradingMode === 'LIVE' ? 'bg-red-400' : 'bg-zinc-500'}`} />
+            {tradingMode === 'LIVE' ? 'LIVE' : 'PAPER'}
+            {showLiveWarning && (
+              <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-900/90 text-red-300 text-[9px] px-2 py-0.5 rounded border border-red-500/40 z-50">
+                LIVE mode — no real broker connected
+              </span>
+            )}
+          </button>
+
           {/* Sound Mute / Unmute Toggle Button */}
           <button
             onClick={() => {
@@ -952,7 +984,8 @@ export default function Header({
                     <span>Ping: <strong className="text-white">{pingMs}ms</strong></span>
                   </div>
                   <div className="flex items-center gap-1.5 text-muted">
-                    <span className="text-white font-bold">[SANDBOX]</span>
+                    <span className={`h-1.5 w-1.5 rounded-full ${tradingMode === 'LIVE' ? 'bg-red-400 animate-pulse' : 'bg-zinc-500'}`} />
+                    <span className={`font-bold ${tradingMode === 'LIVE' ? 'text-red-400' : 'text-zinc-400'}`}>[{tradingMode}]</span>
                   </div>
                   {loadTelegramConfig().enabled && (
                     <div className="col-span-2 text-emerald-400 text-[10px] flex items-center gap-1">
@@ -1094,6 +1127,23 @@ export default function Header({
                     </span>
                   </button>
 
+                  {/* Paper / Live Mode for Mobile */}
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      toggleTradingMode();
+                    }}
+                    className="flex w-full items-center justify-between px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${tradingMode === 'LIVE' ? 'bg-red-400 animate-pulse' : 'bg-zinc-500'}`} />
+                      <span>Trading Mode</span>
+                    </div>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${tradingMode === 'LIVE' ? 'bg-red-500/20 text-red-300' : 'bg-zinc-500/20 text-zinc-300'}`}>
+                      {tradingMode}
+                    </span>
+                  </button>
+
                   {/* Multi-Chart Grid Layout Picker for Mobile */}
                   <div className="border-t border-grid/60 pt-2 mt-1">
                     <span className="text-[10px] uppercase font-bold text-muted block mb-1 px-1">
@@ -1148,12 +1198,14 @@ export default function Header({
           </button>
         )}
 
-        {/* Read-Only Sandbox Mode Badge (Desktop) */}
+        {/* Trading Mode Badge (Desktop) */}
         <span
-          className="clay-badge px-2 py-0.5 text-[10px] font-bold text-white/80 hidden xl:inline-block"
-          title="Secure Read-Only Sandbox: Paper Capital"
+          className={`clay-badge px-2 py-0.5 text-[10px] font-bold hidden xl:inline-block ${
+            tradingMode === 'LIVE' ? 'text-red-400 border-red-500/30' : 'text-zinc-400'
+          }`}
+          title={tradingMode === 'PAPER' ? 'Paper Trading: simulated capital' : 'LIVE mode: real broker orders'}
         >
-          [SANDBOX]
+          [{tradingMode}]
         </span>
 
         {/* WebSocket Latency Ping Meter (Desktop with Click-to-Reconnect) */}
