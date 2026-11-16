@@ -1,5 +1,5 @@
 import { useJournalStore } from '../store/useJournalStore';
-import type { JournalEntry } from '../types/psychology';
+import type { JournalEntry, TradingSessionTag } from '../types/psychology';
 
 /**
  * Helper to render an SVG element into a 2D canvas context.
@@ -122,6 +122,15 @@ export async function captureChartScreenshot(
 
 export const captureMultiCanvasSnapshot = captureChartScreenshot;
 
+function getActiveSessionTag(now: Date = new Date()): TradingSessionTag {
+  const utcHour = now.getUTCHours();
+  if (utcHour >= 0 && utcHour < 7) return 'ASIA';
+  if (utcHour >= 7 && utcHour < 12) return 'LONDON';
+  if (utcHour >= 12 && utcHour < 16) return 'OVERLAP';
+  if (utcHour >= 16 && utcHour < 21) return 'NY';
+  return 'INTER_SESSION';
+}
+
 /**
  * Automatically capture a trade journal entry when an order executes or position closes.
  */
@@ -131,7 +140,10 @@ export async function logTradeToJournal(params: {
   side: 'BUY' | 'SELL' | 'LONG' | 'SHORT';
   entryPrice: number;
   exitPrice?: number;
+  qty?: number;
   pnl?: number;
+  commission?: number;
+  setup?: string;
   chartContainer?: HTMLElement | null;
   emotionTag?: JournalEntry['emotionTag'];
   notes?: string;
@@ -145,6 +157,11 @@ export async function logTradeToJournal(params: {
     }
   }
 
+  const commission = params.commission ?? (params.qty && params.entryPrice ? +(params.qty * params.entryPrice * 0.0003).toFixed(2) : 2.50);
+  const pnl = params.pnl;
+  const netPnl = pnl !== undefined ? +(pnl - commission).toFixed(2) : undefined;
+  const session = getActiveSessionTag();
+
   const entry = useJournalStore.getState().addEntry({
     tradeId: params.tradeId,
     timestamp: Date.now(),
@@ -152,7 +169,19 @@ export async function logTradeToJournal(params: {
     side: params.side,
     entryPrice: params.entryPrice,
     exitPrice: params.exitPrice,
+    qty: params.qty,
     pnl: params.pnl,
+    commission,
+    netPnl,
+    session,
+    setup: params.setup ?? 'TREND_PULLBACK',
+    checklist: {
+      followedPlan: true,
+      validRR: true,
+      confluenceChecked: true,
+      noNewsConflict: true,
+      riskCalculated: true,
+    },
     chartDataUrl,
     emotionTag: params.emotionTag ?? 'PLANNED',
     notes: params.notes ?? `Auto-logged execution for ${params.symbol} at ${params.entryPrice}`,

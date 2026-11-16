@@ -50,6 +50,7 @@ export default function HotkeyModal({ isOpen, onClose }: HotkeyModalProps) {
     {
       title: 'Psychology & System',
       keys: [
+        { key: 'Alt + J', desc: 'Open Portfolio Tracker, PnL Calendar & Trade Journal' },
         { key: 'Alt + Z', desc: 'Toggle Zen Stream Mode (PnL Obfuscation & Box Breathing)' },
         { key: '?', desc: 'Open this Keyboard Hotkeys Cheatsheet' },
       ],

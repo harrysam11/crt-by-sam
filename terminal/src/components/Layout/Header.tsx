@@ -30,6 +30,7 @@ interface HeaderProps {
   onOpenScreener?: () => void;
   onOpenSessions?: () => void;
   onOpenGuardian?: () => void;
+  onOpenPortfolio?: () => void;
   onOpenSettings?: (tab?: 'PROFILE' | 'BILLING' | 'THEME' | 'LANGUAGE' | 'TELEGRAM') => void;
   onTogglePopout?: () => void;
   isPopoutActive?: boolean;
@@ -50,6 +51,7 @@ export default function Header({
   onOpenScreener,
   onOpenSessions,
   onOpenGuardian,
+  onOpenPortfolio,
   onOpenSettings,
   onTogglePopout,
   isPopoutActive,
@@ -500,6 +502,14 @@ export default function Header({
                     {guardianEmergencyLocked ? '[GUARDIAN LOCKED]' : 'TradeXGuardian'}
                   </button>
                 )}
+                {onOpenPortfolio && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenPortfolio(); setIsAccountOpen(false); }}
+                    className="clay-btn py-1 text-center font-bold text-[11px] text-[#38bdf8] hover:text-white"
+                  >
+                    Portfolio & Journal
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -669,6 +679,17 @@ export default function Header({
                     <span className={`text-[10px] font-bold px-1 rounded ${guardianDisciplineScore >= 80 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
                       {guardianDisciplineScore}%
                     </span>
+                  </button>
+                )}
+                {onOpenPortfolio && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenPortfolio(); setIsInstToolsOpen(false); }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <span>Portfolio Tracker & PnL Calendar</span>
                   </button>
                 )}
                 {onOpenTax && (
@@ -854,6 +875,23 @@ export default function Header({
               </div>
             )}
           </div>
+
+          {/* Portfolio Tracker & Trade Journal Pill */}
+          {onOpenPortfolio && (
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                onOpenPortfolio();
+              }}
+              className="clay-btn px-2 py-1 text-xs font-semibold rounded-[6px] transition hidden md:flex items-center gap-1.5 text-white hover:text-white"
+              title="Portfolio Tracker, Analytics, PnL Calendar & AI Journal (Alt+J)"
+            >
+              <svg className="h-3.5 w-3.5 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <span>Portfolio</span>
+            </button>
+          )}
 
           {/* TradeXGuardian Capital Protection Pill */}
           {onOpenGuardian && (
@@ -1177,6 +1215,17 @@ export default function Header({
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${guardianDisciplineScore >= 80 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
                         {guardianDisciplineScore}%
                       </span>
+                    </button>
+                  )}
+                  {onOpenPortfolio && (
+                    <button
+                      onClick={() => { audioHaptics.tick(); onOpenPortfolio(); setIsOverflowOpen(false); }}
+                      className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                    >
+                      <svg className="h-4 w-4 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      <span>Portfolio Tracker & PnL Calendar</span>
                     </button>
                   )}
 

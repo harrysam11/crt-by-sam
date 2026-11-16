@@ -29,6 +29,7 @@ import MiniTerminalPopout from './components/popout/MiniTerminalPopout';
 import ObjectTreePanel from './components/Chart/ObjectTreePanel';
 import DataWindowPanel from './components/Chart/DataWindowPanel';
 import GuardianModal from './components/guardian/GuardianModal';
+import PortfolioDashboardModal from './components/portfolio/PortfolioDashboardModal';
 import { useMarketFeed } from './hooks/useMarketFeed';
 import { useKeyboardHotkeys } from './hooks/useKeyboardHotkeys';
 import { useTerminalStore } from './store/useTerminalStore';
@@ -128,19 +129,23 @@ export default function App() {
   const [isSessionManagerOpen, setIsSessionManagerOpen] = useState(false);
   const [isPopoutOpen, setIsPopoutOpen] = useState(false);
   const [isGuardianOpen, setIsGuardianOpen] = useState(false);
+  const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
 
   // Global Keyboard Hotkeys Listener
   useKeyboardHotkeys({
     onOpenCheatsheet: () => setIsHotkeyOpen(true),
+    onOpenPortfolio: () => setIsPortfolioOpen(true),
   });
 
-  // Global window openers for Screener and Calendar
+  // Global window openers for Screener, Calendar, and Portfolio
   useEffect(() => {
     (window as any).__openScreener = () => setIsScreenerOpen(true);
     (window as any).__openCalendar = () => setIsCalendarOpen(true);
+    (window as any).__openPortfolio = () => setIsPortfolioOpen(true);
     return () => {
       delete (window as any).__openScreener;
       delete (window as any).__openCalendar;
+      delete (window as any).__openPortfolio;
     };
   }, []);
 
@@ -172,6 +177,12 @@ export default function App() {
 
       {/* Trade Psychology & Screenshot Journal Review Drawer */}
       <JournalModal />
+
+      {/* Portfolio Tracker, Analytics, PnL Calendar & AI Journal Suite */}
+      <PortfolioDashboardModal
+        isOpen={isPortfolioOpen}
+        onClose={() => setIsPortfolioOpen(false)}
+      />
 
       {/* NSE & Crypto Option Chain Modal */}
       <OptionChainModal
@@ -271,6 +282,7 @@ export default function App() {
           onOpenScreener={() => setIsScreenerOpen(true)}
           onOpenSessions={() => setIsSessionManagerOpen(true)}
           onOpenGuardian={() => setIsGuardianOpen(true)}
+          onOpenPortfolio={() => setIsPortfolioOpen(true)}
           onOpenSettings={(tab) => {
             if (tab) setSettingsTab(tab);
             setIsSettingsOpen(true);

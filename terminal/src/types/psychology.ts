@@ -30,6 +30,16 @@ export interface CustomThemeConfig {
   accentColor: string;
 }
 
+export interface JournalChecklist {
+  followedPlan: boolean;
+  validRR: boolean;
+  confluenceChecked: boolean;
+  noNewsConflict: boolean;
+  riskCalculated: boolean;
+}
+
+export type TradingSessionTag = 'ASIA' | 'LONDON' | 'NY' | 'OVERLAP' | 'INTER_SESSION';
+
 export interface JournalEntry {
   id: string;
   timestamp: number;
@@ -38,8 +48,18 @@ export interface JournalEntry {
   side: 'BUY' | 'SELL' | 'LONG' | 'SHORT';
   entryPrice: number;
   exitPrice?: number;
+  qty?: number;
   pnl?: number;
+  commission?: number;
+  netPnl?: number;
+  rMultiple?: number;
+  session?: TradingSessionTag;
+  setup?: string;
+  checklist?: JournalChecklist;
+  holdingTimeMs?: number;
   chartDataUrl: string;          // Canvas snapshot Data URL
   emotionTag: 'PLANNED' | 'FOMO' | 'REVENGE' | 'IMPULSE';
   notes: string;
+  tags?: string[];
+  aiTakeaway?: string;
 }

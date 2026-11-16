@@ -8,6 +8,7 @@ import { drawingEvents } from '../components/drawing/framework/DrawingEvents';
 
 interface UseKeyboardHotkeysProps {
   onOpenCheatsheet?: () => void;
+  onOpenPortfolio?: () => void;
 }
 
 const TF_KEYS: Record<string, Timeframe> = {
@@ -20,7 +21,7 @@ const TF_KEYS: Record<string, Timeframe> = {
   'H': '1h',
 };
 
-export function useKeyboardHotkeys({ onOpenCheatsheet }: UseKeyboardHotkeysProps = {}) {
+export function useKeyboardHotkeys({ onOpenCheatsheet, onOpenPortfolio }: UseKeyboardHotkeysProps = {}) {
   const symbol = useTerminalStore((s) => s.symbol);
   const positions = useTerminalStore((s) => s.positions);
   const orders = useTerminalStore((s) => s.orders);
@@ -51,6 +52,14 @@ export function useKeyboardHotkeys({ onOpenCheatsheet }: UseKeyboardHotkeysProps
         e.preventDefault();
         audioHaptics.tick();
         onOpenCheatsheet?.();
+        return;
+      }
+
+      // Hotkey: Alt+J -> Open Portfolio Tracker & Trade Journal
+      if (e.altKey && (e.key === 'j' || e.key === 'J')) {
+        e.preventDefault();
+        audioHaptics.tick();
+        onOpenPortfolio?.();
         return;
       }
 
