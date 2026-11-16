@@ -15,9 +15,16 @@ type Tab = 'positions' | 'orders' | 'algos' | 'journal' | 'alerts' | 'pine';
 export interface PositionsTableProps {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  isMaximized?: boolean;
+  onToggleMaximize?: () => void;
 }
 
-export default function PositionsTable({ isCollapsed, onToggleCollapse }: PositionsTableProps = {}) {
+export default function PositionsTable({
+  isCollapsed,
+  onToggleCollapse,
+  isMaximized,
+  onToggleMaximize,
+}: PositionsTableProps = {}) {
   const [tab, setTab] = useState<Tab>('positions');
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
@@ -143,7 +150,7 @@ export default function PositionsTable({ isCollapsed, onToggleCollapse }: Positi
         </div>
 
         {/* Quick Toolbar */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           {tab === 'journal' && (
             <button
               onClick={copyTradesCsv}
@@ -167,15 +174,41 @@ export default function PositionsTable({ isCollapsed, onToggleCollapse }: Positi
             </button>
           )}
 
+          {/* Maximize / Restore Toggle */}
+          {onToggleMaximize && (
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                onToggleMaximize();
+              }}
+              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-white/10 transition"
+              title={isMaximized ? 'Restore Bottom Panel Size' : 'Maximize Bottom Panel to Full Height'}
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                {isMaximized ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h6m0 0v6m0-6L3 21m17-7h-6m0 0v6m0-6l7 7M14 4h6m0 0v6m0-6l-7 7M10 4H4m0 0v6m0-6l7 7" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                )}
+              </svg>
+            </button>
+          )}
+
+          {/* Expand / Collapse Button with Explicit Label & Chevron */}
           {onToggleCollapse && (
             <button
               onClick={() => {
                 audioHaptics.tick();
                 onToggleCollapse();
               }}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/10 transition"
-              title={isCollapsed ? 'Expand Bottom Panel' : 'Collapse Bottom Panel'}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs transition ${
+                isCollapsed
+                  ? 'clay-pill-active font-bold text-white'
+                  : 'text-slate-400 hover:text-white hover:bg-white/10'
+              }`}
+              title={isCollapsed ? 'Expand Bottom Panel (Show Positions & Orders)' : 'Collapse Bottom Panel'}
             >
+              <span className="text-[10px] hidden sm:inline">{isCollapsed ? 'Expand' : 'Collapse'}</span>
               <svg className={`h-3.5 w-3.5 transition-transform duration-150 ${isCollapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>

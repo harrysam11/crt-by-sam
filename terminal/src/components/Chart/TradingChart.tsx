@@ -699,13 +699,18 @@ export default function TradingChart({
         if (targetCandles[next]) {
           useTerminalStore.getState().updatePriceTick(symbol, targetCandles[next].close);
         }
+        if (chartApi) {
+          try {
+            const logicalRange = chartApi.timeScale().getVisibleLogicalRange();
+            const span = logicalRange ? Math.max(40, logicalRange.to - logicalRange.from) : 80;
+            chartApi.timeScale().setVisibleLogicalRange({
+              from: Math.max(0, next - span + 8),
+              to: next + 8,
+            });
+          } catch {}
+        }
         return next;
       });
-      if (chartApi) {
-        try {
-          chartApi.timeScale().scrollToRealTime();
-        } catch {}
-      }
     }, replaySpeedMs);
     return () => clearInterval(interval);
   }, [isReplayActive, isReplayPlaying, replaySpeedMs, activeCandles, candles, symbol, chartApi]);
@@ -727,7 +732,6 @@ export default function TradingChart({
             from: Math.max(0, startIdx - 80),
             to: startIdx + 8,
           });
-          chartApi.timeScale().scrollToRealTime();
         } catch {}
       }
     }, 50);
@@ -755,13 +759,18 @@ export default function TradingChart({
       if (targetCandles[next]) {
         useTerminalStore.getState().updatePriceTick(symbol, targetCandles[next].close);
       }
+      if (chartApi) {
+        try {
+          const logicalRange = chartApi.timeScale().getVisibleLogicalRange();
+          const span = logicalRange ? Math.max(40, logicalRange.to - logicalRange.from) : 80;
+          chartApi.timeScale().setVisibleLogicalRange({
+            from: Math.max(0, next - span + 8),
+            to: next + 8,
+          });
+        } catch {}
+      }
       return next;
     });
-    if (chartApi) {
-      try {
-        chartApi.timeScale().scrollToRealTime();
-      } catch {}
-    }
   };
 
   const handleToggleIndicator = (key: string) => {
@@ -2808,7 +2817,6 @@ export default function TradingChart({
                       from: Math.max(0, idx - 80),
                       to: idx + 8,
                     });
-                    chartApi.timeScale().scrollToRealTime();
                   } catch {}
                 }, 40);
               }
@@ -3068,14 +3076,14 @@ export default function TradingChart({
     </div>
 
       {/* TradingView Bottom Range & Scale Bar */}
-      <div className="h-8 shrink-0 border-t border-grid bg-panel px-3 flex items-center justify-between text-[11px] text-slate-300 select-none font-mono">
+      <div className="h-8 shrink-0 border-t border-grid/60 bg-[#0c0d14] px-2.5 flex items-center justify-between text-[11px] text-slate-300 select-none font-mono z-10 overflow-x-auto scrollbar-none">
         {/* Left: Time Range Presets */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 shrink-0 overflow-x-auto scrollbar-none">
           {(['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', 'ALL'] as const).map((r) => (
             <button
               key={r}
               onClick={() => handleSelectTimeRange(r)}
-              className="px-2 py-0.5 rounded-[4px] clay-btn text-[10px] font-medium transition"
+              className="px-1.5 sm:px-2 py-0.5 rounded-[4px] clay-btn text-[9.5px] sm:text-[10px] font-medium transition"
             >
               {r}
             </button>
@@ -3083,7 +3091,7 @@ export default function TradingChart({
         </div>
 
         {/* Right: Scale & Timezone */}
-        <div className="flex items-center gap-1.5 text-[10px]">
+        <div className="flex items-center gap-1 text-[10px] shrink-0 ml-auto pl-2">
           <button
             onClick={() => {
               audioHaptics.tick();

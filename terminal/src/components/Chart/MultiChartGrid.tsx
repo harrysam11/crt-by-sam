@@ -88,6 +88,15 @@ export default function MultiChartGrid() {
   const p3 = panes['pane-3'] || { paneId: 'pane-3', symbol: globalSymbol, timeframe: '4h' };
   const p4 = panes['pane-4'] || { paneId: 'pane-4', symbol: globalSymbol, timeframe: '1d' };
 
+  // Keep single chart mode or sync-enabled charts strictly in lockstep with globalSymbol
+  useEffect(() => {
+    if (layout === '1x1' || syncSymbol) {
+      if (panes['pane-1']?.symbol !== globalSymbol) {
+        useLayoutStore.getState().setPaneSymbol('pane-1', globalSymbol);
+      }
+    }
+  }, [globalSymbol, layout, syncSymbol, panes]);
+
   return (
     <div className={`relative flex h-full w-full flex-col overflow-hidden bg-bg ${isChartMaximized ? 'fixed inset-0 z-50' : ''}`}>
       {/* Top Floating Multi-Chart Layout & Sync Controller Toolbar */}
@@ -362,7 +371,7 @@ export default function MultiChartGrid() {
           >
             <TradingChart
               paneId="pane-1"
-              symbolOverride={p1.symbol}
+              symbolOverride={globalSymbol}
               timeframeOverride={p1.timeframe}
             />
           </div>
@@ -376,7 +385,7 @@ export default function MultiChartGrid() {
             >
               <TradingChart
                 paneId="pane-1"
-                symbolOverride={p1.symbol}
+                symbolOverride={syncSymbol ? globalSymbol : p1.symbol}
                 timeframeOverride={p1.timeframe}
               />
             </div>
@@ -386,7 +395,7 @@ export default function MultiChartGrid() {
             >
               <TradingChart
                 paneId="pane-2"
-                symbolOverride={p2.symbol}
+                symbolOverride={syncSymbol ? globalSymbol : p2.symbol}
                 timeframeOverride={p2.timeframe}
               />
             </div>
@@ -401,7 +410,7 @@ export default function MultiChartGrid() {
             >
               <TradingChart
                 paneId="pane-1"
-                symbolOverride={p1.symbol}
+                symbolOverride={syncSymbol ? globalSymbol : p1.symbol}
                 timeframeOverride={p1.timeframe}
               />
             </div>
@@ -411,7 +420,7 @@ export default function MultiChartGrid() {
             >
               <TradingChart
                 paneId="pane-2"
-                symbolOverride={p2.symbol}
+                symbolOverride={syncSymbol ? globalSymbol : p2.symbol}
                 timeframeOverride={p2.timeframe}
               />
             </div>
@@ -426,7 +435,7 @@ export default function MultiChartGrid() {
             >
               <TradingChart
                 paneId="pane-1"
-                symbolOverride={p1.symbol}
+                symbolOverride={syncSymbol ? globalSymbol : p1.symbol}
                 timeframeOverride={p1.timeframe}
               />
             </div>
@@ -436,7 +445,7 @@ export default function MultiChartGrid() {
             >
               <TradingChart
                 paneId="pane-2"
-                symbolOverride={p2.symbol}
+                symbolOverride={syncSymbol ? globalSymbol : p2.symbol}
                 timeframeOverride={p2.timeframe}
               />
             </div>
@@ -446,7 +455,7 @@ export default function MultiChartGrid() {
             >
               <TradingChart
                 paneId="pane-3"
-                symbolOverride={p3.symbol}
+                symbolOverride={syncSymbol ? globalSymbol : p3.symbol}
                 timeframeOverride={p3.timeframe}
               />
             </div>
@@ -456,7 +465,7 @@ export default function MultiChartGrid() {
             >
               <TradingChart
                 paneId="pane-4"
-                symbolOverride={p4.symbol}
+                symbolOverride={syncSymbol ? globalSymbol : p4.symbol}
                 timeframeOverride={p4.timeframe}
               />
             </div>

@@ -9,6 +9,7 @@ import type {
   Alert, Candle, ConnectionStatus, Instrument, Order, OrderSide, Position, QuoteInfo, TickerStat, Timeframe, Trade,
 } from '../types/terminal';
 import { useExecutionEngineStore } from './useExecutionEngineStore';
+import { useLayoutStore } from './useLayoutStore';
 
 export const START_BALANCE = 10000; // USD
 export const LEVERAGES = [1, 2, 5, 10, 20, 50, 100];
@@ -239,10 +240,18 @@ export const useTerminalStore = create<TerminalState>()(
         setSymbol: (symbol) => {
           const safe = sanitizeSymbol(symbol);
           set((s) => ({ symbol: safe, candles: [], error: null, currentPrice: s.prices[safe] ?? 0 }));
+          try {
+            const layoutState = useLayoutStore.getState();
+            layoutState.setPaneSymbol(layoutState.activePaneId || 'pane-1', safe);
+          } catch {}
         },
         setTimeframe: (timeframe) => {
           const safe = sanitizeTimeframe(timeframe);
           set({ timeframe: safe, candles: [], error: null });
+          try {
+            const layoutState = useLayoutStore.getState();
+            layoutState.setPaneTimeframe(layoutState.activePaneId || 'pane-1', safe);
+          } catch {}
         },
         setCandles: (candles) => set({ candles }),
         setStatus: (status) => set({ status }),

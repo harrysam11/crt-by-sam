@@ -57,19 +57,21 @@ export default function App() {
   const [bottomH, setBottomH] = useState(() => {
     try {
       const saved = localStorage.getItem('crt_bottom_h');
-      return saved ? Number(saved) : 160;
+      const val = saved ? Number(saved) : 220;
+      return Math.max(120, Math.min(520, isNaN(val) ? 220 : val));
     } catch {
-      return 160;
+      return 220;
     }
   });
   const [isBottomCollapsed, setIsBottomCollapsed] = useState(() => {
     try {
       const saved = localStorage.getItem('crt_bottom_collapsed');
-      return saved !== null ? saved === 'true' : true;
+      return saved !== null ? saved === 'true' : false; // Default to open/expanded
     } catch {
-      return true;
+      return false;
     }
   });
+  const [isBottomMaximized, setIsBottomMaximized] = useState(false);
   const activeRightDrawer = useDrawingStore((s) => s.activeRightDrawer);
   const setActiveRightDrawer = useDrawingStore((s) => s.setActiveRightDrawer);
 
@@ -81,6 +83,11 @@ export default function App() {
       } catch {}
       return next;
     });
+  };
+
+  const handleToggleBottomMaximize = () => {
+    setIsBottomMaximized((v) => !v);
+    if (isBottomCollapsed) setIsBottomCollapsed(false);
   };
 
   const handleResizeRightW = (delta: number) => {
@@ -95,7 +102,7 @@ export default function App() {
 
   const handleResizeBottomH = (delta: number) => {
     setBottomH((prev) => {
-      const next = clamp(prev - delta, 100, 420);
+      const next = clamp(prev - delta, 120, 520);
       try {
         localStorage.setItem('crt_bottom_h', String(next));
       } catch {}
@@ -258,21 +265,31 @@ export default function App() {
       <div className="flex min-h-0 flex-1 relative overflow-hidden">
         {/* Main Center Area: Chart + Bottom Positions */}
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="min-h-0 flex-1 relative">
-            <MultiChartGrid />
-          </div>
+          {!isBottomMaximized && (
+            <div className="min-h-0 flex-1 relative">
+              <MultiChartGrid />
+            </div>
+          )}
           {!isChartMaximized && (
             <>
-              {!isBottomCollapsed && (
-                <Splitter dir="h" onDrag={handleResizeBottomH} />
+              {!isBottomMaximized && (
+                <Splitter
+                  dir="h"
+                  onDrag={(delta) => {
+                    if (isBottomCollapsed) setIsBottomCollapsed(false);
+                    handleResizeBottomH(delta);
+                  }}
+                />
               )}
               <div
-                style={{ height: isBottomCollapsed ? 34 : bottomH }}
-                className="shrink-0 overflow-hidden transition-all duration-150"
+                style={{ height: isBottomMaximized ? '100%' : isBottomCollapsed ? 34 : bottomH }}
+                className={`${isBottomMaximized ? 'flex-1 h-full' : 'shrink-0'} overflow-hidden transition-all duration-150 relative bg-panel z-10`}
               >
                 <PositionsTable
                   isCollapsed={isBottomCollapsed}
                   onToggleCollapse={handleToggleBottomCollapse}
+                  isMaximized={isBottomMaximized}
+                  onToggleMaximize={handleToggleBottomMaximize}
                 />
               </div>
             </>
