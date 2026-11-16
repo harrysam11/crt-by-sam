@@ -24,6 +24,7 @@ interface HeaderProps {
   onOpenHotkeys?: () => void;
   onOpenCalendar?: () => void;
   onOpenScreener?: () => void;
+  onOpenSessions?: () => void;
   onOpenSettings?: (tab?: 'PROFILE' | 'BILLING' | 'THEME' | 'LANGUAGE' | 'TELEGRAM') => void;
   onTogglePopout?: () => void;
   isPopoutActive?: boolean;
@@ -42,6 +43,7 @@ export default function Header({
   onOpenHotkeys,
   onOpenCalendar,
   onOpenScreener,
+  onOpenSessions,
   onOpenSettings,
   onTogglePopout,
   isPopoutActive,
@@ -599,6 +601,17 @@ export default function Header({
                     <span>Broker API Key Vault</span>
                   </button>
                 )}
+                {onOpenSessions && (
+                  <button
+                    onClick={() => { audioHaptics.tick(); onOpenSessions(); setIsInstToolsOpen(false); }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7C5 4 4 5 4 7zm0 4h16M8 4v3m8-3v3" />
+                    </svg>
+                    <span>Trading Sessions & DB Backup</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -970,6 +983,17 @@ export default function Header({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
                       <span>Broker API Vault (MT5 / Crypto / India)</span>
+                    </button>
+                  )}
+                  {onOpenSessions && (
+                    <button
+                      onClick={() => { audioHaptics.tick(); onOpenSessions(); setIsOverflowOpen(false); }}
+                      className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                    >
+                      <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7C5 4 4 5 4 7zm0 4h16M8 4v3m8-3v3" />
+                      </svg>
+                      <span>Trading Sessions & DB Backup</span>
                     </button>
                   )}
 

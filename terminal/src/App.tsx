@@ -23,6 +23,7 @@ import HotkeyModal from './components/hotkeys/HotkeyModal';
 import EconomicCalendarModal from './components/calendar/EconomicCalendarModal';
 import MarketScreenerModal from './components/screener/MarketScreenerModal';
 import SettingsModal from './components/settings/SettingsModal';
+import SessionManagerModal from './components/session/SessionManagerModal';
 import PopoutWindow from './components/popout/PopoutWindow';
 import MiniTerminalPopout from './components/popout/MiniTerminalPopout';
 import ObjectTreePanel from './components/Chart/ObjectTreePanel';
@@ -123,6 +124,7 @@ export default function App() {
   const [isScreenerOpen, setIsScreenerOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'PROFILE' | 'BILLING' | 'THEME' | 'LANGUAGE' | 'TELEGRAM'>('PROFILE');
+  const [isSessionManagerOpen, setIsSessionManagerOpen] = useState(false);
   const [isPopoutOpen, setIsPopoutOpen] = useState(false);
 
   // Global Keyboard Hotkeys Listener
@@ -229,6 +231,12 @@ export default function App() {
         initialTab={settingsTab}
       />
 
+      {/* Trading Sessions & Database Engine Modal */}
+      <SessionManagerModal
+        isOpen={isSessionManagerOpen}
+        onClose={() => setIsSessionManagerOpen(false)}
+      />
+
       {/* Standalone Pop-out Window (Picture-in-Picture) */}
       <PopoutWindow
         title="Mini Terminal"
@@ -253,6 +261,7 @@ export default function App() {
           onOpenHotkeys={() => setIsHotkeyOpen(true)}
           onOpenCalendar={() => setIsCalendarOpen(true)}
           onOpenScreener={() => setIsScreenerOpen(true)}
+          onOpenSessions={() => setIsSessionManagerOpen(true)}
           onOpenSettings={(tab) => {
             if (tab) setSettingsTab(tab);
             setIsSettingsOpen(true);

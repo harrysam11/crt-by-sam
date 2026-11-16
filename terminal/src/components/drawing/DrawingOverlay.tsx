@@ -600,6 +600,19 @@ export default function DrawingOverlay({
   }, [setSelectedDrawingIds]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement | SVGElement | null;
+    if (
+      target?.closest('[data-drawing-context-bar]') ||
+      target?.closest('[data-drawing-settings-modal]') ||
+      target?.closest('.clay-popover') ||
+      target?.closest('.clay-btn') ||
+      target?.closest('button') ||
+      target?.closest('input') ||
+      target?.closest('select') ||
+      target?.closest('textarea')
+    ) {
+      return;
+    }
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const rawX = e.clientX - rect.left;

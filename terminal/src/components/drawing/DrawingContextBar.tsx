@@ -127,6 +127,9 @@ export default function DrawingContextBar({
       data-drawing-context-bar="true"
       style={{ left: `${safeX}px`, top: `${safeY}px` }}
       onDoubleClick={handleResetPos}
+      onPointerDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
       className="clay-popover fixed z-50 flex items-center gap-1.5 px-2 py-1 font-mono text-xs select-none shadow-2xl backdrop-blur-md border border-white/[0.08] pointer-events-auto"
       title="Drawing Context Toolbar (Drag grip to move, Double-click to reset)"
     >
@@ -152,19 +155,44 @@ export default function DrawingContextBar({
         {PRESET_COLORS.map((col) => (
           <button
             key={col}
-            onClick={() => {
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
               audioHaptics.tick();
               onUpdateDrawing(selectedDrawing.id, { color: col });
             }}
             className={`h-4 w-4 rounded-full border transition ${
               selectedDrawing.color === col
-                ? 'border-white scale-110 shadow-sm'
+                ? 'border-white scale-110 shadow-sm ring-1 ring-white/50'
                 : 'border-transparent hover:scale-105'
             }`}
             style={{ backgroundColor: col }}
             title={col}
           />
         ))}
+
+        {/* Custom Color Input */}
+        <label
+          onPointerDown={(e) => e.stopPropagation()}
+          className="relative flex items-center justify-center cursor-pointer"
+          title="Pick custom color"
+        >
+          <input
+            type="color"
+            value={selectedDrawing.color || '#38bdf8'}
+            onChange={(e) => {
+              onUpdateDrawing(selectedDrawing.id, { color: e.target.value });
+            }}
+            className="sr-only"
+          />
+          <span
+            className="h-4 w-4 rounded-full border border-white/30 flex items-center justify-center hover:scale-110 hover:border-white transition"
+            style={{ backgroundColor: selectedDrawing.color || '#38bdf8' }}
+          >
+            <span className="text-[8px] text-white font-bold leading-none select-none">+</span>
+          </span>
+        </label>
       </div>
 
       {/* Line Width */}
@@ -172,13 +200,16 @@ export default function DrawingContextBar({
         {[1, 2, 3, 4].map((w) => (
           <button
             key={w}
-            onClick={() => {
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
               audioHaptics.tick();
               onUpdateDrawing(selectedDrawing.id, { lineWidth: w });
             }}
             className={`px-1.5 py-0.5 text-[10px] rounded transition ${
               selectedDrawing.lineWidth === w
-                ? 'clay-btn-active font-bold text-white'
+                ? 'clay-btn-active font-bold text-white ring-1 ring-accent/60'
                 : 'clay-btn text-muted hover:text-white'
             }`}
           >
@@ -192,13 +223,16 @@ export default function DrawingContextBar({
         {(['solid', 'dashed', 'dotted'] as const).map((style) => (
           <button
             key={style}
-            onClick={() => {
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
               audioHaptics.tick();
               onUpdateDrawing(selectedDrawing.id, { lineStyle: style });
             }}
             className={`px-1.5 py-0.5 text-[10px] rounded capitalize transition ${
               (selectedDrawing.lineStyle || 'solid') === style
-                ? 'clay-btn-active font-bold text-white'
+                ? 'clay-btn-active font-bold text-white ring-1 ring-accent/60'
                 : 'clay-btn text-muted hover:text-white'
             }`}
             title={`Line style: ${style}`}
@@ -210,7 +244,10 @@ export default function DrawingContextBar({
 
       {/* Fill Opacity Slider for shapes */}
       {supportsFill && (
-        <div className="flex items-center gap-1 pr-2 border-r border-grid/50">
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          className="flex items-center gap-1 pr-2 border-r border-grid/50"
+        >
           <span className="text-[10px] text-muted">Fill</span>
           <input
             type="range"
@@ -218,8 +255,14 @@ export default function DrawingContextBar({
             max="1"
             step="0.05"
             value={selectedDrawing.fillOpacity ?? 0.15}
+            onPointerDown={(e) => e.stopPropagation()}
             onChange={(e) => {
-              onUpdateDrawing(selectedDrawing.id, { fillOpacity: parseFloat(e.target.value) });
+              e.stopPropagation();
+              const val = parseFloat(e.target.value);
+              onUpdateDrawing(selectedDrawing.id, {
+                fillOpacity: val,
+                fillColor: selectedDrawing.fillColor || selectedDrawing.color || '#38bdf8',
+              });
             }}
             className="w-14 accent-accent cursor-pointer"
             title="Fill Opacity"
