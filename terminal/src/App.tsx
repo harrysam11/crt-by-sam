@@ -44,6 +44,7 @@ export default function App() {
   const isDomVisible = useDerivativesStore((s) => s.isDomVisible || s.isFootprintVisible);
   const isAnalyticsVisible = useDerivativesStore((s) => s.isAnalyticsVisible);
   const isChartMaximized = useLayoutStore((s) => s.isChartMaximized);
+  const themeMode = useLayoutStore((s) => s.themeMode);
 
   const [rightW, setRightW] = useState(() => {
     try {
@@ -134,22 +135,15 @@ export default function App() {
 
   // Dark & Light Theme Synchronizer
   useEffect(() => {
-    const applyTheme = () => {
-      const mode = useLayoutStore.getState().themeMode || (localStorage.getItem('crt_theme_mode') as 'DARK' | 'LIGHT') || 'DARK';
-      if (mode === 'LIGHT') {
-        document.documentElement.classList.add('theme-light');
-      } else {
-        document.documentElement.classList.remove('theme-light');
-      }
-    };
-    applyTheme();
-    window.addEventListener('storage', applyTheme);
-    window.addEventListener('crt-theme-change', applyTheme);
-    return () => {
-      window.removeEventListener('storage', applyTheme);
-      window.removeEventListener('crt-theme-change', applyTheme);
-    };
-  }, []);
+    const isLight = themeMode === 'LIGHT';
+    if (isLight) {
+      document.documentElement.classList.add('theme-light');
+      document.body.classList.add('theme-light');
+    } else {
+      document.documentElement.classList.remove('theme-light');
+      document.body.classList.remove('theme-light');
+    }
+  }, [themeMode]);
 
   return (
     <div className="flex h-full flex-col bg-bg text-slate-200 overflow-hidden font-mono">

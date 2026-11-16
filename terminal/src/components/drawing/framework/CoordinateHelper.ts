@@ -6,14 +6,60 @@ export class CoordinateHelper {
     private chartApi: IChartApi | null,
     private seriesApi: ISeriesApi<SeriesType> | null,
     public width: number,
-    public height: number
+    public height: number,
+    private candles?: Array<{ time: number }>
   ) {}
 
   timeToX(time?: number, fallbackX: number = 0): number {
     if (!this.chartApi || time === undefined) return fallbackX;
     try {
       const coord = this.chartApi.timeScale().timeToCoordinate(time as UTCTimestamp);
-      return coord !== null ? coord : fallbackX;
+      if (coord !== null) return coord;
+
+      // Off-screen or future/past bars: use logical index conversion to preserve candle anchoring
+      if (this.candles && this.candles.length > 0) {
+        const timeScale: any = this.chartApi.timeScale();
+        const cLen = this.candles.length;
+        const firstTime = this.candles[0].time;
+        const lastTime = this.candles[cLen - 1].time;
+        const step = cLen > 1 ? (lastTime - firstTime) / (cLen - 1) : 60;
+
+        if (time >= firstTime && time <= lastTime) {
+          let low = 0;
+          let high = cLen - 1;
+          let bestIdx = 0;
+          let minDiff = Infinity;
+          while (low <= high) {
+            const mid = (low + high) >> 1;
+            const diff = Math.abs(this.candles[mid].time - time);
+            if (diff < minDiff) {
+              minDiff = diff;
+              bestIdx = mid;
+            }
+            if (this.candles[mid].time < time) low = mid + 1;
+            else if (this.candles[mid].time > time) high = mid - 1;
+            else break;
+          }
+          if (typeof timeScale.logicalToCoordinate === 'function') {
+            const lCoord = timeScale.logicalToCoordinate(bestIdx);
+            if (lCoord !== null) return lCoord;
+          }
+        } else if (time > lastTime) {
+          const futureBars = (time - lastTime) / (step || 60);
+          const logical = cLen - 1 + futureBars;
+          if (typeof timeScale.logicalToCoordinate === 'function') {
+            const lCoord = timeScale.logicalToCoordinate(logical);
+            if (lCoord !== null) return lCoord;
+          }
+        } else if (time < firstTime) {
+          const pastBars = (time - firstTime) / (step || 60);
+          if (typeof timeScale.logicalToCoordinate === 'function') {
+            const lCoord = timeScale.logicalToCoordinate(pastBars);
+            if (lCoord !== null) return lCoord;
+          }
+        }
+      }
+      return fallbackX;
     } catch {
       return fallbackX;
     }
@@ -23,7 +69,32 @@ export class CoordinateHelper {
     if (!this.chartApi) return undefined;
     try {
       const time = this.chartApi.timeScale().coordinateToTime(x);
-      return typeof time === 'number' ? time : undefined;
+      if (typeof time === 'number') return time;
+
+      // If clicked outside loaded bars (whitespace to the right or left), calculate via logical index
+      if (this.candles && this.candles.length > 0) {
+        const timeScale: any = this.chartApi.timeScale();
+        if (typeof timeScale.coordinateToLogical === 'function') {
+          const logical = timeScale.coordinateToLogical(x);
+          if (typeof logical === 'number' && !isNaN(logical)) {
+            const cLen = this.candles.length;
+            const firstTime = this.candles[0].time;
+            const lastTime = this.candles[cLen - 1].time;
+            const step = cLen > 1 ? (lastTime - firstTime) / (cLen - 1) : 60;
+
+            if (logical >= 0 && logical < cLen) {
+              const idx = Math.min(cLen - 1, Math.max(0, Math.round(logical)));
+              return this.candles[idx].time;
+            } else if (logical >= cLen) {
+              const diffBars = logical - (cLen - 1);
+              return Math.round(lastTime + diffBars * (step || 60));
+            } else {
+              return Math.round(firstTime + logical * (step || 60));
+            }
+          }
+        }
+      }
+      return undefined;
     } catch {
       return undefined;
     }

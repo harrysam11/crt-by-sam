@@ -19,6 +19,7 @@ import {
 import type { ActiveIndicatorInstance } from '../../services/indicators/types';
 import { INDICATOR_REGISTRY } from '../../services/indicators/registry';
 import { useIndicatorsStore } from '../../store/useIndicatorsStore';
+import { useLayoutStore } from '../../store/useLayoutStore';
 import type { Candle } from '../../types/terminal';
 import { audioHaptics } from '../../utils/notify';
 
@@ -41,6 +42,7 @@ export default function SubPaneChart({
   const chartApiRef = useRef<IChartApi | null>(null);
   const seriesMapRef = useRef<Map<string, ISeriesApi<'Line' | 'Histogram'>>>(new Map());
 
+  const themeMode = useLayoutStore((s) => s.themeMode);
   const [liveValues, setLiveValues] = useState<Record<string, number | null>>({});
 
   const toggleVisibility = useIndicatorsStore((s) => s.toggleVisibility);
@@ -53,36 +55,37 @@ export default function SubPaneChart({
   useEffect(() => {
     if (!containerRef.current) return;
 
+    const isLight = themeMode === 'LIGHT' || document.documentElement.classList.contains('theme-light');
     const chart = createChart(containerRef.current, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: '#050508' },
-        textColor: '#828290',
+        background: { type: ColorType.Solid, color: isLight ? '#ffffff' : '#050508' },
+        textColor: isLight ? '#555555' : '#828290',
         fontSize: 10,
       },
       grid: {
-        vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
-        horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
+        vertLines: { color: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.03)' },
+        horzLines: { color: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.03)' },
       },
       rightPriceScale: {
-        borderColor: '#1e1e26',
+        borderColor: isLight ? 'rgba(0, 0, 0, 0.1)' : '#1e1e26',
         scaleMargins: { top: 0.15, bottom: 0.15 },
         autoScale: true,
       },
       timeScale: {
-        borderColor: '#1e1e26',
+        borderColor: isLight ? 'rgba(0, 0, 0, 0.1)' : '#1e1e26',
         timeVisible: true,
         secondsVisible: false,
         visible: false, // Time axis hidden on subpanes to avoid clutter (docked to main chart)
       },
       crosshair: {
         horzLine: {
-          color: 'rgba(255, 255, 255, 0.35)',
+          color: isLight ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.35)',
           width: 1,
           style: LineStyle.Dashed,
         },
         vertLine: {
-          color: 'rgba(255, 255, 255, 0.35)',
+          color: isLight ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.35)',
           width: 1,
           style: LineStyle.Dashed,
         },
@@ -167,6 +170,37 @@ export default function SubPaneChart({
       seriesMapRef.current.clear();
     };
   }, [mainChartApi, mainSeriesApi]);
+
+  // Synchronize layout theme with themeMode
+  useEffect(() => {
+    const chart = chartApiRef.current;
+    if (!chart) return;
+    const isLight = themeMode === 'LIGHT';
+    chart.applyOptions({
+      layout: {
+        background: { type: ColorType.Solid, color: isLight ? '#ffffff' : '#050508' },
+        textColor: isLight ? '#555555' : '#828290',
+      },
+      grid: {
+        vertLines: { color: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.03)' },
+        horzLines: { color: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.03)' },
+      },
+      rightPriceScale: {
+        borderColor: isLight ? 'rgba(0, 0, 0, 0.1)' : '#1e1e26',
+      },
+      timeScale: {
+        borderColor: isLight ? 'rgba(0, 0, 0, 0.1)' : '#1e1e26',
+      },
+      crosshair: {
+        horzLine: {
+          color: isLight ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.35)',
+        },
+        vertLine: {
+          color: isLight ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.35)',
+        },
+      },
+    });
+  }, [themeMode]);
 
   // Compute and update plot data
   useEffect(() => {

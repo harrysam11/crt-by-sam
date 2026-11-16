@@ -54,7 +54,7 @@ import {
   type IntervalUnit,
 } from '../../utils/timeframe';
 import ChartContextMenu, { type ChartContextMenuPos } from './ChartContextMenu';
-import ShareChartModal from '../share/ShareChartModal';
+import { captureMultiCanvasSnapshot } from '../../services/journalService';
 import RiskHUD from '../RiskHUD';
 import { useLayoutStore } from '../../store/useLayoutStore';
 import { chartSyncBus } from '../../services/crosshairSyncBus';
@@ -214,7 +214,9 @@ export default function TradingChart({
   // Modals & Tools
   const [showRiskHUD, setShowRiskHUD] = useState(false);
   const [showSkinsModal, setShowSkinsModal] = useState(false);
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isScreenshotMenuOpen, setIsScreenshotMenuOpen] = useState(false);
+  const [snapshotToast, setSnapshotToast] = useState<string | null>(null);
+  const screenshotMenuRef = useRef<HTMLDivElement>(null);
   const [isRulerActive, setIsRulerActive] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
 
@@ -315,6 +317,7 @@ export default function TradingChart({
   const closeAllMenus = useCallback(() => {
     setActiveMenu(null);
     setMenuAnchor(null);
+    setIsScreenshotMenuOpen(false);
   }, []);
 
   const toggleTfMenu = useCallback(() => {
@@ -385,6 +388,7 @@ export default function TradingChart({
         (styleMenuRef.current && styleMenuRef.current.contains(target)) ||
         (layersMenuRef.current && layersMenuRef.current.contains(target)) ||
         (colorMenuRef.current && colorMenuRef.current.contains(target)) ||
+        (screenshotMenuRef.current && screenshotMenuRef.current.contains(target)) ||
         target.closest('.clay-popover')
       ) {
         return;
@@ -396,7 +400,7 @@ export default function TradingChart({
         closeAllMenus();
       }
     };
-    if (activeMenu) {
+    if (activeMenu || isScreenshotMenuOpen) {
       window.addEventListener('mousedown', handleOutside);
       window.addEventListener('keydown', handleEscape);
     }
@@ -404,7 +408,60 @@ export default function TradingChart({
       window.removeEventListener('mousedown', handleOutside);
       window.removeEventListener('keydown', handleEscape);
     };
-  }, [activeMenu, closeAllMenus]);
+  }, [activeMenu, isScreenshotMenuOpen, closeAllMenus]);
+
+  // TradingView-Style 1-Click Screenshot Handlers (Zero Eye-Mask Overlay)
+  const handleDownloadScreenshot = async () => {
+    setIsScreenshotMenuOpen(false);
+    audioHaptics.tick();
+    try {
+      const dataUrl = await captureMultiCanvasSnapshot(box.current, chartApi);
+      if (dataUrl) {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `${symbol}_${timeframe}_${Date.now()}.png`;
+        a.click();
+        setSnapshotToast('Chart snapshot downloaded');
+        setTimeout(() => setSnapshotToast(null), 3000);
+      }
+    } catch {
+      setSnapshotToast('Snapshot download failed');
+      setTimeout(() => setSnapshotToast(null), 3000);
+    }
+  };
+
+  const handleCopyScreenshotImage = async () => {
+    setIsScreenshotMenuOpen(false);
+    audioHaptics.tick();
+    try {
+      const dataUrl = await captureMultiCanvasSnapshot(box.current, chartApi);
+      if (dataUrl) {
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob }),
+        ]);
+        setSnapshotToast('Chart snapshot copied to clipboard');
+        setTimeout(() => setSnapshotToast(null), 3000);
+      }
+    } catch {
+      setSnapshotToast('Clipboard copy blocked by browser');
+      setTimeout(() => setSnapshotToast(null), 3000);
+    }
+  };
+
+  const handleCopyShareLink = async () => {
+    setIsScreenshotMenuOpen(false);
+    audioHaptics.tick();
+    const url = `${window.location.origin}${window.location.pathname}?symbol=${encodeURIComponent(symbol)}&tf=${timeframe}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setSnapshotToast('Chart link copied to clipboard');
+    } catch {
+      setSnapshotToast('Link copy failed');
+    }
+    setTimeout(() => setSnapshotToast(null), 3000);
+  };
 
   const favoriteTimeframes = useMemo(
     () => TIMEFRAMES[provider].filter((t) => FAVORITE_TIMEFRAMES.includes(t)),
@@ -780,46 +837,50 @@ export default function TradingChart({
 
   // Create once, destroy on unmount.
   useEffect(() => {
+    const isLightMode = themeMode === 'LIGHT' || (typeof document !== 'undefined' && document.documentElement.classList.contains('theme-light'));
     const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
     const isZen = zenMode.active && zenMode.softPastelCandles;
-    const upColor = '#ffffff';
-    const downColor = '#101015';
+
+    const chartBgColor = isCustomBg ? 'transparent' : (isLightMode ? '#ffffff' : '#050508');
+    const chartTextColor = isLightMode ? '#555555' : '#828290';
+    const chartGridColor = isLightMode ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.03)';
+    const chartBorderColor = isLightMode ? 'rgba(0, 0, 0, 0.1)' : '#1e1e26';
 
     const chart = createChart(box.current!, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: isCustomBg ? 'transparent' : '#050508' },
-        textColor: '#828290',
+        background: { type: ColorType.Solid, color: chartBgColor },
+        textColor: chartTextColor,
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
-        horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
+        vertLines: { color: chartGridColor },
+        horzLines: { color: chartGridColor },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          color: 'rgba(255, 255, 255, 0.35)',
+          color: isLightMode ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.35)',
           width: 1,
           style: LineStyle.Dashed,
-          labelBackgroundColor: '#181820',
+          labelBackgroundColor: isLightMode ? '#e4e4e7' : '#181820',
         },
         horzLine: {
-          color: 'rgba(255, 255, 255, 0.35)',
+          color: isLightMode ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.35)',
           width: 1,
           style: LineStyle.Dashed,
-          labelBackgroundColor: '#181820',
+          labelBackgroundColor: isLightMode ? '#e4e4e7' : '#181820',
         },
       },
       rightPriceScale: {
-        borderColor: '#1e1e26',
+        borderColor: chartBorderColor,
         scaleMargins: { top: 0.08, bottom: 0.12 },
         autoScale: true,
         alignLabels: true,
         borderVisible: true,
       },
       timeScale: {
-        borderColor: '#1e1e26',
+        borderColor: chartBorderColor,
         timeVisible: true,
         secondsVisible: false,
         tickMarkFormatter: tickLabel,
@@ -849,16 +910,25 @@ export default function TradingChart({
       localization: { timeFormatter: localTime },
     });
 
-    const isDarkInit = chartSettings.candleDownColor === '#101015' || chartSettings.candleDownColor === '#050508';
-    const borderDownInit = isDarkInit ? '#71717a' : chartSettings.candleDownColor;
+    const defaultUp = isLightMode ? '#16a34a' : '#ffffff';
+    const defaultDown = isLightMode ? '#dc2626' : '#101015';
+    const initialUp = chartSettings.candleUpColor && chartSettings.candleUpColor !== '#ffffff'
+      ? chartSettings.candleUpColor
+      : defaultUp;
+    const initialDown = chartSettings.candleDownColor && chartSettings.candleDownColor !== '#101015'
+      ? chartSettings.candleDownColor
+      : defaultDown;
+
+    const isDarkInit = initialDown === '#101015' || initialDown === '#050508';
+    const borderDownInit = isLightMode ? initialDown : (isDarkInit ? '#71717a' : initialDown);
     const cs = chart.addCandlestickSeries({
-      upColor: chartSettings.candleUpColor || '#ffffff',
-      downColor: chartSettings.candleDownColor || '#101015',
+      upColor: initialUp,
+      downColor: initialDown,
       borderVisible: true,
-      borderUpColor: chartSettings.candleUpColor || '#ffffff',
+      borderUpColor: initialUp,
       borderDownColor: borderDownInit,
       wickVisible: true,
-      wickUpColor: chartSettings.candleUpColor || '#ffffff',
+      wickUpColor: initialUp,
       wickDownColor: borderDownInit,
       visible: chartStyle === 'CANDLE' || chartStyle === 'HOLLOW_CANDLE' || chartStyle === 'HEIKIN_ASHI' || chartStyle === 'FOOTPRINT',
     });
@@ -1135,20 +1205,33 @@ export default function TradingChart({
     }
   }, [zenMode.active, zenMode.softPastelCandles]);
 
-  // Dynamic Chart Settings synchronization
+  // Dynamic Chart Settings and Theme Synchronization
   useEffect(() => {
     const a = api.current;
     if (!a) return;
+    const isLight = themeMode === 'LIGHT';
+    const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
+
     if (chartStyle !== 'FOOTPRINT') {
-      const isDark = chartSettings.candleDownColor === '#101015' || chartSettings.candleDownColor === '#050508';
-      const borderDown = chartSettings.borderDownColor || (isDark ? '#71717a' : chartSettings.candleDownColor);
-      const borderUp = chartSettings.borderUpColor || chartSettings.candleUpColor;
+      const defaultUp = isLight ? '#16a34a' : '#ffffff';
+      const defaultDown = isLight ? '#dc2626' : '#101015';
+
+      const upColor = chartSettings.candleUpColor && chartSettings.candleUpColor !== '#ffffff'
+        ? chartSettings.candleUpColor
+        : defaultUp;
+      const downColor = chartSettings.candleDownColor && chartSettings.candleDownColor !== '#101015'
+        ? chartSettings.candleDownColor
+        : defaultDown;
+
+      const isDark = downColor === '#101015' || downColor === '#050508';
+      const borderDown = chartSettings.borderDownColor || (isLight ? downColor : (isDark ? '#71717a' : downColor));
+      const borderUp = chartSettings.borderUpColor || upColor;
       const wickDown = chartSettings.wickDownColor || borderDown;
-      const wickUp = chartSettings.wickUpColor || chartSettings.candleUpColor;
+      const wickUp = chartSettings.wickUpColor || upColor;
 
       a.candles.applyOptions({
-        upColor: chartSettings.candleBodyVisible !== false ? chartSettings.candleUpColor : 'transparent',
-        downColor: chartSettings.candleBodyVisible !== false ? chartSettings.candleDownColor : 'transparent',
+        upColor: chartSettings.candleBodyVisible !== false ? upColor : 'transparent',
+        downColor: chartSettings.candleBodyVisible !== false ? downColor : 'transparent',
         borderVisible: chartSettings.candleBorderVisible !== false,
         borderUpColor: borderUp,
         borderDownColor: borderDown,
@@ -1157,6 +1240,15 @@ export default function TradingChart({
         wickDownColor: wickDown,
         lastValueVisible: chartSettings.showLastPriceLine,
         priceLineVisible: chartSettings.showLastPriceLine,
+      });
+
+      a.barSeries.applyOptions({
+        upColor,
+        downColor: borderDown,
+      });
+
+      a.lineSeries.applyOptions({
+        color: upColor,
       });
 
       if (chartSettings.topMarginPercent !== undefined && chartSettings.bottomMarginPercent !== undefined) {
@@ -1168,23 +1260,52 @@ export default function TradingChart({
         });
       }
     }
+
+    const gridBase = isLight ? '0, 0, 0' : '255, 255, 255';
+    const chartBg = isCustomBg ? 'transparent' : (isLight ? '#ffffff' : '#050508');
+    const chartText = isLight ? '#555555' : '#828290';
+    const chartBorder = isLight ? 'rgba(0, 0, 0, 0.1)' : '#1e1e26';
+
     a.chart.applyOptions({
+      layout: {
+        background: {
+          type: ColorType.Solid,
+          color: chartBg,
+        },
+        textColor: chartText,
+      },
       grid: {
         vertLines: {
           visible: chartSettings.gridLines === 'both' || chartSettings.gridLines === 'vertical',
-          color: `rgba(255, 255, 255, ${chartSettings.gridOpacity})`,
+          color: `rgba(${gridBase}, ${chartSettings.gridOpacity})`,
         },
         horzLines: {
           visible: chartSettings.gridLines === 'both' || chartSettings.gridLines === 'horizontal',
-          color: `rgba(255, 255, 255, ${chartSettings.gridOpacity})`,
+          color: `rgba(${gridBase}, ${chartSettings.gridOpacity})`,
         },
+      },
+      crosshair: {
+        vertLine: {
+          color: isLight ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.35)',
+          labelBackgroundColor: isLight ? '#e4e4e7' : '#181820',
+        },
+        horzLine: {
+          color: isLight ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.35)',
+          labelBackgroundColor: isLight ? '#e4e4e7' : '#181820',
+        },
+      },
+      rightPriceScale: {
+        borderColor: chartBorder,
+      },
+      timeScale: {
+        borderColor: chartBorder,
       },
     });
 
     if (chartSettings.timezone && chartSettings.timezone !== timezone) {
       setTimezone(chartSettings.timezone as ChartTimezone);
     }
-  }, [chartSettings, timezone]);
+  }, [chartSettings, timezone, themeMode, themeConfig.wallpaperType, themeConfig.mediaUrl, chartStyle]);
 
   // Trade Execution & Order Fill Markers on Candlestick Series (Clean TradingView arrows without text watermark)
   useEffect(() => {
@@ -2467,20 +2588,56 @@ export default function TradingChart({
 
         {/* Right Section: Snapshot, Theme, Settings, Fullscreen */}
         <div className="flex items-center gap-1 shrink-0 ml-auto">
-          {/* Share Chart Snapshot Modal Trigger */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              setIsShareModalOpen(true);
-            }}
-            className="p-1.5 rounded-full clay-btn transition shrink-0 text-slate-300 hover:text-white"
-            title="Take Chart Snapshot (Download PNG / Copy Image)"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
+          {/* Chart Snapshot Dropdown Popover (TradingView-style, NO eye-mask) */}
+          <div className="relative" ref={screenshotMenuRef}>
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setIsScreenshotMenuOpen((v) => !v);
+              }}
+              className={`p-1.5 rounded-full transition shrink-0 ${
+                isScreenshotMenuOpen ? 'clay-btn-active text-white' : 'clay-btn text-slate-300 hover:text-white'
+              }`}
+              title="Take Chart Snapshot (Download PNG / Copy Image)"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+
+            {isScreenshotMenuOpen && (
+              <div className="absolute right-0 top-full mt-1.5 z-50 w-52 clay-popover p-1.5 rounded-xl shadow-2xl select-none font-mono text-xs border border-white/10 backdrop-blur-md">
+                <button
+                  onClick={handleDownloadScreenshot}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 text-slate-200 hover:text-white transition text-left"
+                >
+                  <svg className="h-4 w-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span>Download Image (PNG)</span>
+                </button>
+                <button
+                  onClick={handleCopyScreenshotImage}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 text-slate-200 hover:text-white transition text-left"
+                >
+                  <svg className="h-4 w-4 text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                  </svg>
+                  <span>Copy Image</span>
+                </button>
+                <button
+                  onClick={handleCopyShareLink}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 text-slate-200 hover:text-white transition text-left"
+                >
+                  <svg className="h-4 w-4 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  <span>Copy Chart Link</span>
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Quick Theme Switcher Button */}
           <button
@@ -2946,13 +3103,12 @@ export default function TradingChart({
       {/* Skins Customization Modal */}
       <ChartSkinsModal isOpen={showSkinsModal} onClose={() => setShowSkinsModal(false)} />
 
-      {/* Share Chart Snapshot Modal */}
-      <ShareChartModal
-        isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-        chartApi={chartApi}
-        chartContainer={box.current}
-      />
+      {/* Snapshot Action Toast Notification */}
+      {snapshotToast && (
+        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-emerald-500/40 bg-[#090b10]/95 px-4 py-2 text-xs font-mono font-semibold text-emerald-400 shadow-2xl backdrop-blur pointer-events-none">
+          {snapshotToast}
+        </div>
+      )}
 
       {/* Institutional Symbol Search Modal */}
       <SymbolSearchModal

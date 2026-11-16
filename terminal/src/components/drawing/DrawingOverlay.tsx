@@ -7,7 +7,7 @@
  * - Shift + Drag: Instant Measure Ruler (distance, %, bars, time)
  * - Alt + Drag: Temporary Demonstration Line with live price & pip badge
  * - Alt Hotkeys: Alt+T (Trendline), Alt+H (Horizontal), Alt+V (Vertical), Alt+F (Fib), Alt+R (Rect), Alt+P (Long), Alt+S (Short), Alt+C (Crosshair)
- * - Shift Angle Lock: Snaps lines to 0°, 45°, 90°
+ * - Shift Angle Lock: Snaps lines to 0 deg, 45 deg, 90 deg
  * - Ctrl + Drag: Instant Duplicate / Clone of selected drawing
  * - Auto-revert to Crosshair on completion
  * ZERO EMOJI POLICY strictly enforced.
@@ -371,8 +371,8 @@ export default function DrawingOverlay({
   const coordHelper = useMemo(() => {
     const width = containerRef.current?.clientWidth || 800;
     const height = containerRef.current?.clientHeight || 500;
-    return new CoordinateHelper(chartApi, seriesApi, width, height);
-  }, [chartApi, seriesApi, containerRef.current?.clientWidth, containerRef.current?.clientHeight, viewportTick]);
+    return new CoordinateHelper(chartApi, seriesApi, width, height, candles);
+  }, [chartApi, seriesApi, candles, viewportTick]);
 
   // Magnet snapping helper (with TradingView-style Ctrl key candle snapping)
   const snapToCandle = useCallback(
@@ -385,15 +385,28 @@ export default function DrawingOverlay({
         return { x: rawX, y: rawY, price: rawPrice, time: rawTime };
       }
 
-      let closestIdx = 0;
-      let minXDist = Infinity;
-
-      for (let i = 0; i < candles.length; i++) {
-        const cX = coordHelper.timeToX(candles[i].time, -999);
-        const dist = Math.abs(rawX - cX);
-        if (dist < minXDist) {
-          minXDist = dist;
-          closestIdx = i;
+      // Fast O(log N) binary search for the closest candle
+      let closestIdx = candles.length - 1;
+      if (rawTime !== undefined) {
+        let low = 0;
+        let high = candles.length - 1;
+        let minTimeDiff = Infinity;
+        while (low <= high) {
+          const mid = (low + high) >> 1;
+          const cTime = candles[mid].time;
+          const diff = Math.abs(cTime - rawTime);
+          if (diff < minTimeDiff) {
+            minTimeDiff = diff;
+            closestIdx = mid;
+          }
+          if (cTime < rawTime) {
+            low = mid + 1;
+          } else if (cTime > rawTime) {
+            high = mid - 1;
+          } else {
+            closestIdx = mid;
+            break;
+          }
         }
       }
 
@@ -403,6 +416,7 @@ export default function DrawingOverlay({
       }
 
       const candleX = coordHelper.timeToX(closestCandle.time, rawX);
+      const minXDist = Math.abs(rawX - candleX);
 
       const candidates = [
         { price: closestCandle.high, y: coordHelper.priceToY(closestCandle.high) },
@@ -937,31 +951,49 @@ export default function DrawingOverlay({
           if (!item) return d;
 
           const tool = ToolFactory.create(d);
+          const p1Time = item.initialP1.time !== undefined ? item.initialP1.time + deltaTime : undefined;
+          const p1Price = item.initialP1.price + deltaPrice;
           tool.p1 = {
             ...item.initialP1,
-            price: item.initialP1.price + deltaPrice,
-            time: item.initialP1.time !== undefined ? item.initialP1.time + deltaTime : undefined,
+            price: p1Price,
+            time: p1Time,
+            x: coordHelper.timeToX(p1Time, item.initialP1.x),
+            y: coordHelper.priceToY(p1Price, item.initialP1.y),
           };
           if (item.initialP2) {
+            const p2Time = item.initialP2.time !== undefined ? item.initialP2.time + deltaTime : undefined;
+            const p2Price = item.initialP2.price + deltaPrice;
             tool.p2 = {
               ...item.initialP2,
-              price: item.initialP2.price + deltaPrice,
-              time: item.initialP2.time !== undefined ? item.initialP2.time + deltaTime : undefined,
+              price: p2Price,
+              time: p2Time,
+              x: coordHelper.timeToX(p2Time, item.initialP2.x),
+              y: coordHelper.priceToY(p2Price, item.initialP2.y),
             };
           }
           if (item.initialP3) {
+            const p3Time = item.initialP3.time !== undefined ? item.initialP3.time + deltaTime : undefined;
+            const p3Price = item.initialP3.price + deltaPrice;
             tool.p3 = {
               ...item.initialP3,
-              price: item.initialP3.price + deltaPrice,
-              time: item.initialP3.time !== undefined ? item.initialP3.time + deltaTime : undefined,
+              price: p3Price,
+              time: p3Time,
+              x: coordHelper.timeToX(p3Time, item.initialP3.x),
+              y: coordHelper.priceToY(p3Price, item.initialP3.y),
             };
           }
           if (item.initialPoints) {
-            (tool as any).points = item.initialPoints.map((pt) => ({
-              ...pt,
-              price: pt.price + deltaPrice,
-              time: pt.time !== undefined ? pt.time + deltaTime : undefined,
-            }));
+            (tool as any).points = item.initialPoints.map((pt) => {
+              const ptTime = pt.time !== undefined ? pt.time + deltaTime : undefined;
+              const ptPrice = pt.price + deltaPrice;
+              return {
+                ...pt,
+                price: ptPrice,
+                time: ptTime,
+                x: coordHelper.timeToX(ptTime, pt.x),
+                y: coordHelper.priceToY(ptPrice, pt.y),
+              };
+            });
           }
           if (item.initialEntryPrice !== undefined) {
             tool.entryPrice = item.initialEntryPrice + deltaPrice;
@@ -1389,7 +1421,7 @@ export default function DrawingOverlay({
       onPointerUp={handlePointerUp}
       style={{ right: `${priceScaleWidth}px`, bottom: '26px' }}
       className={`absolute left-0 top-0 z-20 ${
-        isDrawingTool || activeDrawing || selectionBox || isCtrlHeld || isShiftHeld || isAltHeld || selectedDrawingIds.length > 0 || draggingHandle || draggingBody || isSettingsModalOpen
+        isDrawingTool || activeDrawing || selectionBox || isCtrlHeld || isShiftHeld || isAltHeld || draggingHandle || draggingBody
           ? `${activeTool === 'CURSOR_CROSSHAIR' ? 'cursor-crosshair' : activeTool === 'CURSOR_ARROW' ? 'cursor-default' : 'cursor-crosshair'} pointer-events-auto`
           : activeTool === 'CURSOR_ERASER'
           ? 'cursor-not-allowed pointer-events-auto'

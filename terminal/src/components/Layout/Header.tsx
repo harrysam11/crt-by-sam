@@ -243,20 +243,6 @@ export default function Header({
       <BreathingHalo />
 
       <div className="ml-auto flex items-center gap-2 whitespace-nowrap">
-        {/* Stealth Mask Button */}
-        <button
-          onClick={() => {
-            audioHaptics.tick();
-            setIsMasked((v) => !v);
-          }}
-          className={`px-2 py-0.5 text-[10px] font-bold transition ${
-            isMasked ? 'clay-pill-active' : 'clay-pill'
-          }`}
-          title="Toggle Stealth Balance Masking"
-        >
-          {isMasked ? 'Unmask' : 'Mask'}
-        </button>
-
         <Stat label="Balance" value={displayBalance} />
         <Stat label="Equity" value={displayEquity} />
         <Stat
