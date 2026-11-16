@@ -6,10 +6,15 @@ import type {
   InputValueType,
 } from '../services/indicators/types';
 import { INDICATOR_REGISTRY } from '../services/indicators/registry';
+import {
+  type IndicatorTemplate,
+  buildInstancesFromTemplate,
+} from '../services/indicators/templates';
 
 interface IndicatorsState {
   activeInstances: ActiveIndicatorInstance[];
   favorites: string[];
+  customTemplates: IndicatorTemplate[];
   selectedInstanceForSettings: ActiveIndicatorInstance | null;
 
   addInstance: (indicatorId: string) => ActiveIndicatorInstance | null;
@@ -19,6 +24,9 @@ interface IndicatorsState {
   updateInstanceInputs: (instanceId: string, inputs: Record<string, InputValueType>) => void;
   updateInstanceStyles: (instanceId: string, styles: Record<string, IndicatorPlotStyle>) => void;
   toggleFavorite: (indicatorId: string) => void;
+  applyTemplate: (template: IndicatorTemplate, replaceExisting?: boolean) => void;
+  saveCurrentAsTemplate: (name: string, description?: string) => IndicatorTemplate | null;
+  deleteCustomTemplate: (templateId: string) => void;
   openSettings: (instance: ActiveIndicatorInstance) => void;
   closeSettings: () => void;
 }
@@ -30,6 +38,7 @@ export const useIndicatorsStore = create<IndicatorsState>()(
     (set, get) => ({
       activeInstances: DEFAULT_INSTANCES,
       favorites: ['ema', 'sma', 'rsi', 'macd', 'bbands', 'supertrend'],
+      customTemplates: [],
       selectedInstanceForSettings: null,
 
       addInstance: (indicatorId: string) => {
@@ -127,6 +136,55 @@ export const useIndicatorsStore = create<IndicatorsState>()(
         });
       },
 
+      applyTemplate: (template: IndicatorTemplate, replaceExisting = true) => {
+        const curPanes = replaceExisting
+          ? 1
+          : Math.max(
+              1,
+              ...get()
+                .activeInstances.filter((i) => !i.overlay)
+                .map((i) => i.paneIndex + 1)
+            );
+        const newInstances = buildInstancesFromTemplate(template.indicators, curPanes);
+        set((s) => ({
+          activeInstances: replaceExisting
+            ? newInstances
+            : [...s.activeInstances, ...newInstances],
+          selectedInstanceForSettings: null,
+        }));
+      },
+
+      saveCurrentAsTemplate: (name: string, description = '') => {
+        const active = get().activeInstances;
+        if (active.length === 0) return null;
+
+        const newTemplate: IndicatorTemplate = {
+          id: `custom_tmpl_${Date.now()}`,
+          name: name.trim() || 'Custom Indicator Set',
+          description: description.trim() || `${active.length} active indicators stack`,
+          isBuiltIn: false,
+          category: 'CUSTOM',
+          indicators: active.map((inst) => ({
+            indicatorId: inst.indicatorId,
+            name: inst.name,
+            inputs: { ...inst.inputs },
+            styles: JSON.parse(JSON.stringify(inst.styles)),
+          })),
+        };
+
+        set((s) => ({
+          customTemplates: [newTemplate, ...s.customTemplates],
+        }));
+
+        return newTemplate;
+      },
+
+      deleteCustomTemplate: (templateId: string) => {
+        set((s) => ({
+          customTemplates: s.customTemplates.filter((t) => t.id !== templateId),
+        }));
+      },
+
       openSettings: (instance) => set({ selectedInstanceForSettings: instance }),
       closeSettings: () => set({ selectedInstanceForSettings: null }),
     }),
@@ -135,6 +193,7 @@ export const useIndicatorsStore = create<IndicatorsState>()(
       partialize: (s) => ({
         activeInstances: s.activeInstances,
         favorites: s.favorites,
+        customTemplates: s.customTemplates,
       }),
     }
   )

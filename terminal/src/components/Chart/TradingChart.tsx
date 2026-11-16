@@ -2417,6 +2417,24 @@ export default function TradingChart({
             )}
           </button>
 
+          {/* Indicator Templates Quick Button */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setIsIndicatorsModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 clay-pill px-2 py-0.5 text-xs font-semibold text-slate-300 hover:text-white transition shrink-0 hidden md:flex"
+            title="Institutional Indicator Templates & Saved Presets"
+          >
+            <svg className="h-3.5 w-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+            <span className="hidden lg:inline text-[11px]">Templates</span>
+          </button>
+
           {/* Quick Volume Histogram Toggle */}
           <button
             onClick={() => {

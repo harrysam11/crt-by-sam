@@ -11,6 +11,10 @@ import { INDICATOR_REGISTRY } from '../../services/indicators/registry';
 import { useIndicatorsStore } from '../../store/useIndicatorsStore';
 import { useTerminalStore } from '../../store/useTerminalStore';
 import { PRESET_PINE_SCRIPTS, executePineScript } from '../../services/pineRunner';
+import {
+  BUILT_IN_INDICATOR_TEMPLATES,
+  type IndicatorTemplate,
+} from '../../services/indicators/templates';
 import type { IndicatorCategory } from '../../services/indicators/types';
 import { StandardCard, StandardCardGrid } from '../common/StandardCard';
 
@@ -24,6 +28,7 @@ interface IndicatorsModalProps {
 
 const CATEGORIES = [
   'ALL',
+  'TEMPLATES',
   'FAVORITES',
   'Moving Averages',
   'Oscillators',
@@ -39,11 +44,18 @@ export default function IndicatorsModal({ isOpen, onClose }: IndicatorsModalProp
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('ALL');
   const [pineStatus, setPineStatus] = useState<string | null>(null);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [templateNotice, setTemplateNotice] = useState<string | null>(null);
 
   const activeInstances = useIndicatorsStore((s) => s.activeInstances);
   const favorites = useIndicatorsStore((s) => s.favorites);
+  const customTemplates = useIndicatorsStore((s) => s.customTemplates);
   const addInstance = useIndicatorsStore((s) => s.addInstance);
   const toggleFavorite = useIndicatorsStore((s) => s.toggleFavorite);
+  const applyTemplate = useIndicatorsStore((s) => s.applyTemplate);
+  const saveCurrentAsTemplate = useIndicatorsStore((s) => s.saveCurrentAsTemplate);
+  const deleteCustomTemplate = useIndicatorsStore((s) => s.deleteCustomTemplate);
 
   // Terminal state for Pine Script
   const candles = useTerminalStore((s) => s.candles);
@@ -52,8 +64,24 @@ export default function IndicatorsModal({ isOpen, onClose }: IndicatorsModalProp
   const pinePlots = useTerminalStore((s) => s.pinePlots);
   const setPinePlots = useTerminalStore((s) => s.setPinePlots);
 
+  const allTemplates = useMemo(() => {
+    return [...customTemplates, ...BUILT_IN_INDICATOR_TEMPLATES];
+  }, [customTemplates]);
+
+  const filteredTemplates = useMemo(() => {
+    if (selectedCategory !== 'ALL' && selectedCategory !== 'TEMPLATES') return [];
+    if (!search.trim()) return allTemplates;
+    const q = search.toLowerCase();
+    return allTemplates.filter(
+      (t) =>
+        t.name.toLowerCase().includes(q) ||
+        t.description.toLowerCase().includes(q) ||
+        t.indicators.some((i) => i.name?.toLowerCase().includes(q) || i.indicatorId.toLowerCase().includes(q))
+    );
+  }, [allTemplates, search, selectedCategory]);
+
   const filteredIndicators = useMemo(() => {
-    if (selectedCategory === 'Pine Script') return [];
+    if (selectedCategory === 'Pine Script' || selectedCategory === 'TEMPLATES') return [];
     return INDICATOR_REGISTRY.filter((ind) => {
       // Category filter
       if (selectedCategory === 'FAVORITES') {
@@ -84,6 +112,25 @@ export default function IndicatorsModal({ isOpen, onClose }: IndicatorsModalProp
         s.code.toLowerCase().includes(q)
     );
   }, [search, selectedCategory]);
+
+  const handleApplyTemplate = (tmpl: IndicatorTemplate, replaceExisting = true) => {
+    audioHaptics.fill();
+    applyTemplate(tmpl, replaceExisting);
+    setTemplateNotice(`Applied ${tmpl.name} (${tmpl.indicators.length} indicators)`);
+    setTimeout(() => setTemplateNotice(null), 3000);
+  };
+
+  const handleSaveCurrentAsTemplate = () => {
+    if (!newTemplateName.trim()) return;
+    audioHaptics.tick();
+    const created = saveCurrentAsTemplate(newTemplateName.trim());
+    if (created) {
+      setNewTemplateName('');
+      setIsSavingTemplate(false);
+      setTemplateNotice(`Template "${created.name}" saved!`);
+      setTimeout(() => setTemplateNotice(null), 3000);
+    }
+  };
 
   const handleApplyPine = async (code: string, name: string) => {
     audioHaptics.tick();
@@ -188,6 +235,106 @@ export default function IndicatorsModal({ isOpen, onClose }: IndicatorsModalProp
 
           {/* Indicator Cards Grid */}
           <div className="flex-1 overflow-y-auto p-4">
+            {/* Template Save / Status Notice */}
+            {templateNotice && (
+              <div className="mb-4 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between">
+                <span>{templateNotice}</span>
+                <span className="text-[10px] text-emerald-400 font-semibold">[Persistent]</span>
+              </div>
+            )}
+
+            {/* Indicator Templates Section */}
+            {(selectedCategory === 'ALL' || selectedCategory === 'TEMPLATES') && filteredTemplates.length > 0 && (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">
+                    Institutional Indicator Templates ({filteredTemplates.length})
+                  </div>
+
+                  {/* Save Current as Template Action */}
+                  {activeInstances.length > 0 && !isSavingTemplate && (
+                    <button
+                      onClick={() => {
+                        audioHaptics.tick();
+                        setIsSavingTemplate(true);
+                      }}
+                      className="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold transition flex items-center gap-1.5"
+                    >
+                      <span>Save Current Stack ({activeInstances.length}) as Template</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Inline Save Form */}
+                {isSavingTemplate && (
+                  <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newTemplateName}
+                      onChange={(e) => setNewTemplateName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveCurrentAsTemplate();
+                        if (e.key === 'Escape') setIsSavingTemplate(false);
+                      }}
+                      placeholder="Template Name (e.g. My 5m Scalp Setup)"
+                      className="flex-1 bg-black/60 border border-grid px-3 py-1.5 rounded text-white text-xs placeholder:text-muted focus:outline-none focus:border-emerald-400"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleSaveCurrentAsTemplate}
+                      disabled={!newTemplateName.trim()}
+                      className="px-3 py-1.5 rounded bg-emerald-500 text-black font-bold text-xs hover:bg-emerald-400 disabled:opacity-50 transition"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setIsSavingTemplate(false)}
+                      className="px-2.5 py-1.5 rounded text-muted hover:text-white text-xs transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
+                {/* Templates Grid */}
+                <StandardCardGrid className="grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {filteredTemplates.map((tmpl) => (
+                    <StandardCard
+                      key={tmpl.id}
+                      title={tmpl.name}
+                      meta={`${tmpl.description} (${tmpl.indicators.map((i) => i.name || i.indicatorId).join(', ')})`}
+                      badge={tmpl.isBuiltIn ? 'Built-In' : 'Custom'}
+                      badgeColor={tmpl.isBuiltIn ? 'accent' : 'emerald'}
+                      icon={
+                        <svg className="h-4 w-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                          <rect x="3" y="3" width="7" height="7" />
+                          <rect x="14" y="3" width="7" height="7" />
+                          <rect x="14" y="14" width="7" height="7" />
+                          <rect x="3" y="14" width="7" height="7" />
+                        </svg>
+                      }
+                      primaryAction={{
+                        label: 'Apply Template',
+                        onClick: () => handleApplyTemplate(tmpl, true),
+                      }}
+                      secondaryAction={{
+                        label: tmpl.isBuiltIn ? '+ Append' : 'Delete',
+                        active: false,
+                        onClick: () => {
+                          audioHaptics.tick();
+                          if (tmpl.isBuiltIn) {
+                            handleApplyTemplate(tmpl, false);
+                          } else {
+                            deleteCustomTemplate(tmpl.id);
+                          }
+                        },
+                      }}
+                    />
+                  ))}
+                </StandardCardGrid>
+              </div>
+            )}
+
             {/* Pine Scripts Section */}
             {filteredPineScripts.length > 0 && (
               <div className="mb-6">
@@ -273,9 +420,9 @@ export default function IndicatorsModal({ isOpen, onClose }: IndicatorsModalProp
               </div>
             )}
 
-            {filteredIndicators.length === 0 && filteredPineScripts.length === 0 && (
+            {filteredIndicators.length === 0 && filteredPineScripts.length === 0 && filteredTemplates.length === 0 && (
               <div className="text-center text-slate-500 py-16 text-xs font-mono">
-                No indicators match your search or filter.
+                No indicators or templates match your search or filter.
               </div>
             )}
           </div>
