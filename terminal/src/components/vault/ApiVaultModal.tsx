@@ -6,7 +6,9 @@ import {
   loadEncryptedVault,
   clearVault,
   type ApiCredentials,
+  type SupportedBroker,
 } from '../../services/cryptoVault';
+import { audioHaptics } from '../../utils/notify';
 
 interface ApiVaultModalProps {
   isOpen: boolean;
@@ -14,12 +16,19 @@ interface ApiVaultModalProps {
 }
 
 export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
-  const [broker, setBroker] = useState<ApiCredentials['broker']>('DELTA_EXCHANGE');
+  const [broker, setBroker] = useState<SupportedBroker>('METATRADER_5');
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
-  const [isTestnet, setIsTestnet] = useState(true);
+  const [isTestnet, setIsTestnet] = useState(false);
   const [password, setPassword] = useState('');
 
+  // Extended broker connector state
+  const [accountNumber, setAccountNumber] = useState('');
+  const [server, setServer] = useState('MetaQuotes-Demo');
+  const [gatewayUrl, setGatewayUrl] = useState('ws://127.0.0.1:8765');
+  const [appId, setAppId] = useState('CRT-Terminal');
+
+  const [activeTab, setActiveTab] = useState<'CONNECT' | 'STATUS' | 'GUIDE'>('CONNECT');
   const [unlockPassword, setUnlockPassword] = useState('');
   const [unlockedCreds, setUnlockedCreds] = useState<ApiCredentials | null>(null);
   const [statusMsg, setStatusMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -30,26 +39,31 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password.trim() || !apiKey.trim() || !apiSecret.trim()) {
-      setStatusMsg({ text: 'Please fill in credentials and a master passphrase.', ok: false });
+    if (!password.trim()) {
+      setStatusMsg({ text: 'Please enter a master encryption passphrase.', ok: false });
       return;
     }
 
     try {
       const payload: ApiCredentials = {
         broker,
-        apiKey: apiKey.trim(),
+        apiKey: apiKey.trim() || accountNumber.trim(),
         apiSecret: apiSecret.trim(),
         isTestnet,
+        server: server.trim(),
+        gatewayUrl: gatewayUrl.trim(),
+        appId: appId.trim(),
+        accountNumber: accountNumber.trim(),
       };
 
       const encrypted = await encryptSecret(JSON.stringify(payload), password);
       saveEncryptedVault(encrypted);
 
-      setApiKey('');
-      setApiSecret('');
       setPassword('');
-      setStatusMsg({ text: 'Credentials encrypted and stored locally with AES-GCM 256.', ok: true });
+      setStatusMsg({
+        text: `${broker} credentials encrypted with AES-GCM 256 and saved locally in secure client vault.`,
+        ok: true,
+      });
     } catch (err) {
       setStatusMsg({ text: 'Encryption failed: ' + String(err), ok: false });
     }
@@ -66,12 +80,12 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
     try {
       const decrypted = await decryptSecret(encrypted, unlockPassword);
       const creds = JSON.parse(decrypted) as Partial<ApiCredentials>;
-      if (!creds || typeof creds !== 'object' || !creds.apiKey || !creds.apiSecret) {
+      if (!creds || typeof creds !== 'object') {
         setStatusMsg({ text: 'Corrupted credentials schema in decrypted vault.', ok: false });
         return;
       }
       setUnlockedCreds(creds as ApiCredentials);
-      setStatusMsg({ text: 'Vault unlocked successfully.', ok: true });
+      setStatusMsg({ text: `Vault unlocked: connected to ${creds.broker}.`, ok: true });
     } catch {
       setStatusMsg({ text: 'Invalid passphrase or corrupted vault. Decryption failed.', ok: false });
     }
@@ -90,177 +104,422 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md select-none font-mono text-xs">
-      <div className="flex h-[85vh] w-full max-w-2xl flex-col rounded-[10px] border border-white/[0.08] bg-panel shadow-2xl overflow-hidden">
+      <div className="flex h-[88vh] w-full max-w-3xl flex-col rounded-xl border border-white/[0.08] bg-panel shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-grid px-6 py-4 bg-bg/50">
           <div className="flex items-center gap-2.5">
             <span className="flex h-2 w-2 rounded-full bg-accent" />
             <h2 className="text-sm font-semibold text-white">
-              Secure Client-Side API Vault & State Backup
+              Institutional Broker Vault & Gateway Connectors
             </h2>
           </div>
-          <button onClick={onClose} className="text-muted hover:text-white" aria-label="Close">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              onClose();
+            }}
+            className="clay-btn px-2.5 py-1 text-muted hover:text-white"
+          >
+            ESC
           </button>
         </div>
 
-        {/* Content */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Status Message Banner */}
-          {statusMsg && (
-            <div
-              className={`rounded-lg border p-3 ${
-                statusMsg.ok
-                  ? 'border-up/40 bg-up/10 text-up'
-                  : 'border-red-500/40 bg-red-500/10 text-red-300'
+        {/* Tab navigation */}
+        <div className="flex border-b border-grid bg-bg/30 px-6">
+          {(['CONNECT', 'STATUS', 'GUIDE'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => {
+                audioHaptics.tick();
+                setActiveTab(tab);
+              }}
+              className={`py-2 px-4 font-semibold text-xs border-b-2 transition ${
+                activeTab === tab
+                  ? 'border-accent text-white'
+                  : 'border-transparent text-muted hover:text-white'
               }`}
             >
-              {statusMsg.text}
-            </div>
-          )}
+              {tab === 'CONNECT'
+                ? 'Broker Setup'
+                : tab === 'STATUS'
+                ? 'Vault Status'
+                : 'Bridge Architecture'}
+            </button>
+          ))}
+        </div>
 
-          {/* Section 1: Unlock Existing Vault */}
-          {hasVault && !unlockedCreds && (
-            <div className="rounded-xl border border-grid bg-bg/40 p-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-white mb-2">
-                Unlock Stored Credentials
-              </h3>
-              <p className="text-[11px] text-muted mb-3">
-                Your credentials are encrypted using AES-GCM 256. Enter your master password to inspect or verify.
-              </p>
-              <form onSubmit={handleUnlock} className="flex gap-2">
-                <input
-                  type="password"
-                  placeholder="Master Passphrase"
-                  value={unlockPassword}
-                  onChange={(e) => setUnlockPassword(e.target.value)}
-                  className="flex-1 rounded border border-grid bg-bg px-3 py-1.5 text-white"
-                />
-                <button
-                  type="submit"
-                  className="rounded bg-accent px-4 py-1.5 font-bold text-white hover:brightness-110"
-                >
-                  Unlock
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* Unlocked Credentials View */}
-          {unlockedCreds && (
-            <div className="rounded-xl border border-up/40 bg-up/10 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-up uppercase">Vault Unlocked: {unlockedCreds.broker}</span>
-                <button
-                  onClick={() => {
-                    clearVault();
-                    setUnlockedCreds(null);
-                    setStatusMsg({ text: 'Vault wiped from local storage.', ok: true });
-                  }}
-                  className="text-red-400 hover:underline"
-                >
-                  Wipe Vault
-                </button>
-              </div>
-              <div className="space-y-1 font-mono text-[11px] text-muted">
-                <div>API Key: <span className="text-white">{unlockedCreds.apiKey.slice(0, 8)}...</span></div>
-                <div>Network: <span className="text-white">{unlockedCreds.isTestnet ? 'Testnet Sandbox' : 'Live Production'}</span></div>
-              </div>
-            </div>
-          )}
-
-          {/* Section 2: Store / Update Credentials */}
-          <div className="rounded-xl border border-grid bg-bg/40 p-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-white mb-3">
-              Store Encrypted Broker Keys
-            </h3>
-            <form onSubmit={handleSave} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] text-muted block mb-1">Broker Platform</label>
-                  <select
-                    value={broker}
-                    onChange={(e) => setBroker(e.target.value as any)}
-                    className="w-full rounded border border-grid bg-bg px-2.5 py-1.5 text-white"
-                  >
-                    <option value="DELTA_EXCHANGE">Delta Exchange (India & Global)</option>
-                    <option value="OANDA">OANDA v20 Forex</option>
-                    <option value="BINANCE">Binance Futures</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] text-muted block mb-1">Environment</label>
-                  <select
-                    value={isTestnet ? 'TESTNET' : 'PROD'}
-                    onChange={(e) => setIsTestnet(e.target.value === 'TESTNET')}
-                    className="w-full rounded border border-grid bg-bg px-2.5 py-1.5 text-white"
-                  >
-                    <option value="TESTNET">Testnet Sandbox (Safe Practice)</option>
-                    <option value="PROD">Live Production Account</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] text-muted block mb-1">API Key</label>
-                <input
-                  type="text"
-                  placeholder="Paste broker API key"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] text-muted block mb-1">API Secret</label>
-                <input
-                  type="password"
-                  placeholder="Paste broker API secret"
-                  value={apiSecret}
-                  onChange={(e) => setApiSecret(e.target.value)}
-                  className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] text-muted block mb-1">Master Encryption Passphrase</label>
-                <input
-                  type="password"
-                  placeholder="Choose a passphrase to encrypt your keys"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full rounded bg-accent py-2 font-bold text-white hover:brightness-110"
-              >
-                Encrypt & Save Keys Locally
-              </button>
-            </form>
-          </div>
-
-          {/* Section 3: E2EE Workspace Backup */}
-          <div className="rounded-xl border border-grid bg-bg/40 p-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-white mb-2">
-              Workspace & Layout Backup
-            </h3>
-            <p className="text-[11px] text-muted mb-3">
-              Export your watchlists, positions, paper journal, and customized parameters as a JSON backup.
-            </p>
-            <button
-              onClick={handleExportBackup}
-              className="rounded bg-grid px-4 py-2 font-semibold text-white hover:bg-grid/80"
-            >
-              Export JSON Backup
+        {/* Status Notification Message */}
+        {statusMsg && (
+          <div
+            className={`px-6 py-2 border-b text-[11px] font-semibold flex items-center justify-between ${
+              statusMsg.ok
+                ? 'border-up/30 bg-up/10 text-up'
+                : 'border-down/30 bg-down/10 text-down'
+            }`}
+          >
+            <span>{statusMsg.text}</span>
+            <button onClick={() => setStatusMsg(null)} className="text-muted hover:text-white">
+              x
             </button>
           </div>
+        )}
+
+        {/* Scrollable Content Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          {activeTab === 'CONNECT' && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-grid bg-bg/40 p-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-white mb-2">
+                  Connect MT5, Tradovate or Crypto Broker
+                </h3>
+                <p className="text-[11px] text-muted mb-4">
+                  Keys and credentials are encrypted on your local device using AES-GCM 256-bit PBKDF2 encryption. They are never sent to external servers in plain text.
+                </p>
+
+                <form onSubmit={handleSave} className="space-y-3.5">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                        Broker Platform
+                      </label>
+                      <select
+                        value={broker}
+                        onChange={(e) => {
+                          const val = e.target.value as SupportedBroker;
+                          setBroker(val);
+                          if (val === 'METATRADER_5') {
+                            setServer('MetaQuotes-Demo');
+                            setGatewayUrl('ws://127.0.0.1:8765');
+                          } else if (val === 'TRADOVATE') {
+                            setAppId('CRT-Terminal');
+                          } else if (val === 'INTERACTIVE_BROKERS') {
+                            setGatewayUrl('http://127.0.0.1:5000');
+                          }
+                        }}
+                        className="w-full rounded border border-grid bg-bg px-2.5 py-1.5 text-white focus:outline-none"
+                      >
+                        <option value="METATRADER_5">MetaTrader 5 (MT5 Bridge Gateway)</option>
+                        <option value="TRADOVATE">Tradovate (CME Futures Direct)</option>
+                        <option value="INTERACTIVE_BROKERS">Interactive Brokers (IBKR TWS)</option>
+                        <option value="DELTA_EXCHANGE">Delta Exchange (Options & Futures)</option>
+                        <option value="BINANCE">Binance Futures (Perp USDT)</option>
+                        <option value="BYBIT">Bybit Perpetuals</option>
+                        <option value="OANDA">OANDA v20 Forex</option>
+                        <option value="CUSTOM">Custom WebSocket / REST Bridge</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                        Environment / Network
+                      </label>
+                      <select
+                        value={isTestnet ? 'DEMO' : 'LIVE'}
+                        onChange={(e) => setIsTestnet(e.target.value === 'DEMO')}
+                        className="w-full rounded border border-grid bg-bg px-2.5 py-1.5 text-white focus:outline-none"
+                      >
+                        <option value="DEMO">Demo / Simulation Sandbox</option>
+                        <option value="LIVE">Live Capital Account</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Broker Specific Fields */}
+                  {broker === 'METATRADER_5' && (
+                    <div className="space-y-3 border-t border-grid/50 pt-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            MT5 Account Login ID
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 5092819"
+                            value={accountNumber}
+                            onChange={(e) => setAccountNumber(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            MT5 Broker Server
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. FTMO-Server or MetaQuotes-Demo"
+                            value={server}
+                            onChange={(e) => setServer(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            MT5 Password (Master or Investor)
+                          </label>
+                          <input
+                            type="password"
+                            placeholder="Account password"
+                            value={apiSecret}
+                            onChange={(e) => setApiSecret(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            Local Bridge WebSocket URL
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="ws://127.0.0.1:8765"
+                            value={gatewayUrl}
+                            onChange={(e) => setGatewayUrl(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {broker === 'TRADOVATE' && (
+                    <div className="space-y-3 border-t border-grid/50 pt-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            Tradovate App ID
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="CRT-Terminal"
+                            value={appId}
+                            onChange={(e) => setAppId(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            API Key
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Tradovate API Key"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                          API Secret
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="Tradovate API Secret"
+                          value={apiSecret}
+                          onChange={(e) => setApiSecret(e.target.value)}
+                          className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {broker === 'INTERACTIVE_BROKERS' && (
+                    <div className="space-y-3 border-t border-grid/50 pt-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            IBKR Account ID
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. U1234567"
+                            value={accountNumber}
+                            onChange={(e) => setAccountNumber(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                            TWS Client Gateway Host:Port
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="http://127.0.0.1:5000"
+                            value={gatewayUrl}
+                            onChange={(e) => setGatewayUrl(e.target.value)}
+                            className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {['DELTA_EXCHANGE', 'BINANCE', 'BYBIT', 'OANDA', 'CUSTOM'].includes(broker) && (
+                    <div className="space-y-3 border-t border-grid/50 pt-3">
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                          API Key
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Paste API Key"
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                          API Secret
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="Paste API Secret (HMAC-SHA256)"
+                          value={apiSecret}
+                          onChange={(e) => setApiSecret(e.target.value)}
+                          className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Encryption Passphrase */}
+                  <div className="border-t border-grid/50 pt-3">
+                    <label className="text-[10px] uppercase font-bold text-muted block mb-1">
+                      Master Passphrase for Local AES Encryption
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Passphrase to encrypt your keys on this device"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      className="w-full rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="clay-pill-active w-full py-2 font-bold text-xs"
+                  >
+                    Encrypt & Save in Secure Client Vault
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'STATUS' && (
+            <div className="space-y-4">
+              {hasVault ? (
+                <div className="rounded-xl border border-grid bg-bg/40 p-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-white mb-2">
+                    Vault Status: Encrypted Credentials Present
+                  </h3>
+                  <p className="text-[11px] text-muted mb-3">
+                    Enter your master passphrase to unlock and inspect your broker configuration.
+                  </p>
+                  <form onSubmit={handleUnlock} className="flex gap-2">
+                    <input
+                      type="password"
+                      placeholder="Master Passphrase"
+                      value={unlockPassword}
+                      onChange={(e) => setUnlockPassword(e.target.value)}
+                      className="flex-1 rounded border border-grid bg-bg px-3 py-1.5 text-white"
+                    />
+                    <button
+                      type="submit"
+                      className="clay-pill-active px-4 py-1.5 font-bold"
+                    >
+                      Unlock
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-grid bg-bg/40 p-4 text-center text-muted">
+                  No encrypted credentials currently stored. Use the Broker Setup tab to connect.
+                </div>
+              )}
+
+              {unlockedCreds && (
+                <div className="rounded-xl border border-up/40 bg-up/10 p-4 space-y-2">
+                  <div className="flex items-center justify-between border-b border-up/20 pb-2">
+                    <span className="font-bold text-up uppercase">
+                      Vault Unlocked: {unlockedCreds.broker}
+                    </span>
+                    <button
+                      onClick={() => {
+                        clearVault();
+                        setUnlockedCreds(null);
+                        setStatusMsg({ text: 'Vault wiped from local storage.', ok: true });
+                      }}
+                      className="text-red-400 hover:underline text-[10px]"
+                    >
+                      Wipe Vault
+                    </button>
+                  </div>
+                  <div className="space-y-1 font-mono text-[11px] text-muted">
+                    <div>Broker: <span className="text-white font-bold">{unlockedCreds.broker}</span></div>
+                    {unlockedCreds.server && <div>Server: <span className="text-white">{unlockedCreds.server}</span></div>}
+                    {unlockedCreds.gatewayUrl && <div>Gateway: <span className="text-white">{unlockedCreds.gatewayUrl}</span></div>}
+                    <div>Network: <span className="text-white">{unlockedCreds.isTestnet ? 'Demo / Simulation' : 'Live Production'}</span></div>
+                  </div>
+                </div>
+              )}
+
+              {/* Workspace Export Backup */}
+              <div className="rounded-xl border border-grid bg-bg/40 p-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-white mb-2">
+                  Encrypted Workspace Backup
+                </h3>
+                <p className="text-[11px] text-muted mb-3">
+                  Export your terminal preferences, drawings, alerts, and settings as a JSON backup file.
+                </p>
+                <button
+                  onClick={handleExportBackup}
+                  className="clay-btn px-4 py-1.5 font-semibold text-white"
+                >
+                  Export JSON Backup
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'GUIDE' && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-grid bg-bg/40 p-4 space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                  How MT5, Tradovate & External Feeds Work in Pure Web Apps
+                </h3>
+
+                <div className="space-y-2 text-[11px] text-slate-300 leading-relaxed">
+                  <p>
+                    <b className="text-white">1. The Browser Sandbox Boundary:</b><br />
+                    Web browsers cannot directly invoke C++ DLLs or execute raw binary TCP sockets to desktop MT5 binaries (e.g. `terminal64.exe`). This is an inherent browser security sandbox restriction.
+                  </p>
+
+                  <p>
+                    <b className="text-white">2. MT5 Bridge Architecture (ZeroMQ / Python):</b><br />
+                    To stream free tick feeds and execute trades on MT5, a lightweight local bridge daemon (such as the standard Python `MetaTrader5` library or ZeroMQ EA) runs on your computer or VPS. It connects directly to your MT5 terminal and exposes a local WebSocket server (default <code className="text-cyan-300">ws://127.0.0.1:8765</code>). CRT Terminal connects to this local WebSocket to receive raw ticks, footprint order books, and send instant execution tickets.
+                  </p>
+
+                  <p>
+                    <b className="text-white">3. Tradovate Direct WebSocket & OAuth:</b><br />
+                    Tradovate provides official REST and WebSocket endpoints for CME Futures (ES, NQ, YM, GC, CL). By configuring your Tradovate App ID and API Key in the vault, CRT Terminal streams real-time CME market data and routes orders directly through Tradovate APIs.
+                  </p>
+
+                  <p>
+                    <b className="text-white">4. Zero-Knowledge Encryption:</b><br />
+                    Your master passphrase derives an AES-GCM 256-bit encryption key in memory via PBKDF2 with 100,000 SHA-256 iterations. Secrets are stored strictly encrypted inside your browser&#39;s local storage.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

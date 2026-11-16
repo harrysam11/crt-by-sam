@@ -55,19 +55,36 @@ const SAMPLE_NEWS: NewsItem[] = [
   },
 ];
 
-const MONTH_SEASONALITY = [
-  { month: 'Jan', winRate: 52 },
-  { month: 'Feb', winRate: 64 },
-  { month: 'Mar', winRate: 48 },
-  { month: 'Apr', winRate: 58 },
-  { month: 'May', winRate: 45 },
-  { month: 'Jun', winRate: 41 },
-  { month: 'Jul', winRate: 60 },
-  { month: 'Aug', winRate: 39 },
-  { month: 'Sep', winRate: 32 },
-  { month: 'Oct', winRate: 68 },
-  { month: 'Nov', winRate: 72 },
-  { month: 'Dec', winRate: 55 },
+interface SeasonalMonthData {
+  month: string;
+  winRate: number;
+  avgReturn: number;
+  fiveYearReturn: number;
+  tenYearReturn: number;
+  currentYearReturn?: number;
+}
+
+const SEASONAL_TENDENCY_MONTHS: SeasonalMonthData[] = [
+  { month: 'Jan', winRate: 54, avgReturn: 3.8, fiveYearReturn: 3.8, tenYearReturn: 4.2, currentYearReturn: 2.1 },
+  { month: 'Feb', winRate: 64, avgReturn: 9.4, fiveYearReturn: 13.2, tenYearReturn: 13.6, currentYearReturn: 11.5 },
+  { month: 'Mar', winRate: 48, avgReturn: -1.2, fiveYearReturn: 12.0, tenYearReturn: 12.4, currentYearReturn: 14.8 },
+  { month: 'Apr', winRate: 58, avgReturn: 6.5, fiveYearReturn: 18.5, tenYearReturn: 18.9, currentYearReturn: 18.2 },
+  { month: 'May', winRate: 45, avgReturn: -3.4, fiveYearReturn: 15.1, tenYearReturn: 15.5, currentYearReturn: 13.0 },
+  { month: 'Jun', winRate: 41, avgReturn: -4.1, fiveYearReturn: 11.0, tenYearReturn: 11.4, currentYearReturn: 8.5 },
+  { month: 'Jul', winRate: 60, avgReturn: 8.2, fiveYearReturn: 19.2, tenYearReturn: 19.6, currentYearReturn: 16.4 },
+  { month: 'Aug', winRate: 39, avgReturn: -6.5, fiveYearReturn: 12.7, tenYearReturn: 13.1, currentYearReturn: 11.2 },
+  { month: 'Sep', winRate: 32, avgReturn: -8.9, fiveYearReturn: 3.8, tenYearReturn: 4.2, currentYearReturn: 2.5 },
+  { month: 'Oct', winRate: 68, avgReturn: 14.2, fiveYearReturn: 18.0, tenYearReturn: 18.4, currentYearReturn: 17.8 },
+  { month: 'Nov', winRate: 72, avgReturn: 18.6, fiveYearReturn: 36.6, tenYearReturn: 37.0, currentYearReturn: 35.2 },
+  { month: 'Dec', winRate: 55, avgReturn: 5.4, fiveYearReturn: 42.0, tenYearReturn: 42.4, currentYearReturn: undefined },
+];
+
+const DAY_OF_WEEK_TENDENCY = [
+  { day: 'Mon', winRate: 54, avgReturn: 0.42, bias: 'BULLISH' },
+  { day: 'Tue', winRate: 59, avgReturn: 0.88, bias: 'BULLISH' },
+  { day: 'Wed', winRate: 49, avgReturn: -0.15, bias: 'NEUTRAL' },
+  { day: 'Thu', winRate: 63, avgReturn: 1.15, bias: 'STRONG BULL' },
+  { day: 'Fri', winRate: 46, avgReturn: -0.38, bias: 'BEARISH' },
 ];
 
 export default function AnalyticsPanel() {
@@ -402,32 +419,174 @@ export default function AnalyticsPanel() {
         )}
 
         {activeTab === 'SEASONALITY' && (
-          <div className="space-y-4">
+          <div className="space-y-3 font-mono">
+            {/* Seasonal Regime Summary Banner */}
+            <div className="rounded-xl border border-grid bg-bg/50 p-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] uppercase font-bold text-muted">Seasonal Tendency Regime</span>
+                <span className="rounded bg-up/20 px-1.5 py-0.5 text-[9px] font-bold text-up">BULLISH WINDOW</span>
+              </div>
+              <h4 className="text-xs font-bold text-white mb-1">
+                {labelOf(symbol)} Q4 Institutional Expansion
+              </h4>
+              <p className="text-[10px] text-muted leading-relaxed">
+                Historically, {labelOf(symbol)} demonstrates its strongest seasonal rally from Oct 15 through Nov 30 with a 72% positive win-rate.
+              </p>
+            </div>
+
+            {/* TradingView-Style Multi-Year Composite Seasonal Tendency Chart */}
+            <div className="rounded-xl border border-grid bg-bg/50 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] uppercase font-bold text-white">
+                  Multi-Year Cumulative Tendency
+                </span>
+                <span className="text-[9px] text-muted">Jan - Dec</span>
+              </div>
+
+              {/* Chart Legend */}
+              <div className="flex items-center gap-3 text-[9px] text-muted mb-2">
+                <span className="flex items-center gap-1">
+                  <span className="h-1.5 w-3 rounded-full bg-cyan-400" />
+                  <span>10Y Avg</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-1.5 w-3 rounded-full bg-indigo-400" />
+                  <span>5Y Avg</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-1.5 w-3 rounded-full bg-up" />
+                  <span>Current Year</span>
+                </span>
+              </div>
+
+              {/* Responsive SVG Tendency Curve */}
+              <div className="relative w-full h-32 bg-black/40 rounded border border-grid/40 p-1">
+                <svg viewBox="0 0 280 100" className="w-full h-full overflow-visible">
+                  {/* Horizontal Gridlines */}
+                  <line x1="10" y1="20" x2="270" y2="20" stroke="rgba(255,255,255,0.08)" strokeDasharray="2 2" />
+                  <line x1="10" y1="50" x2="270" y2="50" stroke="rgba(255,255,255,0.12)" />
+                  <line x1="10" y1="80" x2="270" y2="80" stroke="rgba(255,255,255,0.08)" strokeDasharray="2 2" />
+
+                  {/* Baseline 0% indicator */}
+                  <text x="12" y="48" fill="#71717a" fontSize="8" fontFamily="monospace">0%</text>
+                  <text x="12" y="18" fill="#71717a" fontSize="8" fontFamily="monospace">+40%</text>
+                  <text x="12" y="78" fill="#71717a" fontSize="8" fontFamily="monospace">-20%</text>
+
+                  {/* 10-Year Composite Trendline (Cyan) */}
+                  <polyline
+                    fill="none"
+                    stroke="#38bdf8"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    points="20,50 42,46 64,38 86,40 108,35 130,42 152,44 174,34 196,44 218,48 240,32 262,20"
+                  />
+
+                  {/* 5-Year Composite Trendline (Indigo) */}
+                  <polyline
+                    fill="none"
+                    stroke="#818cf8"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="3 2"
+                    points="20,50 42,47 64,39 86,41 108,36 130,41 152,43 174,33 196,43 218,47 240,30 262,18"
+                  />
+
+                  {/* Current Year Trajectory (Green) */}
+                  <polyline
+                    fill="none"
+                    stroke="#4ade80"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    points="20,50 42,48 64,37 86,36 108,33 130,43 152,46 174,35 196,42 218,47 240,31"
+                  />
+
+                  {/* Current Month Active Dot */}
+                  <circle cx="240" cy="31" r="3.5" fill="#4ade80" />
+
+                  {/* Month X-Axis Ticks */}
+                  {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'].map((m, i) => (
+                    <text
+                      key={i}
+                      x={20 + i * 22}
+                      y="96"
+                      fill="#71717a"
+                      fontSize="8"
+                      textAnchor="middle"
+                      fontFamily="monospace"
+                    >
+                      {m}
+                    </text>
+                  ))}
+                </svg>
+              </div>
+            </div>
+
+            {/* Monthly Seasonality Matrix Table */}
             <div className="rounded-xl border border-grid bg-bg/50 p-3">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">
-                  {labelOf(symbol)} Monthly Win Rate
+                  Monthly Win Rate & Avg Return
                 </h4>
-                <span className="text-[10px] text-up font-bold">Oct: 68% | Nov: 72%</span>
+                <span className="text-[10px] text-up font-bold">10-Year Sample</span>
               </div>
-              <p className="text-[10px] text-muted mb-3">
-                Historical monthly probability of positive returns over the past 10 years.
-              </p>
 
-              <div className="space-y-1.5 font-mono text-[10px]">
-                {MONTH_SEASONALITY.map((m) => {
+              <div className="space-y-1 text-[10px]">
+                {SEASONAL_TENDENCY_MONTHS.map((m) => {
                   const isGreen = m.winRate >= 50;
+                  const isRetPos = m.avgReturn >= 0;
                   return (
-                    <div key={m.month} className="flex items-center gap-2">
-                      <span className="w-7 text-muted">{m.month}</span>
-                      <div className="flex-1 h-3 rounded bg-grid overflow-hidden">
+                    <div key={m.month} className="flex items-center gap-2 py-0.5 border-b border-grid/20 last:border-0">
+                      <span className="w-7 text-muted font-bold">{m.month}</span>
+                      <div className="flex-1 h-2 rounded bg-grid overflow-hidden">
                         <div
                           className={`h-full ${isGreen ? 'bg-up' : 'bg-down'}`}
                           style={{ width: `${m.winRate}%` }}
                         />
                       </div>
-                      <span className={`w-8 text-right font-bold ${isGreen ? 'text-up' : 'text-down'}`}>
+                      <span className={`w-8 text-right font-semibold ${isGreen ? 'text-up' : 'text-down'}`}>
                         {m.winRate}%
+                      </span>
+                      <span className={`w-12 text-right font-bold ${isRetPos ? 'text-up' : 'text-down'}`}>
+                        {isRetPos ? '+' : ''}{m.avgReturn.toFixed(1)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Day of the Week Intraday Tendencies */}
+            <div className="rounded-xl border border-grid bg-bg/50 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">
+                  Day-of-Week Edge
+                </h4>
+                <span className="text-[10px] text-muted">Weekly Cycle</span>
+              </div>
+
+              <div className="space-y-1.5 text-[10px]">
+                {DAY_OF_WEEK_TENDENCY.map((d) => {
+                  const isBull = d.avgReturn >= 0;
+                  return (
+                    <div key={d.day} className="flex items-center justify-between py-0.5">
+                      <span className="w-8 font-bold text-white">{d.day}</span>
+                      <span className="text-muted">Win: <b className={d.winRate >= 50 ? 'text-up' : 'text-down'}>{d.winRate}%</b></span>
+                      <span className={`font-semibold ${isBull ? 'text-up' : 'text-down'}`}>
+                        {isBull ? '+' : ''}{d.avgReturn.toFixed(2)}%
+                      </span>
+                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                        d.bias === 'STRONG BULL'
+                          ? 'bg-up/20 text-up'
+                          : d.bias === 'BULLISH'
+                          ? 'bg-up/10 text-up'
+                          : d.bias === 'BEARISH'
+                          ? 'bg-down/20 text-down'
+                          : 'bg-grid text-muted'
+                      }`}>
+                        {d.bias}
                       </span>
                     </div>
                   );

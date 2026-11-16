@@ -13,6 +13,7 @@ import { useTerminalStore } from '../../store/useTerminalStore';
 import { getInstrument } from '../../services/instruments';
 import { fmtPrice, labelOf } from '../../utils/formatters';
 import { audioHaptics, requestNotify } from '../../utils/notify';
+import { loadTelegramConfig, sendTelegramMessage } from '../../services/telegramService';
 import type { AlertConditionType } from '../../types/terminal';
 
 interface CreateAlertModalProps {
@@ -36,6 +37,11 @@ export default function CreateAlertModal({ isOpen, onClose, initialPrice }: Crea
   const [alertNote, setAlertNote] = useState('');
   const [notifySound, setNotifySound] = useState(true);
   const [notifyPush, setNotifyPush] = useState(true);
+  const [notifyTelegram, setNotifyTelegram] = useState(true);
+  const [isTestingTg, setIsTestingTg] = useState(false);
+  const [tgFeedback, setTgFeedback] = useState<string | null>(null);
+
+  const tgConfig = loadTelegramConfig();
 
   if (!isOpen) return null;
 
@@ -76,6 +82,12 @@ export default function CreateAlertModal({ isOpen, onClose, initialPrice }: Crea
         },
         note: alertNote.trim() || `${labelOf(symbol)} ${indicatorId.toUpperCase()} ${operator} ${indValNum}`,
       });
+    }
+
+    if (notifyTelegram && tgConfig.enabled) {
+      sendTelegramMessage(
+        `<b>Alert Created</b>: <b>${labelOf(symbol)}</b> target <b>${fmtPrice(priceNum, symbol)}</b> (${conditionType === 'PRICE' ? operator : indicatorId.toUpperCase()}).\nNote: ${alertNote.trim() || 'Active price alert'}`
+      ).catch(() => {});
     }
 
     onClose();
@@ -206,7 +218,7 @@ export default function CreateAlertModal({ isOpen, onClose, initialPrice }: Crea
             <label className="text-[10px] uppercase font-bold text-muted mb-1 block">
               Alert Actions
             </label>
-            <div className="flex items-center gap-4 py-1">
+            <div className="flex flex-wrap items-center gap-4 py-1">
               <label className="flex items-center gap-2 cursor-pointer text-slate-300">
                 <input
                   type="checkbox"
@@ -225,7 +237,55 @@ export default function CreateAlertModal({ isOpen, onClose, initialPrice }: Crea
                 />
                 <span>Browser Notification</span>
               </label>
+              <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={notifyTelegram}
+                  onChange={(e) => setNotifyTelegram(e.target.checked)}
+                  className="rounded bg-black border-grid text-white focus:ring-0"
+                />
+                <span>Telegram Bot Alert</span>
+              </label>
             </div>
+
+            {/* Telegram Configuration Status & Instant Test */}
+            {notifyTelegram && (
+              <div className="mt-2 rounded border border-grid/60 bg-bg/50 p-2 text-[10px]">
+                {tgConfig.enabled && tgConfig.botToken && tgConfig.chatId ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-up font-semibold">
+                      [TG Active: Chat ID {tgConfig.chatId}]
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isTestingTg}
+                      onClick={async () => {
+                        audioHaptics.tick();
+                        setIsTestingTg(true);
+                        setTgFeedback(null);
+                        const res = await sendTelegramMessage(
+                          `Test Ping from Create Alert Dialog for <b>${labelOf(symbol)}</b> at <b>${fmtPrice(currentPrice, symbol)}</b>`
+                        );
+                        setIsTestingTg(false);
+                        setTgFeedback(res.ok ? 'Delivered successfully to Telegram!' : `Failed: ${res.error}`);
+                      }}
+                      className="clay-pill px-2.5 py-0.5 text-white hover:text-white"
+                    >
+                      {isTestingTg ? 'Sending...' : 'Test TG Ping'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-amber-400">
+                    Telegram bot not configured yet. Configure token and chat ID in <b>Settings &gt; Telegram</b>.
+                  </div>
+                )}
+                {tgFeedback && (
+                  <div className="mt-1 text-slate-300 font-mono text-[9px]">
+                    {tgFeedback}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Alert Note */}

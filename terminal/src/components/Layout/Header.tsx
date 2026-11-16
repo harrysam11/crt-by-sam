@@ -8,6 +8,7 @@ import { fmtPct, fmtPnl, fmtPrice, fmtUsd, labelOf, pnlClass } from '../../utils
 import { BreathingHalo } from '../../features/zen/ZenController';
 import { audioHaptics } from '../../utils/notify';
 import { loadTelegramConfig } from '../../services/telegramService';
+import { useLayoutStore, type ChartGridLayout } from '../../store/useLayoutStore';
 
 const DOT = { open: 'bg-up', connecting: 'bg-yellow-400', reconnecting: 'bg-yellow-400', closed: 'bg-down' } as const;
 
@@ -67,23 +68,44 @@ export default function Header({
   const isAnalyticsVisible = useDerivativesStore((s) => s.isAnalyticsVisible);
   const toggleAnalytics = useDerivativesStore((s) => s.toggleAnalytics);
 
+  // Multi-chart Grid Layout Store
+  const layout = useLayoutStore((s) => s.layout);
+  const setLayout = useLayoutStore((s) => s.setLayout);
+  const syncSymbol = useLayoutStore((s) => s.syncSymbol);
+  const syncTimeframe = useLayoutStore((s) => s.syncTimeframe);
+  const syncCrosshair = useLayoutStore((s) => s.syncCrosshair);
+  const syncRange = useLayoutStore((s) => s.syncRange);
+  const toggleSync = useLayoutStore((s) => s.toggleSync);
+  const savedLayouts = useLayoutStore((s) => s.savedLayouts);
+  const activeLayoutId = useLayoutStore((s) => s.activeLayoutId);
+  const loadLayout = useLayoutStore((s) => s.loadLayout);
+  const isChartMaximized = useLayoutStore((s) => s.isChartMaximized);
+  const toggleChartMaximized = useLayoutStore((s) => s.toggleChartMaximized);
+
   // Stealth Mode Balance Mask
   const [isMasked, setIsMasked] = useState(false);
   const [isInstToolsOpen, setIsInstToolsOpen] = useState(false);
   const instToolsRef = useRef<HTMLDivElement>(null);
+  const [isLayoutOpen, setIsLayoutOpen] = useState(false);
+  const layoutRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (instToolsRef.current && !instToolsRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (instToolsRef.current && !instToolsRef.current.contains(target)) {
         setIsInstToolsOpen(false);
+      }
+      if (layoutRef.current && !layoutRef.current.contains(target)) {
+        setIsLayoutOpen(false);
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsInstToolsOpen(false);
+        setIsLayoutOpen(false);
       }
     };
-    if (isInstToolsOpen) {
+    if (isInstToolsOpen || isLayoutOpen) {
       window.addEventListener('mousedown', handleClickOutside);
       window.addEventListener('keydown', handleKeyDown);
     }
@@ -91,7 +113,7 @@ export default function Header({
       window.removeEventListener('mousedown', handleClickOutside);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isInstToolsOpen]);
+  }, [isInstToolsOpen, isLayoutOpen]);
 
   // Colour the price by tick direction
   const prev = useRef(price);
@@ -409,6 +431,152 @@ export default function Header({
                     <span>Broker API Key Vault</span>
                   </button>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* Multi-Chart Layout Dropdown (TradingView-Grade) */}
+          <div className="relative" ref={layoutRef}>
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setIsLayoutOpen((v) => !v);
+              }}
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold transition ${
+                isLayoutOpen || layout !== '1x1' ? 'clay-btn-active' : 'clay-btn'
+              }`}
+              title="Multi-Chart Layouts & Synchronization"
+            >
+              <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+              </svg>
+              <span>Layout ({layout})</span>
+              <svg className={`h-3 w-3 text-slate-400 transition-transform ${isLayoutOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {isLayoutOpen && (
+              <div className="absolute right-0 top-full mt-2 z-50 w-72 clay-popover p-3 shadow-2xl select-none font-mono text-xs space-y-3">
+                {/* Grid Pickers */}
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-muted block mb-1.5">
+                    Select Grid Layout
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { id: '1x1', label: '1x1 Single', desc: '1 Chart' },
+                      { id: '1x2', label: '1x2 Vertical', desc: 'Side-by-Side' },
+                      { id: '2x1', label: '2x1 Horizontal', desc: 'Stacked' },
+                      { id: '2x2', label: '2x2 Quad', desc: '4 Panes' },
+                    ].map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          audioHaptics.tick();
+                          setLayout(item.id as ChartGridLayout);
+                          setIsLayoutOpen(false);
+                        }}
+                        className={`p-2 rounded-lg text-left transition flex flex-col ${
+                          layout === item.id
+                            ? 'clay-pill-active font-bold'
+                            : 'hover:bg-white/10 text-slate-300'
+                        }`}
+                      >
+                        <span className="font-semibold text-white">{item.label}</span>
+                        <span className="text-[9px] text-muted">{item.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Multi-chart Synchronization Toggles */}
+                <div className="border-t border-grid/60 pt-2">
+                  <span className="text-[10px] uppercase font-bold text-muted block mb-1">
+                    Multi-Chart Sync
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white">
+                      <input
+                        type="checkbox"
+                        checked={syncSymbol}
+                        onChange={() => toggleSync('syncSymbol')}
+                        className="rounded bg-black border-grid text-white focus:ring-0"
+                      />
+                      <span>Sync Symbol</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white">
+                      <input
+                        type="checkbox"
+                        checked={syncTimeframe}
+                        onChange={() => toggleSync('syncTimeframe')}
+                        className="rounded bg-black border-grid text-white focus:ring-0"
+                      />
+                      <span>Sync TF</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white">
+                      <input
+                        type="checkbox"
+                        checked={syncCrosshair}
+                        onChange={() => toggleSync('syncCrosshair')}
+                        className="rounded bg-black border-grid text-white focus:ring-0"
+                      />
+                      <span>Sync Crosshair</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white">
+                      <input
+                        type="checkbox"
+                        checked={syncRange}
+                        onChange={() => toggleSync('syncRange')}
+                        className="rounded bg-black border-grid text-white focus:ring-0"
+                      />
+                      <span>Sync Range</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Saved Layout Templates */}
+                <div className="border-t border-grid/60 pt-2">
+                  <span className="text-[10px] uppercase font-bold text-muted block mb-1">
+                    Preset Templates
+                  </span>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {savedLayouts.map((tmpl) => (
+                      <button
+                        key={tmpl.id}
+                        onClick={() => {
+                          audioHaptics.tick();
+                          loadLayout(tmpl.id);
+                          setIsLayoutOpen(false);
+                        }}
+                        className={`w-full text-left px-2 py-1 rounded transition flex items-center justify-between ${
+                          activeLayoutId === tmpl.id
+                            ? 'clay-pill-active font-bold'
+                            : 'hover:bg-white/10 text-slate-300'
+                        }`}
+                      >
+                        <span className="truncate">{tmpl.name}</span>
+                        <span className="text-[9px] text-muted ml-2">({tmpl.layout})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Maximize Chart Action */}
+                <div className="border-t border-grid/60 pt-2">
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      toggleChartMaximized();
+                      setIsLayoutOpen(false);
+                    }}
+                    className={`w-full py-1.5 text-center font-bold rounded transition ${
+                      isChartMaximized ? 'clay-pill-active' : 'clay-btn text-white'
+                    }`}
+                  >
+                    {isChartMaximized ? 'Exit Maximize Chart' : 'Maximize Chart View'}
+                  </button>
+                </div>
               </div>
             )}
           </div>

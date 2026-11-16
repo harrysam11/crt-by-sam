@@ -117,12 +117,26 @@ export async function decryptSecret(payloadStr: string, password: string): Promi
   return dec.decode(decrypted);
 }
 
+export type SupportedBroker =
+  | 'METATRADER_5'
+  | 'TRADOVATE'
+  | 'INTERACTIVE_BROKERS'
+  | 'DELTA_EXCHANGE'
+  | 'BINANCE'
+  | 'BYBIT'
+  | 'OANDA'
+  | 'CUSTOM';
+
 export interface ApiCredentials {
-  broker: 'DELTA_EXCHANGE' | 'OANDA' | 'BINANCE' | 'CUSTOM';
+  broker: SupportedBroker;
   apiKey: string;
   apiSecret: string;
   subAccountId?: string;
   isTestnet: boolean;
+  server?: string;
+  gatewayUrl?: string;
+  appId?: string;
+  accountNumber?: string;
 }
 
 const VAULT_STORAGE_KEY = 'crt_secure_vault_v1';
