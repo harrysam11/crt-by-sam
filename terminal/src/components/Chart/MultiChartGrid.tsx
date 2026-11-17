@@ -12,6 +12,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import TradingChart from './TradingChart';
+import Splitter from '../Layout/Splitter';
 import { audioHaptics } from '../../utils/notify';
 import { useLayoutStore, type ChartGridLayout } from '../../store/useLayoutStore';
 import { useTerminalStore } from '../../store/useTerminalStore';
@@ -34,9 +35,16 @@ export default function MultiChartGrid() {
   const deleteLayout = useLayoutStore((s) => s.deleteLayout);
   const isChartMaximized = useLayoutStore((s) => s.isChartMaximized);
   const toggleChartMaximized = useLayoutStore((s) => s.toggleChartMaximized);
+  const splitRatioH = useLayoutStore((s) => s.splitRatioH);
+  const splitRatioV = useLayoutStore((s) => s.splitRatioV);
+  const setSplitRatioH = useLayoutStore((s) => s.setSplitRatioH);
+  const setSplitRatioV = useLayoutStore((s) => s.setSplitRatioV);
+  const resetSplitRatios = useLayoutStore((s) => s.resetSplitRatios);
 
   const globalSymbol = useTerminalStore((s) => s.symbol);
   const globalTimeframe = useTerminalStore((s) => s.timeframe);
+
+  const gridContainerRef = useRef<HTMLDivElement>(null);
 
   const [isLayoutMenuOpen, setIsLayoutMenuOpen] = useState(false);
   const [isTemplateMenuOpen, setIsTemplateMenuOpen] = useState(false);
@@ -96,6 +104,37 @@ export default function MultiChartGrid() {
       }
     }
   }, [globalSymbol, layout, syncSymbol, panes]);
+
+  // Select pane and sync to top nav header immediately
+  const handleSelectPane = (targetPaneId: string) => {
+    setActivePaneId(targetPaneId);
+    const targetPane = panes[targetPaneId];
+    if (targetPane) {
+      useTerminalStore.getState().setSymbol(targetPane.symbol);
+      if (targetPane.timeframe) {
+        useTerminalStore.getState().setTimeframe(targetPane.timeframe);
+      }
+    }
+  };
+
+  // Drag handlers for resizable spaces with synchronized ratio
+  const handleDragH = (deltaPx: number) => {
+    if (!gridContainerRef.current) return;
+    const w = gridContainerRef.current.clientWidth;
+    if (w <= 0) return;
+    const deltaRatio = deltaPx / w;
+    const next = Math.min(0.85, Math.max(0.15, splitRatioH + deltaRatio));
+    setSplitRatioH(next);
+  };
+
+  const handleDragV = (deltaPx: number) => {
+    if (!gridContainerRef.current) return;
+    const h = gridContainerRef.current.clientHeight;
+    if (h <= 0) return;
+    const deltaRatio = deltaPx / h;
+    const next = Math.min(0.85, Math.max(0.15, splitRatioV + deltaRatio));
+    setSplitRatioV(next);
+  };
 
   return (
     <div className={`relative flex h-full w-full flex-col overflow-hidden bg-bg ${isChartMaximized ? 'fixed inset-0 z-50' : ''}`}>
@@ -375,12 +414,12 @@ export default function MultiChartGrid() {
         </button>
       </div>
 
-      {/* Grid Container with Active Pane Focus Rings */}
-      <div className="flex-1 min-h-0 w-full h-full">
+      {/* Grid Container with Active Pane Focus Rings & Resizable Splitters */}
+      <div ref={gridContainerRef} className="flex-1 min-h-0 w-full h-full relative">
         {layout === '1x1' && (
           <div
             className={`h-full w-full relative ${activePaneId === 'pane-1' ? 'ring-1 ring-white/30' : ''}`}
-            onClick={() => setActivePaneId('pane-1')}
+            onClick={() => handleSelectPane('pane-1')}
           >
             <TradingChart
               paneId="pane-1"
@@ -391,10 +430,11 @@ export default function MultiChartGrid() {
         )}
 
         {layout === '1x2' && (
-          <div className="grid h-full w-full grid-cols-2 divide-x divide-grid">
+          <div className="flex h-full w-full overflow-hidden">
             <div
+              style={{ width: `calc(${splitRatioH * 100}% - 3px)` }}
               className={`h-full min-h-0 relative ${activePaneId === 'pane-1' ? 'ring-1 ring-white/40 z-10' : ''}`}
-              onClick={() => setActivePaneId('pane-1')}
+              onClick={() => handleSelectPane('pane-1')}
             >
               <TradingChart
                 paneId="pane-1"
@@ -402,9 +442,11 @@ export default function MultiChartGrid() {
                 timeframeOverride={p1.timeframe}
               />
             </div>
+            <Splitter dir="v" onDrag={handleDragH} />
             <div
+              style={{ width: `calc(${(1 - splitRatioH) * 100}% - 3px)` }}
               className={`h-full min-h-0 relative ${activePaneId === 'pane-2' ? 'ring-1 ring-white/40 z-10' : ''}`}
-              onClick={() => setActivePaneId('pane-2')}
+              onClick={() => handleSelectPane('pane-2')}
             >
               <TradingChart
                 paneId="pane-2"
@@ -416,10 +458,11 @@ export default function MultiChartGrid() {
         )}
 
         {layout === '2x1' && (
-          <div className="grid h-full w-full grid-rows-2 divide-y divide-grid">
+          <div className="flex flex-col h-full w-full overflow-hidden">
             <div
-              className={`h-full min-h-0 relative ${activePaneId === 'pane-1' ? 'ring-1 ring-white/40 z-10' : ''}`}
-              onClick={() => setActivePaneId('pane-1')}
+              style={{ height: `calc(${splitRatioV * 100}% - 3px)` }}
+              className={`w-full min-h-0 relative ${activePaneId === 'pane-1' ? 'ring-1 ring-white/40 z-10' : ''}`}
+              onClick={() => handleSelectPane('pane-1')}
             >
               <TradingChart
                 paneId="pane-1"
@@ -427,9 +470,11 @@ export default function MultiChartGrid() {
                 timeframeOverride={p1.timeframe}
               />
             </div>
+            <Splitter dir="h" onDrag={handleDragV} />
             <div
-              className={`h-full min-h-0 relative ${activePaneId === 'pane-2' ? 'ring-1 ring-white/40 z-10' : ''}`}
-              onClick={() => setActivePaneId('pane-2')}
+              style={{ height: `calc(${(1 - splitRatioV) * 100}% - 3px)` }}
+              className={`w-full min-h-0 relative ${activePaneId === 'pane-2' ? 'ring-1 ring-white/40 z-10' : ''}`}
+              onClick={() => handleSelectPane('pane-2')}
             >
               <TradingChart
                 paneId="pane-2"
@@ -441,46 +486,62 @@ export default function MultiChartGrid() {
         )}
 
         {layout === '2x2' && (
-          <div className="grid h-full w-full grid-cols-2 grid-rows-2 divide-x divide-y divide-grid">
-            <div
-              className={`h-full min-h-0 relative ${activePaneId === 'pane-1' ? 'ring-1 ring-white/40 z-10' : ''}`}
-              onClick={() => setActivePaneId('pane-1')}
-            >
-              <TradingChart
-                paneId="pane-1"
-                symbolOverride={syncSymbol ? globalSymbol : p1.symbol}
-                timeframeOverride={p1.timeframe}
-              />
+          <div className="flex flex-col h-full w-full overflow-hidden">
+            {/* Top Row */}
+            <div style={{ height: `calc(${splitRatioV * 100}% - 3px)` }} className="flex w-full min-h-0 overflow-hidden">
+              <div
+                style={{ width: `calc(${splitRatioH * 100}% - 3px)` }}
+                className={`h-full min-h-0 relative ${activePaneId === 'pane-1' ? 'ring-1 ring-white/40 z-10' : ''}`}
+                onClick={() => handleSelectPane('pane-1')}
+              >
+                <TradingChart
+                  paneId="pane-1"
+                  symbolOverride={syncSymbol ? globalSymbol : p1.symbol}
+                  timeframeOverride={p1.timeframe}
+                />
+              </div>
+              <Splitter dir="v" onDrag={handleDragH} />
+              <div
+                style={{ width: `calc(${(1 - splitRatioH) * 100}% - 3px)` }}
+                className={`h-full min-h-0 relative ${activePaneId === 'pane-2' ? 'ring-1 ring-white/40 z-10' : ''}`}
+                onClick={() => handleSelectPane('pane-2')}
+              >
+                <TradingChart
+                  paneId="pane-2"
+                  symbolOverride={syncSymbol ? globalSymbol : p2.symbol}
+                  timeframeOverride={p2.timeframe}
+                />
+              </div>
             </div>
-            <div
-              className={`h-full min-h-0 relative ${activePaneId === 'pane-2' ? 'ring-1 ring-white/40 z-10' : ''}`}
-              onClick={() => setActivePaneId('pane-2')}
-            >
-              <TradingChart
-                paneId="pane-2"
-                symbolOverride={syncSymbol ? globalSymbol : p2.symbol}
-                timeframeOverride={p2.timeframe}
-              />
-            </div>
-            <div
-              className={`h-full min-h-0 relative ${activePaneId === 'pane-3' ? 'ring-1 ring-white/40 z-10' : ''}`}
-              onClick={() => setActivePaneId('pane-3')}
-            >
-              <TradingChart
-                paneId="pane-3"
-                symbolOverride={syncSymbol ? globalSymbol : p3.symbol}
-                timeframeOverride={p3.timeframe}
-              />
-            </div>
-            <div
-              className={`h-full min-h-0 relative ${activePaneId === 'pane-4' ? 'ring-1 ring-white/40 z-10' : ''}`}
-              onClick={() => setActivePaneId('pane-4')}
-            >
-              <TradingChart
-                paneId="pane-4"
-                symbolOverride={syncSymbol ? globalSymbol : p4.symbol}
-                timeframeOverride={p4.timeframe}
-              />
+
+            {/* Horizontal Splitter */}
+            <Splitter dir="h" onDrag={handleDragV} />
+
+            {/* Bottom Row */}
+            <div style={{ height: `calc(${(1 - splitRatioV) * 100}% - 3px)` }} className="flex w-full min-h-0 overflow-hidden">
+              <div
+                style={{ width: `calc(${splitRatioH * 100}% - 3px)` }}
+                className={`h-full min-h-0 relative ${activePaneId === 'pane-3' ? 'ring-1 ring-white/40 z-10' : ''}`}
+                onClick={() => handleSelectPane('pane-3')}
+              >
+                <TradingChart
+                  paneId="pane-3"
+                  symbolOverride={syncSymbol ? globalSymbol : p3.symbol}
+                  timeframeOverride={p3.timeframe}
+                />
+              </div>
+              <Splitter dir="v" onDrag={handleDragH} />
+              <div
+                style={{ width: `calc(${(1 - splitRatioH) * 100}% - 3px)` }}
+                className={`h-full min-h-0 relative ${activePaneId === 'pane-4' ? 'ring-1 ring-white/40 z-10' : ''}`}
+                onClick={() => handleSelectPane('pane-4')}
+              >
+                <TradingChart
+                  paneId="pane-4"
+                  symbolOverride={syncSymbol ? globalSymbol : p4.symbol}
+                  timeframeOverride={p4.timeframe}
+                />
+              </div>
             </div>
           </div>
         )}

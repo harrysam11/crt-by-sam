@@ -21,6 +21,8 @@ interface ChartTradingOverlayProps {
   symbol: string;
   seriesApi: ISeriesApi<SeriesType> | null;
   chartApi?: IChartApi | null;
+  showPositions?: boolean;
+  showOrders?: boolean;
 }
 
 type DragTarget =
@@ -30,7 +32,13 @@ type DragTarget =
   | { type: 'TP'; symbol: string; initialPrice: number }
   | { type: 'POSITION_DRAG'; symbol: string; isLong: boolean; entryPrice: number };
 
-export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: ChartTradingOverlayProps) {
+export default function ChartTradingOverlay({
+  symbol,
+  seriesApi,
+  chartApi,
+  showPositions = true,
+  showOrders = true,
+}: ChartTradingOverlayProps) {
   const currentPrice = useTerminalStore((s) => s.prices[symbol] ?? (s.symbol === symbol ? s.currentPrice : 0));
   const position = useTerminalStore((s) => s.positions[symbol]);
   const orders = useTerminalStore((s) => s.orders.filter((o) => o.status === 'PENDING' && o.symbol === symbol));
@@ -207,7 +215,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
       </div>
 
       {/* 2. Active Position Line & Action Pill */}
-      {position && (() => {
+      {showPositions && position && (() => {
         const y = seriesApi.priceToCoordinate(position.entryPrice);
         if (y === null || !Number.isFinite(y)) return null;
 
@@ -223,9 +231,11 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
             onMouseEnter={() => setIsPosHovered(true)}
             onMouseLeave={() => setIsPosHovered(false)}
           >
-            {/* Position Horizontal Line */}
+            {/* Position Subtle Guideline (non-intrusive dashed line, unobtrusive for chart analysis) */}
             <div
-              className="h-[1px] flex-1 border-t border-solid"
+              className={`h-[1px] flex-1 border-t border-dashed transition-opacity duration-200 ${
+                isPosHovered ? 'opacity-75' : 'opacity-25'
+              }`}
               style={{ borderColor: color }}
             />
 
@@ -511,7 +521,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
       })()}
 
       {/* 3. Stop Loss (SL) Order Line (Draggable) */}
-      {slOrder && (() => {
+      {showOrders && slOrder && (() => {
         const displayPrice =
           dragTarget?.type === 'SL' && dragCurrentPrice !== null
             ? dragCurrentPrice
@@ -529,7 +539,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
             style={{ top: `${y}px`, right: `${priceScaleWidth}px` }}
             className="absolute left-0 flex items-center"
           >
-            <div className={`h-[1px] flex-1 border-t ${isDragging ? 'border-solid border-red-400' : 'border-dashed border-red-500'}`} />
+            <div className={`h-[1px] flex-1 border-t ${isDragging ? 'border-solid border-red-400' : 'border-dashed border-red-500/40'}`} />
             
             {/* Live Drag Risk Floating Badge */}
             {isDragging && (
@@ -572,7 +582,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
       })()}
 
       {/* 4. Take Profit (TP) Order Line (Draggable) */}
-      {tpOrder && (() => {
+      {showOrders && tpOrder && (() => {
         const displayPrice =
           dragTarget?.type === 'TP' && dragCurrentPrice !== null
             ? dragCurrentPrice
@@ -590,7 +600,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
             style={{ top: `${y}px`, right: `${priceScaleWidth}px` }}
             className="absolute left-0 flex items-center"
           >
-            <div className={`h-[1px] flex-1 border-t ${isDragging ? 'border-solid border-emerald-400' : 'border-dashed border-emerald-500'}`} />
+            <div className={`h-[1px] flex-1 border-t ${isDragging ? 'border-solid border-emerald-400' : 'border-dashed border-emerald-500/40'}`} />
             
             {/* Live Drag Reward Floating Badge */}
             {isDragging && (
@@ -633,7 +643,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
       })()}
 
       {/* 5. Pending Limit & Stop Orders (Draggable) */}
-      {otherOrders.map((o) => {
+      {showOrders && otherOrders.map((o) => {
         const isDragging = dragTarget?.type === 'ORDER' && dragTarget.id === o.id;
         const displayPrice = isDragging && dragCurrentPrice !== null ? dragCurrentPrice : o.price;
         const y = seriesApi.priceToCoordinate(displayPrice);
@@ -649,7 +659,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
             className="absolute left-0 flex items-center"
           >
             <div
-              className={`h-[1px] flex-1 border-t ${isDragging ? 'border-solid' : 'border-dashed'}`}
+              className={`h-[1px] flex-1 border-t ${isDragging ? 'border-solid' : 'border-dashed opacity-40'}`}
               style={{ borderColor: color }}
             />
             <div

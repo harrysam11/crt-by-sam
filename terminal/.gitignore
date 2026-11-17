@@ -32,3 +32,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Mobile App Native Build Caches
+terminal/android/.gradle
+terminal/android/build
+terminal/android/app/build
+terminal/android/.idea
+terminal/android/local.properties
+terminal/ios/DerivedData
+terminal/ios/Pods
+terminal/ios/App/App/public
+terminal/android/app/src/main/assets/public

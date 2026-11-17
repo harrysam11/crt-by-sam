@@ -142,6 +142,13 @@ export default function CommandPaletteModal({ isOpen, onClose, onOpenModal }: Co
         category: 'NAVIGATION',
         action: () => onOpenModal('SESSIONS'),
       },
+      {
+        id: 'nav-download',
+        title: 'Download App for iOS, Android & Desktop',
+        subtitle: 'Install standalone PWA or build native Capacitor Xcode / Android Studio app',
+        category: 'NAVIGATION',
+        action: () => onOpenModal('DOWNLOAD'),
+      },
 
       // Layout Controls
       {

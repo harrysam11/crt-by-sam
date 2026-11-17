@@ -34,6 +34,7 @@ import LandingPage from './components/landing/LandingPage';
 import CommandPaletteModal from './components/common/CommandPaletteModal';
 import MacroNewsPanel from './components/news/MacroNewsPanel';
 import LayoutCustomizerModal from './components/Layout/LayoutCustomizerModal';
+import AppDownloadModal from './components/landing/AppDownloadModal';
 import { useMarketFeed } from './hooks/useMarketFeed';
 import { useKeyboardHotkeys } from './hooks/useKeyboardHotkeys';
 import { useTerminalStore } from './store/useTerminalStore';
@@ -136,6 +137,7 @@ export default function App() {
   const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isLayoutCustomizerOpen, setIsLayoutCustomizerOpen] = useState(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   // View Mode: TERMINAL or LANDING showcase
   const [viewMode, setViewMode] = useState<'TERMINAL' | 'LANDING'>(() => {
@@ -179,6 +181,7 @@ export default function App() {
       case 'CALENDAR': setIsCalendarOpen(true); break;
       case 'SESSIONS': setIsSessionManagerOpen(true); break;
       case 'LAYOUT_CUSTOMIZER': setIsLayoutCustomizerOpen(true); break;
+      case 'DOWNLOAD': setIsDownloadModalOpen(true); break;
       default: break;
     }
   };
@@ -358,6 +361,12 @@ export default function App() {
       <LayoutCustomizerModal
         isOpen={isLayoutCustomizerOpen}
         onClose={() => setIsLayoutCustomizerOpen(false)}
+      />
+
+      {/* iOS, Android & Desktop Download App Modal */}
+      <AppDownloadModal
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
       />
 
       {/* Global Terminal Header */}

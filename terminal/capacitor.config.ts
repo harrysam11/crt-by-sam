@@ -1,0 +1,31 @@
+import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'com.crtbysam.terminal',
+  appName: 'CRT Terminal',
+  webDir: 'dist',
+  bundledWebRuntime: false,
+  server: {
+    androidScheme: 'https',
+    cleartext: true,
+    allowNavigation: [
+      'localhost',
+      '127.0.0.1',
+      '*.binance.com',
+      '*.faireconomy.media',
+      '*.yahoo.com'
+    ]
+  },
+  android: {
+    allowMixedContent: true,
+    captureInput: true,
+    webContentsDebuggingEnabled: false
+  },
+  ios: {
+    contentInset: 'always',
+    preferredContentMode: 'mobile',
+    scheme: 'CRT Terminal'
+  }
+};
+
+export default config;

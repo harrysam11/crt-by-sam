@@ -53,7 +53,7 @@ export const DEFAULT_CHART_SETTINGS: ChartSettingsState = {
   showHighLowLines: false,
   showOhlcValues: true,
   showBarChangePercent: true,
-  showVolumeMetric: true,
+  showVolumeMetric: false,
   priceScalePosition: 'right',
   showCountdownTimer: true,
   topMarginPercent: 8,

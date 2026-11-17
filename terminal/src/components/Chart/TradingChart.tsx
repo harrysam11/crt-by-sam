@@ -129,6 +129,9 @@ export default function TradingChart({
   const setPaneTimeframe = useLayoutStore((s) => s.setPaneTimeframe);
   const themeMode = useLayoutStore((s) => s.themeMode);
   const toggleThemeMode = useLayoutStore((s) => s.toggleThemeMode);
+  const layout = useLayoutStore((s) => s.layout);
+  const isMultiChart = layout !== '1x1';
+  const isCurrentPaneActive = !paneId || paneId === activePaneId;
 
   // Independent candle fetching for secondary / overridden panes
   const isIndependentPane = Boolean(symbolOverride || timeframeOverride);
@@ -284,7 +287,7 @@ export default function TradingChart({
   const [scaleMode, setScaleMode] = useState<PriceScaleType>('NORMAL');
   const [timezone, setTimezone] = useState<ChartTimezone>('UTC');
   const [showVolumeProfile, setShowVolumeProfile] = useState(false);
-  const [showVolume, setShowVolume] = useState(true);
+  const [showVolume, setShowVolume] = useState(false);
   const [isSymbolSearchOpen, setIsSymbolSearchOpen] = useState(false);
   const [externalLineTrigger, setExternalLineTrigger] = useState<{ price: number; type: 'LINE' | 'RAY' } | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<ChartContextMenuPos | null>(null);
@@ -1131,6 +1134,7 @@ export default function TradingChart({
           chartSyncBus.emitCrosshair({
             sourcePaneId: paneId,
             time: p.time as number,
+            price: d.close,
           });
         }
         writeOhlc({ open: d.open, high: d.high, low: d.low, close: d.close, volume: v?.value });
@@ -1142,6 +1146,15 @@ export default function TradingChart({
           rsi: rVal?.value ?? null,
           oi: oVal?.value ?? null,
         });
+      } else {
+        // Clear crosshair on other charts when mouse leaves candles
+        if (hovering.current) {
+          chartSyncBus.emitCrosshair({
+            sourcePaneId: paneId,
+            time: null,
+            price: null,
+          });
+        }
       }
     });
 
@@ -1159,6 +1172,18 @@ export default function TradingChart({
 
     const offCrosshair = chartSyncBus.subscribeCrosshair((e) => {
       if (e.sourcePaneId === paneId || !useLayoutStore.getState().syncCrosshair) return;
+      if (!e.time) {
+        try {
+          chart.clearCrosshairPosition();
+        } catch {}
+      } else {
+        try {
+          const targetSeries = cs || lineSeries || areaSeries || barSeries;
+          if (targetSeries) {
+            chart.setCrosshairPosition(e.price ?? 0, e.time as any, targetSeries);
+          }
+        } catch {}
+      }
     });
 
     const offRange = chartSyncBus.subscribeRange((e) => {
@@ -2790,26 +2815,28 @@ export default function TradingChart({
 
       {/* Chart Center Area: Docked Left Rail + Canvas */}
       <div className="relative flex flex-1 min-h-0 w-full overflow-hidden">
-        {/* Docked Left Drawing Rail */}
-        <DrawingToolbar
-          activeTool={activeTool}
-          onSelectTool={setActiveTool}
-          onClearAll={() => setClearDrawingTrigger(Date.now())}
-          drawingsCount={drawingsCount}
-          magnetConfig={magnetConfig}
-          onToggleMagnet={() =>
-            setMagnetConfig((prev) => ({
-              ...prev,
-              enabled: !prev.enabled,
-              mode: prev.mode === 'WEAK' ? 'STRONG' : 'WEAK',
-            }))
-          }
-          isLockedAll={isLockedAll}
-          onToggleLockAll={() => setIsLockedAll((v) => !v)}
-          isHiddenAll={isHiddenAll}
-          onToggleHideAll={() => setIsHiddenAll((v) => !v)}
-          onOpenObjectTree={() => setIsObjectTreeOpen(true)}
-        />
+        {/* Docked Left Drawing Rail (only on active pane in multi-chart grid) */}
+        {(!isMultiChart || isCurrentPaneActive) && (
+          <DrawingToolbar
+            activeTool={activeTool}
+            onSelectTool={setActiveTool}
+            onClearAll={() => setClearDrawingTrigger(Date.now())}
+            drawingsCount={drawingsCount}
+            magnetConfig={magnetConfig}
+            onToggleMagnet={() =>
+              setMagnetConfig((prev) => ({
+                ...prev,
+                enabled: !prev.enabled,
+                mode: prev.mode === 'WEAK' ? 'STRONG' : 'WEAK',
+              }))
+            }
+            isLockedAll={isLockedAll}
+            onToggleLockAll={() => setIsLockedAll((v) => !v)}
+            isHiddenAll={isHiddenAll}
+            onToggleHideAll={() => setIsHiddenAll((v) => !v)}
+            onOpenObjectTree={() => setIsObjectTreeOpen(true)}
+          />
+        )}
 
         {/* Main Chart Canvas & Overlays Container */}
         <div className="relative min-h-0 flex-1 h-full overflow-hidden flex flex-col">
@@ -3045,6 +3072,8 @@ export default function TradingChart({
             symbol={symbol}
             seriesApi={seriesApi}
             chartApi={chartApi}
+            showPositions={chartSettings.showPositionsOnChart}
+            showOrders={chartSettings.showOrdersOnChart}
           />
 
           {/* Risk Sizing HUD Widget */}

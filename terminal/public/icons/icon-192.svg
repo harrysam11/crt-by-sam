@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0e17"/>
+      <stop offset="100%" stop-color="#040508"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0.05"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <rect width="508" height="508" x="2" y="2" rx="110" fill="none" stroke="url(#accentGrad)" stroke-width="4" stroke-opacity="0.4"/>
+
+  <!-- Candlestick chart watermark behind -->
+  <g opacity="0.18">
+    <line x1="120" y1="180" x2="120" y2="340" stroke="#38bdf8" stroke-width="4"/>
+    <rect x="108" y="210" width="24" height="90" rx="4" fill="#38bdf8"/>
+
+    <line x1="180" y1="140" x2="180" y2="380" stroke="#10b981" stroke-width="4"/>
+    <rect x="168" y="170" width="24" height="150" rx="4" fill="#10b981"/>
+
+    <line x1="332" y1="160" x2="332" y2="360" stroke="#f43f5e" stroke-width="4"/>
+    <rect x="320" y="200" width="24" height="120" rx="4" fill="#f43f5e"/>
+
+    <line x1="392" y1="190" x2="392" y2="330" stroke="#38bdf8" stroke-width="4"/>
+    <rect x="380" y="220" width="24" height="70" rx="4" fill="#38bdf8"/>
+  </g>
+
+  <!-- Protective TradeXGuardian Shield -->
+  <path d="M256 96 L376 148 V276 C376 348 324 404 256 428 C188 404 136 348 136 276 V148 Z" 
+        fill="url(#shieldGrad)" 
+        stroke="url(#accentGrad)" 
+        stroke-width="8" 
+        stroke-linejoin="round"/>
+
+  <!-- CRT Terminal Monogram / Core Geometry -->
+  <path d="M220 200 C190 200 176 222 176 256 C176 290 190 312 220 312 C236 312 248 304 254 292" 
+        fill="none" 
+        stroke="#ffffff" 
+        stroke-width="16" 
+        stroke-linecap="round"/>
+
+  <path d="M256 220 V292 M256 220 H304 M280 256 H256" 
+        fill="none" 
+        stroke="#38bdf8" 
+        stroke-width="14" 
+        stroke-linecap="round"/>
+
+  <!-- Pulse Lock Indicator -->
+  <circle cx="256" cy="356" r="10" fill="#10b981"/>
+</svg>

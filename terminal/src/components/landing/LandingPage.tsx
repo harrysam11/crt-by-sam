@@ -17,6 +17,7 @@ import { usePsychologyStore } from '../../store/usePsychologyStore';
 import { useLayoutStore } from '../../store/useLayoutStore';
 import { fmtPrice, fmtPct, fmtUsd } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
+import AppDownloadModal from './AppDownloadModal';
 
 interface LandingPageProps {
   onLaunchTerminal: (symbol?: string) => void;
@@ -33,6 +34,8 @@ export default function LandingPage({
   const toggleThemeMode = useLayoutStore((s) => s.toggleThemeMode);
   const watchlist = useTerminalStore((s) => s.watchlist);
   const quotes = useTerminalStore((s) => s.quotes);
+
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   // Prop Firm Challenge Calculator State (Live & Real)
   const [accountSize, setAccountSize] = useState<number>(50000);
@@ -165,6 +168,19 @@ export default function LandingPage({
         </div>
 
         <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setIsDownloadModalOpen(true);
+            }}
+            className="clay-btn px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5"
+            title="Download App for iOS, Android, and Desktop"
+          >
+            <svg className="h-3.5 w-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span className="hidden sm:inline">Download App</span>
+          </button>
           {onOpenGuardian && (
             <button
               onClick={() => {
@@ -198,14 +214,14 @@ export default function LandingPage({
           <span>No Automated Bots • Zero Signals • Pure Capital Protection</span>
         </div>
 
-        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight max-w-4xl leading-tight">
+        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight max-w-4xl leading-tight font-heading">
           You decide how to trade. <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-teal-300 to-emerald-400">
             TradeXGuardian controls the discipline.
           </span>
         </h1>
 
-        <p className="mt-6 text-sm sm:text-base text-slate-400 max-w-2xl leading-relaxed">
+        <p className="mt-6 text-sm sm:text-base text-slate-400 max-w-2xl leading-relaxed font-sans">
           The institutional prevention-only trading system that sits between you and the market.
           Blocks revenge-trading, overleveraging, and daily drawdown breaches before an order ever reaches your broker.
         </p>
@@ -216,12 +232,25 @@ export default function LandingPage({
               audioHaptics.tick();
               onLaunchTerminal();
             }}
-            className="clay-btn-active px-6 py-2.5 text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-xl"
+            className="clay-btn-active px-6 py-2.5 text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-xl font-heading"
           >
             <span>Enter Live Terminal</span>
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
+          </button>
+
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setIsDownloadModalOpen(true);
+            }}
+            className="clay-btn px-5 py-2.5 text-sm font-semibold text-accent hover:text-white transition flex items-center gap-2"
+          >
+            <svg className="h-4 w-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            <span>Download for iOS &amp; Android</span>
           </button>
 
           <a
@@ -665,24 +694,113 @@ export default function LandingPage({
         </div>
       </section>
 
+      {/* Download Native App for iOS & Android Section */}
+      <section id="download" className="border-t border-grid bg-white/[0.01] px-6 py-16">
+        <div className="max-w-5xl mx-auto w-full text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-accent/30 bg-accent/10 text-accent text-xs font-semibold">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+            <span>Cross-Platform Standalone Software</span>
+          </div>
+
+          <h2 className="text-2xl sm:text-4xl font-extrabold text-white font-heading">
+            Trade with Zero Latency on Any Device
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto font-sans leading-relaxed">
+            Install CRT Terminal directly on your iPhone, iPad, Android phone, tablet, or desktop.
+            Standalone full-screen execution with offline caching, local data persistence, and zero app store delays.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 text-left">
+            {/* iOS */}
+            <div className="clay-panel p-5 rounded-2xl border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-white font-heading">Apple iOS &amp; iPadOS</span>
+                <span className="text-[10px] font-bold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">Safari PWA</span>
+              </div>
+              <p className="text-xs text-slate-300 font-sans leading-relaxed">
+                Add to your home screen with 1 tap. Runs in isolated full-screen standalone mode without URL bars.
+              </p>
+              <button
+                onClick={() => {
+                  audioHaptics.tick();
+                  setIsDownloadModalOpen(true);
+                }}
+                className="w-full clay-btn py-2 text-xs font-bold text-white hover:text-sky-300 transition"
+              >
+                View iOS Install Guide
+              </button>
+            </div>
+
+            {/* Android */}
+            <div className="clay-panel p-5 rounded-2xl border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-white font-heading">Google Android</span>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Direct Install</span>
+              </div>
+              <p className="text-xs text-slate-300 font-sans leading-relaxed">
+                Install as a standalone Android app with offline shell support and high-performance WebGL chart acceleration.
+              </p>
+              <button
+                onClick={() => {
+                  audioHaptics.tick();
+                  setIsDownloadModalOpen(true);
+                }}
+                className="w-full clay-btn py-2 text-xs font-bold text-white hover:text-emerald-300 transition"
+              >
+                Install on Android
+              </button>
+            </div>
+
+            {/* Native Capacitor Project */}
+            <div className="clay-panel p-5 rounded-2xl border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-white font-heading">Native Capacitor Projects</span>
+                <span className="text-[10px] font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">Xcode / Gradle</span>
+              </div>
+              <p className="text-xs text-slate-300 font-sans leading-relaxed">
+                Full native Xcode and Android Studio projects included in the repository. Ready to compile into signed binaries.
+              </p>
+              <button
+                onClick={() => {
+                  audioHaptics.tick();
+                  setIsDownloadModalOpen(true);
+                }}
+                className="w-full clay-btn py-2 text-xs font-bold text-white hover:text-purple-300 transition"
+              >
+                Compile Native APK / IPA
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Institutional Footer */}
       <footer className="border-t border-grid bg-panel px-6 py-10 mt-auto">
         <div className="max-w-6xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-6 text-xs text-muted">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-white">CRT TERMINAL & TRADEXGUARDIAN</span>
-              <span className="px-1.5 py-0.2 rounded bg-white/10 text-white text-[10px]">PRODUCTION READY</span>
+              <span className="font-bold text-white font-heading">CRT TERMINAL &amp; TRADEXGUARDIAN</span>
+              <span className="px-1.5 py-0.2 rounded bg-white/10 text-white text-[10px] font-mono">PRODUCTION READY</span>
             </div>
-            <p className="mt-1 text-[11px]">Designed for professional traders, prop firm challengers, and institutional execution.</p>
+            <p className="mt-1 text-[11px] font-sans">Designed for professional traders, prop firm challengers, and institutional execution.</p>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setIsDownloadModalOpen(true);
+              }}
+              className="clay-btn px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white transition"
+            >
+              Download App
+            </button>
             <button
               onClick={() => {
                 audioHaptics.tick();
                 onLaunchTerminal();
               }}
-              className="clay-btn-active px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              className="clay-btn-active px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer font-heading"
             >
               <span>Launch Terminal</span>
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -692,6 +810,12 @@ export default function LandingPage({
           </div>
         </div>
       </footer>
+
+      {/* Download and Installation Modal */}
+      <AppDownloadModal
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
+      />
     </div>
   );
 }

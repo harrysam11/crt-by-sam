@@ -122,6 +122,11 @@ interface LayoutState {
   toggleChartMaximized: () => void;
   setThemeMode: (mode: ThemeMode) => void;
   toggleThemeMode: () => void;
+  splitRatioH: number;
+  splitRatioV: number;
+  setSplitRatioH: (ratio: number) => void;
+  setSplitRatioV: (ratio: number) => void;
+  resetSplitRatios: () => void;
   saveCurrentLayout: (name: string) => string;
   loadLayout: (id: string) => void;
   deleteLayout: (id: string) => void;
@@ -142,6 +147,12 @@ export const useLayoutStore = create<LayoutState>()(
       themeMode: (localStorage.getItem('crt_theme_mode') as ThemeMode) || 'DARK',
       savedLayouts: DEFAULT_TEMPLATES,
       activeLayoutId: null,
+      splitRatioH: 0.5,
+      splitRatioV: 0.5,
+
+      setSplitRatioH: (splitRatioH) => set({ splitRatioH }),
+      setSplitRatioV: (splitRatioV) => set({ splitRatioV }),
+      resetSplitRatios: () => set({ splitRatioH: 0.5, splitRatioV: 0.5 }),
 
       setLayout: (layout) => set({ layout }),
 
@@ -308,6 +319,8 @@ export const useLayoutStore = create<LayoutState>()(
         themeMode: s.themeMode,
         savedLayouts: s.savedLayouts,
         activeLayoutId: s.activeLayoutId,
+        splitRatioH: s.splitRatioH,
+        splitRatioV: s.splitRatioV,
       }),
     }
   )
