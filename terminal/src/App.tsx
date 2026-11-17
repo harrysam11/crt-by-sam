@@ -33,6 +33,7 @@ import PortfolioDashboardModal from './components/portfolio/PortfolioDashboardMo
 import LandingPage from './components/landing/LandingPage';
 import CommandPaletteModal from './components/common/CommandPaletteModal';
 import MacroNewsPanel from './components/news/MacroNewsPanel';
+import LayoutCustomizerModal from './components/Layout/LayoutCustomizerModal';
 import { useMarketFeed } from './hooks/useMarketFeed';
 import { useKeyboardHotkeys } from './hooks/useKeyboardHotkeys';
 import { useTerminalStore } from './store/useTerminalStore';
@@ -134,6 +135,7 @@ export default function App() {
   const [isGuardianOpen, setIsGuardianOpen] = useState(false);
   const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isLayoutCustomizerOpen, setIsLayoutCustomizerOpen] = useState(false);
 
   // View Mode: TERMINAL or LANDING showcase
   const [viewMode, setViewMode] = useState<'TERMINAL' | 'LANDING'>(() => {
@@ -176,19 +178,22 @@ export default function App() {
       case 'SCREENER': setIsScreenerOpen(true); break;
       case 'CALENDAR': setIsCalendarOpen(true); break;
       case 'SESSIONS': setIsSessionManagerOpen(true); break;
+      case 'LAYOUT_CUSTOMIZER': setIsLayoutCustomizerOpen(true); break;
       default: break;
     }
   };
 
-  // Global window openers for Screener, Calendar, and Portfolio
+  // Global window openers for Screener, Calendar, Portfolio, and Layout Customizer
   useEffect(() => {
     (window as any).__openScreener = () => setIsScreenerOpen(true);
     (window as any).__openCalendar = () => setIsCalendarOpen(true);
     (window as any).__openPortfolio = () => setIsPortfolioOpen(true);
+    (window as any).__openLayoutCustomizer = () => setIsLayoutCustomizerOpen(true);
     return () => {
       delete (window as any).__openScreener;
       delete (window as any).__openCalendar;
       delete (window as any).__openPortfolio;
+      delete (window as any).__openLayoutCustomizer;
     };
   }, []);
 
@@ -349,6 +354,12 @@ export default function App() {
         onOpenModal={handleOpenModalByName}
       />
 
+      {/* Multi-Chart Workspace & Panes Customizer Modal */}
+      <LayoutCustomizerModal
+        isOpen={isLayoutCustomizerOpen}
+        onClose={() => setIsLayoutCustomizerOpen(false)}
+      />
+
       {/* Global Terminal Header */}
       {!isChartMaximized && (
         <Header
@@ -373,6 +384,7 @@ export default function App() {
           isPopoutActive={isPopoutOpen}
           onOpenLanding={() => setViewMode('LANDING')}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          onOpenLayoutCustomizer={() => setIsLayoutCustomizerOpen(true)}
         />
       )}
 

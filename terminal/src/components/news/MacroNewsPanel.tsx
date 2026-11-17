@@ -167,12 +167,13 @@ export default function MacroNewsPanel() {
           {/* Refresh button */}
           <button
             onClick={handleManualRefresh}
-            className="p-1 rounded text-muted hover:text-white transition"
-            title={`Refresh - last updated ${relativeTime(lastRefreshed)}`}
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition"
+            title={`Manual Refresh - last updated ${relativeTime(lastRefreshed)}`}
           >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <svg className={`h-3 w-3 text-accent ${isLoadingCalendar ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
+            <span className="hidden sm:inline">Refresh</span>
           </button>
           {/* Close button */}
           <button

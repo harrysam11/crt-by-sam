@@ -38,6 +38,7 @@ interface HeaderProps {
   onToggleMode?: () => void;
   onOpenLanding?: () => void;
   onOpenCommandPalette?: () => void;
+  onOpenLayoutCustomizer?: () => void;
 }
 
 export default function Header({
@@ -59,6 +60,7 @@ export default function Header({
   isPopoutActive,
   onOpenLanding,
   onOpenCommandPalette,
+  onOpenLayoutCustomizer,
 }: HeaderProps) {
   const symbol = useTerminalStore((s) => s.symbol);
   const price = useTerminalStore((s) => s.currentPrice);
@@ -553,14 +555,14 @@ export default function Header({
               audioHaptics.tick();
               onOpenCommandPalette?.();
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg bg-black/40 hover:bg-black/70 border border-white/10 text-slate-300 hover:text-white transition shadow-sm font-sans"
+            className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 text-xs rounded-lg bg-black/40 hover:bg-black/70 border border-white/10 text-slate-300 hover:text-white transition shadow-sm font-sans"
             title="Search all features, tools, pairs, and layouts (Ctrl+K)"
           >
             <svg className="h-3.5 w-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <span className="hidden xl:inline text-[11px] text-slate-400">Search tools...</span>
-            <kbd className="rounded border border-white/10 bg-white/5 px-1 py-0.2 text-[9px] font-mono text-muted">Ctrl+K</kbd>
+            <span className="hidden 2xl:inline text-[11px] text-slate-400">Search tools...</span>
+            <kbd className="hidden sm:inline-block rounded border border-white/10 bg-white/5 px-1 py-0.2 text-[9px] font-mono text-muted">Ctrl+K</kbd>
           </button>
 
           {/* Institutional Suite Dropdown */}
@@ -758,30 +760,70 @@ export default function Header({
             )}
           </div>
 
-          {/* Multi-Chart Layout Dropdown (TradingView-Grade) */}
+          {/* Multi-Chart Layout Dropdown (TradingView-Grade Icon-Only) */}
           <div className="relative flex items-center" ref={layoutRef}>
             <button
               onClick={() => {
                 audioHaptics.tick();
                 setIsLayoutOpen((v) => !v);
               }}
-              className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 text-xs font-semibold transition ${
+              className={`flex items-center justify-center p-1.5 sm:px-2 py-1 text-xs font-semibold rounded-lg transition ${
                 isLayoutOpen || layout !== '1x1' ? 'clay-btn-active' : 'clay-btn'
               }`}
-              title="Multi-Chart Layouts & Workspace Customization"
+              title={`Layout: ${layout} - Click to switch or customize workspace`}
             >
-              <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+              <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                {layout === '1x1' && (
+                  <rect x="3" y="3" width="18" height="18" rx="2" strokeWidth={2} />
+                )}
+                {layout === '1x2' && (
+                  <>
+                    <rect x="3" y="3" width="8" height="18" rx="1.5" strokeWidth={2} />
+                    <rect x="13" y="3" width="8" height="18" rx="1.5" strokeWidth={2} />
+                  </>
+                )}
+                {layout === '2x1' && (
+                  <>
+                    <rect x="3" y="3" width="18" height="8" rx="1.5" strokeWidth={2} />
+                    <rect x="3" y="13" width="18" height="8" rx="1.5" strokeWidth={2} />
+                  </>
+                )}
+                {layout === '2x2' && (
+                  <>
+                    <rect x="3" y="3" width="8" height="8" rx="1" strokeWidth={2} />
+                    <rect x="13" y="3" width="8" height="8" rx="1" strokeWidth={2} />
+                    <rect x="3" y="13" width="8" height="8" rx="1" strokeWidth={2} />
+                    <rect x="13" y="13" width="8" height="8" rx="1" strokeWidth={2} />
+                  </>
+                )}
               </svg>
-              <span className="hidden sm:inline">Layout:</span>
-              <span>{layout}</span>
-              <svg className={`h-3 w-3 text-slate-400 transition-transform ${isLayoutOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              {layout !== '1x1' && (
+                <span className="ml-1 text-[9px] font-mono font-bold text-accent hidden sm:inline">{layout}</span>
+              )}
             </button>
 
             {isLayoutOpen && (
               <div className="absolute right-0 top-full mt-2 z-50 w-80 clay-popover p-3 shadow-2xl select-none font-mono text-xs space-y-3">
+                {/* Customize Layout / Panes Freedom Action */}
+                {onOpenLayoutCustomizer && (
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      setIsLayoutOpen(false);
+                      onOpenLayoutCustomizer();
+                    }}
+                    className="flex w-full items-center justify-between p-2.5 rounded-xl bg-accent/20 hover:bg-accent/30 border border-accent/40 text-white font-bold text-xs transition group shadow-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <svg className="h-4 w-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      <span className="font-heading">Customize Layout &amp; Panes</span>
+                    </div>
+                    <span className="text-[10px] text-accent group-hover:translate-x-0.5 transition-transform font-mono">Edit &gt;</span>
+                  </button>
+                )}
+
                 {/* Grid Pickers */}
                 <div>
                   <span className="text-[10px] uppercase font-bold text-muted block mb-1.5">

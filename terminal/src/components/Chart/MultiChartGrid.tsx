@@ -339,6 +339,19 @@ export default function MultiChartGrid() {
                   {layout === item.id && <span className="text-[10px] font-bold">*</span>}
                 </button>
               ))}
+              <div className="border-t border-grid pt-1 mt-1">
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    setIsLayoutMenuOpen(false);
+                    (window as any).__openLayoutCustomizer?.();
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 text-left transition text-[11px] rounded-lg bg-accent/20 hover:bg-accent/30 border border-accent/40 text-white font-bold"
+                >
+                  <span>Customize Panes</span>
+                  <span className="text-[10px] text-accent font-mono">&gt;</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

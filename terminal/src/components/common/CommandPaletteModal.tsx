@@ -145,6 +145,13 @@ export default function CommandPaletteModal({ isOpen, onClose, onOpenModal }: Co
 
       // Layout Controls
       {
+        id: 'layout-customizer',
+        title: 'Customize Layout & Panes (Pairs & Timeframes)',
+        subtitle: 'Configure grid, custom symbol and timeframe per pane, sync settings',
+        category: 'LAYOUT',
+        action: () => onOpenModal('LAYOUT_CUSTOMIZER'),
+      },
+      {
         id: 'layout-1x1',
         title: 'Layout: 1x1 Single Chart View',
         subtitle: 'Maximize workspace to one chart',
