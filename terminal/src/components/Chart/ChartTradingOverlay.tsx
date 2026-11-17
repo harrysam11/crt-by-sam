@@ -80,12 +80,33 @@ export default function ChartTradingOverlay({
   const [isPosActionsOpen, setIsPosActionsOpen] = useState(false);
   const [isPosHovered, setIsPosHovered] = useState(false);
 
-  // Mouse drag tracking listener
+  // Horizontal position badge movable offset state
+  const [badgeRightOffset, setBadgeRightOffset] = useState<number>(() => {
+    try {
+      const stored = localStorage.getItem('crt_pos_badge_offset');
+      return stored ? Math.max(0, parseInt(stored, 10) || 0) : 0;
+    } catch {
+      return 0;
+    }
+  });
+  const [isDraggingBadgeX, setIsDraggingBadgeX] = useState(false);
+  const dragStartXRef = useRef<{ startX: number; initialRight: number } | null>(null);
+
+  // Mouse drag tracking listener (vertical for TP/SL/orders, horizontal for badge positioning)
   useEffect(() => {
-    if (!dragTarget || !seriesApi || !containerRef.current) return;
+    if (!dragTarget && !isDraggingBadgeX) return;
 
     const onMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current || !seriesApi) return;
+      // Horizontal badge dragging along the price line
+      if (isDraggingBadgeX && dragStartXRef.current) {
+        const deltaX = dragStartXRef.current.startX - e.clientX;
+        const maxOffset = Math.max(0, (containerRef.current?.clientWidth || 800) - 260);
+        const newRight = Math.max(0, Math.min(maxOffset, dragStartXRef.current.initialRight + deltaX));
+        setBadgeRightOffset(newRight);
+        return;
+      }
+
+      if (!containerRef.current || !seriesApi || !dragTarget) return;
       const rect = containerRef.current.getBoundingClientRect();
       const relativeY = e.clientY - rect.top;
       const price = seriesApi.coordinateToPrice(relativeY);
@@ -95,6 +116,16 @@ export default function ChartTradingOverlay({
     };
 
     const onMouseUp = () => {
+      if (isDraggingBadgeX) {
+        setIsDraggingBadgeX(false);
+        if (dragStartXRef.current) {
+          try {
+            localStorage.setItem('crt_pos_badge_offset', String(badgeRightOffset));
+          } catch {}
+        }
+        dragStartXRef.current = null;
+      }
+
       if (dragTarget && dragCurrentPrice !== null) {
         audioHaptics.tick();
         const roundedPrice = +dragCurrentPrice.toFixed(4);
@@ -126,7 +157,7 @@ export default function ChartTradingOverlay({
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
     };
-  }, [dragTarget, dragCurrentPrice, seriesApi, updateOrderPrice, updateAlertPrice, updatePositionBrackets]);
+  }, [dragTarget, isDraggingBadgeX, dragCurrentPrice, badgeRightOffset, seriesApi, updateOrderPrice, updateAlertPrice, updatePositionBrackets]);
 
   if (!seriesApi) return null;
 
@@ -234,25 +265,65 @@ export default function ChartTradingOverlay({
             {/* Position Subtle Guideline (non-intrusive dashed line, unobtrusive for chart analysis) */}
             <div
               className={`h-[1px] flex-1 border-t border-dashed transition-opacity duration-200 ${
-                isPosHovered ? 'opacity-75' : 'opacity-25'
+                isPosHovered ? 'opacity-70' : 'opacity-20'
               }`}
               style={{ borderColor: color }}
             />
 
-            {/* Position Control Badge (Compact with Action Menu) */}
-            <div className="relative pointer-events-auto flex items-center">
+            {/* Position Control Badge (Transparent Frosted Glass, Visible on Hover, Movable along line) */}
+            <div
+              style={{ marginRight: `${badgeRightOffset}px` }}
+              className="relative pointer-events-auto flex items-center"
+            >
               <div
-                className="flex items-center gap-1.5 rounded-l-lg px-2.5 py-1 text-[10px] font-bold text-white shadow-xl select-none"
-                style={{ backgroundColor: color }}
+                onMouseDown={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.closest('button') || target.closest('input') || target.closest('[data-drag-target]')) {
+                    return;
+                  }
+                  e.preventDefault();
+                  setIsDraggingBadgeX(true);
+                  dragStartXRef.current = { startX: e.clientX, initialRight: badgeRightOffset };
+                }}
+                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-bold select-none transition-all duration-200 border cursor-grab active:cursor-grabbing ${
+                  isPosHovered
+                    ? 'bg-[#0c0d14]/95 border-opacity-80 shadow-2xl opacity-100 text-white scale-100'
+                    : 'bg-[#090b10]/40 backdrop-blur-sm border-opacity-30 opacity-45 hover:opacity-100 text-slate-200 hover:bg-[#0c0d14]/90'
+                }`}
+                style={{
+                  borderColor: color,
+                  boxShadow: isPosHovered ? `0 4px 20px ${color}33` : 'none',
+                }}
+                title="Drag horizontally along line to reposition badge away from candles"
               >
-                <span>{position.side} {fmtQty(position.size)}</span>
-                <span className="font-mono">@{fmtPrice(position.entryPrice, symbol)}</span>
-                <span className="bg-black/40 px-1.5 py-0.2 rounded font-mono">
+                {/* Horizontal Drag Grip Handle */}
+                <div
+                  className="flex items-center text-slate-400 hover:text-white cursor-grab active:cursor-grabbing -ml-1 pr-0.5"
+                  title="Click and drag horizontally to move badge away from candles"
+                >
+                  <svg className="h-3 w-3 opacity-60 hover:opacity-100" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M7 2a2 2 0 100 4 2 2 0 000-4zM7 8a2 2 0 100 4 2 2 0 000-4zM7 14a2 2 0 100 4 2 2 0 000-4zM13 2a2 2 0 100 4 2 2 0 000-4zM13 8a2 2 0 100 4 2 2 0 000-4zM13 14a2 2 0 100 4 2 2 0 000-4z" />
+                  </svg>
+                </div>
+
+                {/* Side + Size */}
+                <span className={isLong ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                  {position.side} {fmtQty(position.size)}
+                </span>
+
+                {/* Entry Price */}
+                <span className="font-mono text-slate-300">@{fmtPrice(position.entryPrice, symbol)}</span>
+
+                {/* Live PnL */}
+                <span className={`px-1.5 py-0.2 rounded font-mono ${
+                  isPosProfit ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/80 text-rose-300 border border-rose-500/30'
+                }`}>
                   {isPosProfit ? `+${fmtUsd(posPnl)}` : `-${fmtUsd(Math.abs(posPnl))}`}
                 </span>
 
                 {/* Drag-to-Set TP / SL Handle */}
                 <div
+                  data-drag-target="true"
                   onMouseDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -265,7 +336,7 @@ export default function ChartTradingOverlay({
                     });
                     setDragCurrentPrice(position.entryPrice);
                   }}
-                  className="flex items-center gap-1 cursor-ns-resize rounded bg-black/50 hover:bg-black/80 px-1.5 py-0.5 text-[9px] font-semibold text-white border border-white/20 transition ml-0.5"
+                  className="flex items-center gap-1 cursor-ns-resize rounded bg-sky-950/70 hover:bg-sky-900/90 px-1.5 py-0.5 text-[9px] font-semibold text-sky-200 border border-sky-500/40 transition ml-0.5"
                   title={
                     isLong
                       ? "Drag UP for Take Profit (TP) • Drag DOWN for Stop Loss (SL)"
@@ -286,7 +357,7 @@ export default function ChartTradingOverlay({
                     setIsPosActionsOpen(!isPosActionsOpen);
                   }}
                   className={`p-1 rounded transition flex items-center justify-center ${
-                    isPosActionsOpen ? 'bg-white text-black' : 'bg-black/30 hover:bg-black/60 text-white'
+                    isPosActionsOpen ? 'bg-white text-black' : 'bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white'
                   }`}
                   title={isPosActionsOpen ? "Hide Position Options" : "Show Position Options"}
                 >
@@ -315,7 +386,7 @@ export default function ChartTradingOverlay({
                     audioHaptics.error();
                     closePosition(symbol);
                   }}
-                  className="bg-black/40 hover:bg-black/80 px-1.5 py-0.2 rounded font-bold text-white transition ml-0.5"
+                  className="bg-white/5 hover:bg-rose-600/80 px-1.5 py-0.2 rounded font-bold text-slate-300 hover:text-white transition ml-0.5"
                   title="Close Position at Market"
                 >
                   x
@@ -475,6 +546,16 @@ export default function ChartTradingOverlay({
                 </div>
               )}
             </div>
+
+            {/* Right guideline extension from badge to price scale */}
+            {badgeRightOffset > 0 && (
+              <div
+                style={{ width: `${badgeRightOffset}px`, borderColor: color }}
+                className={`h-[1px] border-t border-dashed transition-opacity duration-200 ${
+                  isPosHovered ? 'opacity-70' : 'opacity-20'
+                }`}
+              />
+            )}
           </div>
         );
       })()}
@@ -557,8 +638,10 @@ export default function ChartTradingOverlay({
                 setDragTarget({ type: 'SL', symbol, initialPrice: displayPrice });
                 setDragCurrentPrice(displayPrice);
               }}
-              className={`pointer-events-auto flex cursor-ns-resize items-center gap-1.5 rounded-l-lg px-2 py-0.5 text-[10px] font-bold text-white shadow-lg bg-red-600 transition-transform ${
-                isDragging ? 'scale-105 ring-2 ring-white' : 'hover:brightness-110'
+              className={`pointer-events-auto flex cursor-ns-resize items-center gap-1.5 rounded-lg px-2 py-0.5 text-[10px] font-bold shadow-lg transition-all ${
+                isDragging
+                  ? 'scale-105 ring-2 ring-white bg-red-600 text-white opacity-100'
+                  : 'bg-red-950/60 backdrop-blur-sm border border-red-500/40 text-red-200 opacity-60 hover:opacity-100 hover:bg-red-900/80'
               }`}
               title="Drag to adjust Stop Loss price"
             >
@@ -618,8 +701,10 @@ export default function ChartTradingOverlay({
                 setDragTarget({ type: 'TP', symbol, initialPrice: displayPrice });
                 setDragCurrentPrice(displayPrice);
               }}
-              className={`pointer-events-auto flex cursor-ns-resize items-center gap-1.5 rounded-l-lg px-2 py-0.5 text-[10px] font-bold text-white shadow-lg bg-emerald-600 transition-transform ${
-                isDragging ? 'scale-105 ring-2 ring-white' : 'hover:brightness-110'
+              className={`pointer-events-auto flex cursor-ns-resize items-center gap-1.5 rounded-lg px-2 py-0.5 text-[10px] font-bold shadow-lg transition-all ${
+                isDragging
+                  ? 'scale-105 ring-2 ring-white bg-emerald-600 text-white opacity-100'
+                  : 'bg-emerald-950/60 backdrop-blur-sm border border-emerald-500/40 text-emerald-200 opacity-60 hover:opacity-100 hover:bg-emerald-900/80'
               }`}
               title="Drag to adjust Take Profit price"
             >
@@ -670,9 +755,12 @@ export default function ChartTradingOverlay({
                 setDragTarget({ type: 'ORDER', id: o.id, initialPrice: displayPrice });
                 setDragCurrentPrice(displayPrice);
               }}
-              style={{ backgroundColor: color }}
-              className={`pointer-events-auto flex cursor-ns-resize items-center gap-1.5 rounded-l-lg px-2.5 py-0.5 text-[10px] font-bold text-white shadow-lg transition-transform ${
-                isDragging ? 'scale-105 ring-2 ring-white' : 'hover:brightness-110'
+              style={{
+                backgroundColor: isDragging ? color : 'rgba(12, 13, 20, 0.7)',
+                borderColor: color,
+              }}
+              className={`pointer-events-auto flex cursor-ns-resize items-center gap-1.5 rounded-lg px-2.5 py-0.5 text-[10px] font-bold text-white shadow-lg transition-all border ${
+                isDragging ? 'scale-105 ring-2 ring-white opacity-100' : 'backdrop-blur-sm opacity-60 hover:opacity-100'
               }`}
               title="Drag to change Limit Order price"
             >
