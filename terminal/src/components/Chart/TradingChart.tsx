@@ -700,11 +700,18 @@ export default function TradingChart({
         if (chartApi) {
           try {
             const logicalRange = chartApi.timeScale().getVisibleLogicalRange();
-            const span = logicalRange ? Math.max(40, logicalRange.to - logicalRange.from) : 80;
-            chartApi.timeScale().setVisibleLogicalRange({
-              from: Math.max(0, next - span + 8),
-              to: next + 8,
-            });
+            if (logicalRange) {
+              // Only auto-advance viewport if user is currently looking at playhead
+              // If user panned/scrolled to earlier candles, do NOT yank their viewport
+              const isFollowing = Math.abs(logicalRange.to - (prev + 8)) <= 25;
+              if (isFollowing) {
+                const span = Math.max(40, logicalRange.to - logicalRange.from);
+                chartApi.timeScale().setVisibleLogicalRange({
+                  from: Math.max(0, next - span + 8),
+                  to: next + 8,
+                });
+              }
+            }
           } catch {}
         }
         return next;
@@ -769,6 +776,22 @@ export default function TradingChart({
       }
       return next;
     });
+  };
+
+  const handleRecenterReplay = () => {
+    audioHaptics.tick();
+    if (chartApi) {
+      try {
+        const curRange = chartApi.timeScale().getVisibleLogicalRange();
+        const span = curRange && Number.isFinite(curRange.to - curRange.from)
+          ? Math.max(50, Math.round(curRange.to - curRange.from))
+          : 80;
+        chartApi.timeScale().setVisibleLogicalRange({
+          from: Math.max(0, replayIndex - span + 8),
+          to: replayIndex + 8,
+        });
+      } catch {}
+    }
   };
 
   const handleToggleIndicator = (key: string) => {
@@ -1539,25 +1562,6 @@ export default function TradingChart({
     if (isInitialLoad) {
       hasFittedSymbolRef.current[symbol] = true;
       a.chart.timeScale().fitContent();
-    } else if (isReplayActive) {
-      try {
-        const curLen = displayCandles.length;
-        const currentRange = a.chart.timeScale().getVisibleLogicalRange();
-        if (
-          !currentRange ||
-          currentRange.from > curLen ||
-          currentRange.to < 0 ||
-          currentRange.to > curLen + 40
-        ) {
-          const span = currentRange && Number.isFinite(currentRange.to - currentRange.from)
-            ? Math.max(50, Math.round(currentRange.to - currentRange.from))
-            : 80;
-          a.chart.timeScale().setVisibleLogicalRange({
-            from: Math.max(0, curLen - span),
-            to: curLen + 8,
-          });
-        }
-      } catch {}
     }
     const lastBar = displayCandles[n - 1];
     writeOhlc(lastBar);
@@ -2898,6 +2902,7 @@ export default function TradingChart({
             speedMs={replaySpeedMs}
             onSpeedChange={setReplaySpeedMs}
             currentTimeString={candles[replayIndex] ? new Date(candles[replayIndex].time * 1000).toLocaleString() : undefined}
+            onRecenter={handleRecenterReplay}
           />
 
           {/* Candle-Close Countdown Floating Timer */}

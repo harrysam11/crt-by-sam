@@ -27,7 +27,8 @@ type DragTarget =
   | { type: 'ORDER'; id: string; initialPrice: number }
   | { type: 'ALERT'; id: string; initialPrice: number }
   | { type: 'SL'; symbol: string; initialPrice: number }
-  | { type: 'TP'; symbol: string; initialPrice: number };
+  | { type: 'TP'; symbol: string; initialPrice: number }
+  | { type: 'POSITION_DRAG'; symbol: string; isLong: boolean; entryPrice: number };
 
 export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: ChartTradingOverlayProps) {
   const currentPrice = useTerminalStore((s) => s.prices[symbol] ?? (s.symbol === symbol ? s.currentPrice : 0));
@@ -69,6 +70,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
   const [quickQty, setQuickQty] = useState('0.1');
   const [isQuickTradeCollapsed, setIsQuickTradeCollapsed] = useState(false);
   const [isPosActionsOpen, setIsPosActionsOpen] = useState(false);
+  const [isPosHovered, setIsPosHovered] = useState(false);
 
   // Mouse drag tracking listener
   useEffect(() => {
@@ -96,6 +98,14 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
           updatePositionBrackets(dragTarget.symbol, roundedPrice, undefined);
         } else if (dragTarget.type === 'TP') {
           updatePositionBrackets(dragTarget.symbol, undefined, roundedPrice);
+        } else if (dragTarget.type === 'POSITION_DRAG') {
+          const isUp = roundedPrice > dragTarget.entryPrice;
+          const isTp = dragTarget.isLong ? isUp : !isUp;
+          if (isTp) {
+            updatePositionBrackets(dragTarget.symbol, undefined, roundedPrice);
+          } else {
+            updatePositionBrackets(dragTarget.symbol, roundedPrice, undefined);
+          }
         }
       }
       setDragTarget(null);
@@ -203,11 +213,15 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
 
         const isLong = position.side === 'LONG';
         const color = isLong ? '#10b981' : '#f43f5e';
+        const containerH = containerRef.current?.clientHeight ?? 500;
+        const isNearBottom = containerH - y < 240;
 
         return (
           <div
             style={{ top: `${y}px`, right: `${priceScaleWidth}px` }}
             className="absolute left-0 flex items-center"
+            onMouseEnter={() => setIsPosHovered(true)}
+            onMouseLeave={() => setIsPosHovered(false)}
           >
             {/* Position Horizontal Line */}
             <div
@@ -216,7 +230,7 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
             />
 
             {/* Position Control Badge (Compact with Action Menu) */}
-            <div className="relative pointer-events-auto">
+            <div className="relative pointer-events-auto flex items-center">
               <div
                 className="flex items-center gap-1.5 rounded-l-lg px-2.5 py-1 text-[10px] font-bold text-white shadow-xl select-none"
                 style={{ backgroundColor: color }}
@@ -227,19 +241,61 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
                   {isPosProfit ? `+${fmtUsd(posPnl)}` : `-${fmtUsd(Math.abs(posPnl))}`}
                 </span>
 
-                {/* Actions Menu Trigger */}
+                {/* Drag-to-Set TP / SL Handle */}
+                <div
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    audioHaptics.tick();
+                    setDragTarget({
+                      type: 'POSITION_DRAG',
+                      symbol,
+                      isLong,
+                      entryPrice: position.entryPrice,
+                    });
+                    setDragCurrentPrice(position.entryPrice);
+                  }}
+                  className="flex items-center gap-1 cursor-ns-resize rounded bg-black/50 hover:bg-black/80 px-1.5 py-0.5 text-[9px] font-semibold text-white border border-white/20 transition ml-0.5"
+                  title={
+                    isLong
+                      ? "Drag UP for Take Profit (TP) • Drag DOWN for Stop Loss (SL)"
+                      : "Drag UP for Stop Loss (SL) • Drag DOWN for Take Profit (TP)"
+                  }
+                >
+                  <svg className="h-2.5 w-2.5 text-sky-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                  </svg>
+                  <span>Drag TP/SL</span>
+                </div>
+
+                {/* Actions Menu Arrow Trigger */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     audioHaptics.tick();
                     setIsPosActionsOpen(!isPosActionsOpen);
                   }}
-                  className={`px-1.5 py-0.2 rounded text-[10px] font-bold transition ${
+                  className={`p-1 rounded transition flex items-center justify-center ${
                     isPosActionsOpen ? 'bg-white text-black' : 'bg-black/30 hover:bg-black/60 text-white'
                   }`}
-                  title="Position Commands (SL, TP, BE, Rev, Close)"
+                  title={isPosActionsOpen ? "Hide Position Options" : "Show Position Options"}
                 >
-                  ...
+                  <svg
+                    className={`h-3 w-3 transition-transform duration-200 ${
+                      isPosActionsOpen
+                        ? isNearBottom
+                          ? 'rotate-0'
+                          : 'rotate-180'
+                        : isNearBottom
+                        ? 'rotate-180'
+                        : 'rotate-0'
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={isNearBottom ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
+                  </svg>
                 </button>
 
                 {/* Quick Close button */}
@@ -256,11 +312,52 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
                 </button>
               </div>
 
-              {/* Floating Position Action Menu Popover */}
+              {/* Hover Quick Action Chips */}
+              {isPosHovered && !isPosActionsOpen && (
+                <div className="flex items-center gap-1 ml-1 bg-panel/90 backdrop-blur-md px-1.5 py-0.5 rounded border border-grid/60 shadow-lg animate-fadeIn">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      audioHaptics.tick();
+                      snapBreakEven(symbol);
+                    }}
+                    className="bg-black/40 hover:bg-black px-1.5 py-0.5 rounded text-[9px] font-bold text-cyan-300 border border-cyan-400/30"
+                    title="Snap Break-Even"
+                  >
+                    BE
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      audioHaptics.tick();
+                      flipPosition(symbol);
+                    }}
+                    className="bg-black/40 hover:bg-black px-1.5 py-0.5 rounded text-[9px] font-bold text-amber-300 border border-amber-400/30"
+                    title="Reverse Direction"
+                  >
+                    Rev
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      audioHaptics.tick();
+                      useTerminalStore.getState().closePartialPosition(symbol, 0.5);
+                    }}
+                    className="bg-black/40 hover:bg-black px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-300 border border-white/20"
+                    title="Close 50%"
+                  >
+                    50%
+                  </button>
+                </div>
+              )}
+
+              {/* Floating Position Action Menu Popover (Adaptive Upward/Downward Direction) */}
               {isPosActionsOpen && (
                 <div
                   onClick={(e) => e.stopPropagation()}
-                  className="absolute right-0 top-full mt-1.5 flex flex-col gap-1 rounded-lg border border-white/10 bg-[#0c0d14]/95 p-2 shadow-2xl backdrop-blur-md z-50 text-[10px] font-mono whitespace-nowrap min-w-[170px]"
+                  className={`absolute right-0 ${
+                    isNearBottom ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+                  } flex flex-col gap-1 rounded-lg border border-white/10 bg-[#0c0d14]/95 p-2 shadow-2xl backdrop-blur-md z-50 text-[10px] font-mono whitespace-nowrap min-w-[180px]`}
                 >
                   <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider pb-1 border-b border-white/10 flex items-center justify-between">
                     <span>Position Commands</span>
@@ -367,6 +464,47 @@ export default function ChartTradingOverlay({ symbol, seriesApi, chartApi }: Cha
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Live Projected Drag TP/SL Line & Floating HUD Badge */}
+      {dragTarget?.type === 'POSITION_DRAG' && dragCurrentPrice !== null && position && (() => {
+        const isLong = position.side === 'LONG';
+        const isUp = dragCurrentPrice > position.entryPrice;
+        const isTp = isLong ? isUp : !isUp;
+        const dragY = seriesApi.priceToCoordinate(dragCurrentPrice);
+        if (dragY === null || !Number.isFinite(dragY)) return null;
+
+        const dist = Math.abs(dragCurrentPrice - position.entryPrice);
+        const dollarVal = dist * position.size * toUsd(symbol);
+        const pctDist = position.entryPrice > 0 ? ((dist / position.entryPrice) * 100).toFixed(2) : '0.00';
+        const bracketColor = isTp ? '#10b981' : '#f43f5e';
+
+        return (
+          <div
+            style={{ top: `${dragY}px`, right: `${priceScaleWidth}px` }}
+            className="absolute left-0 flex items-center z-50 pointer-events-none"
+          >
+            {/* Dashed projection line */}
+            <div
+              className="h-[1px] flex-1 border-t border-dashed"
+              style={{ borderColor: bracketColor }}
+            />
+            {/* Floating HUD Badge */}
+            <div
+              className="rounded px-2.5 py-1 text-[10px] font-mono font-bold text-white shadow-2xl border"
+              style={{
+                backgroundColor: isTp ? 'rgba(16, 185, 129, 0.95)' : 'rgba(244, 63, 94, 0.95)',
+                borderColor: isTp ? '#34d399' : '#fb7185',
+              }}
+            >
+              <span>{isTp ? 'Take Profit (TP): ' : 'Stop Loss (SL): '}</span>
+              <span>{fmtPrice(dragCurrentPrice, symbol)}</span>
+              <span className="ml-1.5 bg-black/40 px-1 py-0.2 rounded text-[9px]">
+                {isTp ? `+${fmtUsd(dollarVal)} (+${pctDist}%)` : `-${fmtUsd(dollarVal)} (-${pctDist}%)`}
+              </span>
             </div>
           </div>
         );

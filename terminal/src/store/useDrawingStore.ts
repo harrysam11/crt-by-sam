@@ -89,6 +89,7 @@ interface DrawingState {
     | 'ANALYTICS'
     | 'OBJECT_TREE'
     | 'DATA_WINDOW'
+    | 'NEWS_FEED'
     | null;
   setActiveRightDrawer: (
     drawer:
@@ -98,6 +99,7 @@ interface DrawingState {
       | 'ANALYTICS'
       | 'OBJECT_TREE'
       | 'DATA_WINDOW'
+      | 'NEWS_FEED'
       | null
       | ((
           prev:
@@ -107,6 +109,7 @@ interface DrawingState {
             | 'ANALYTICS'
             | 'OBJECT_TREE'
             | 'DATA_WINDOW'
+            | 'NEWS_FEED'
             | null
         ) =>
           | 'WATCHLIST'
@@ -115,6 +118,7 @@ interface DrawingState {
           | 'ANALYTICS'
           | 'OBJECT_TREE'
           | 'DATA_WINDOW'
+          | 'NEWS_FEED'
           | null)
   ) => void;
 

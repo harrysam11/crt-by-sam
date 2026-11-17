@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useJournalStore } from '../../store/useJournalStore';
 import { fmtPnl, fmtPrice, fmtTime, labelOf, pnlClass } from '../../utils/formatters';
 import type { JournalEntry } from '../../types/psychology';
+import WeeklyReviewView from './WeeklyReviewView';
 
 const EMOTION_BADGES: Record<JournalEntry['emotionTag'], { label: string; cls: string }> = {
   PLANNED: { label: 'Planned Setup', cls: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
@@ -21,6 +22,7 @@ export default function JournalModal() {
   const setFilterEmotion = useJournalStore((s) => s.setFilterEmotion);
 
   const [activeId, setActiveId] = useState<string | null>(selectedEntryId);
+  const [journalTab, setJournalTab] = useState<'DAILY' | 'WEEKLY'>('DAILY');
 
   if (!isModalOpen) return null;
 
@@ -32,38 +34,62 @@ export default function JournalModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-      <div className="flex h-[90vh] w-full max-w-6xl flex-col rounded-[10px] border border-white/[0.08] bg-panel shadow-2xl overflow-hidden">
+      <div className="flex h-[90vh] w-full max-w-6xl flex-col rounded-[10px] border border-white/[0.08] bg-panel shadow-2xl overflow-hidden font-sans">
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-grid px-6 py-4 bg-bg/50">
+        <div className="flex items-center justify-between border-b border-grid px-6 py-3.5 bg-bg/50">
           <div className="flex items-center gap-3">
             <span className="flex h-2.5 w-2.5 rounded-full bg-accent" />
-            <h2 className="text-base font-semibold text-white">Trade Psychology Journal & Canvas Archive</h2>
-            <span className="rounded-[4px] bg-white/[0.05] border border-white/[0.08] px-2 py-0.5 text-xs text-muted">
-              {entries.length} snapshots recorded
-            </span>
+            <h2 className="text-base font-semibold text-white font-heading">Trade Journal & Canvas Archive</h2>
+            
+            {/* View Switcher: Daily vs Weekly */}
+            <div className="flex items-center gap-1 rounded-lg bg-black/40 border border-white/10 p-0.5 ml-3">
+              <button
+                onClick={() => setJournalTab('DAILY')}
+                className={`rounded-md px-3 py-1 text-xs font-semibold transition ${
+                  journalTab === 'DAILY'
+                    ? 'bg-accent text-white shadow-sm'
+                    : 'text-muted hover:text-white'
+                }`}
+              >
+                Daily Journal ({entries.length})
+              </button>
+              <button
+                onClick={() => setJournalTab('WEEKLY')}
+                className={`rounded-md px-3 py-1 text-xs font-semibold transition ${
+                  journalTab === 'WEEKLY'
+                    ? 'bg-accent text-white shadow-sm'
+                    : 'text-muted hover:text-white'
+                }`}
+              >
+                Weekly Review
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Filter buttons */}
-            <div className="flex items-center gap-1">
-              {(['ALL', 'PLANNED', 'FOMO', 'REVENGE', 'IMPULSE'] as const).map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => setFilterEmotion(tag)}
-                  className={`rounded px-2.5 py-1 text-xs font-medium transition ${
-                    filterEmotion === tag
-                      ? 'bg-accent text-white'
-                      : 'bg-grid/60 text-muted hover:text-white'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
+            {/* Filter buttons (Daily only) */}
+            {journalTab === 'DAILY' && (
+              <div className="flex items-center gap-1">
+                {(['ALL', 'PLANNED', 'FOMO', 'REVENGE', 'IMPULSE'] as const).map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => setFilterEmotion(tag)}
+                    className={`rounded px-2.5 py-1 text-xs font-medium transition ${
+                      filterEmotion === tag
+                        ? 'bg-accent text-white'
+                        : 'bg-grid/60 text-muted hover:text-white'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <button
               onClick={closeJournalModal}
-              className="rounded-lg p-1.5 text-muted hover:bg-grid hover:text-white"
+              className="rounded-lg p-1.5 text-muted hover:bg-grid hover:text-white transition"
+              title="Close Journal"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -73,6 +99,9 @@ export default function JournalModal() {
         </div>
 
         {/* Modal Content */}
+        {journalTab === 'WEEKLY' ? (
+          <WeeklyReviewView />
+        ) : (
         <div className="flex min-h-0 flex-1">
           {/* Entries Sidebar List */}
           <div className="w-80 shrink-0 border-r border-grid overflow-y-auto bg-bg/30">
@@ -228,6 +257,7 @@ export default function JournalModal() {
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

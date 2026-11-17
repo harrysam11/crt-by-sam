@@ -20,6 +20,7 @@ interface BarReplayControllerProps {
   speedMs: number;
   onSpeedChange: (speed: number) => void;
   currentTimeString?: string;
+  onRecenter?: () => void;
 }
 
 export default function BarReplayController({
@@ -35,6 +36,7 @@ export default function BarReplayController({
   speedMs,
   onSpeedChange,
   currentTimeString,
+  onRecenter,
 }: BarReplayControllerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -133,6 +135,24 @@ export default function BarReplayController({
         </svg>
         <span>Step</span>
       </button>
+
+      {/* Recenter Viewport to Head */}
+      {onRecenter && (
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            onRecenter();
+          }}
+          className="flex items-center gap-1 px-2 py-1 clay-btn text-muted hover:text-white transition text-[11px]"
+          title="Recenter Viewport to Replay Playhead"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          <span>Recenter</span>
+        </button>
+      )}
 
       {/* Playback Speed Selector */}
       <div className="flex items-center gap-1 pl-1 pr-2 border-r border-grid/50">

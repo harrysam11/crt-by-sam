@@ -31,6 +31,8 @@ import DataWindowPanel from './components/Chart/DataWindowPanel';
 import GuardianModal from './components/guardian/GuardianModal';
 import PortfolioDashboardModal from './components/portfolio/PortfolioDashboardModal';
 import LandingPage from './components/landing/LandingPage';
+import CommandPaletteModal from './components/common/CommandPaletteModal';
+import MacroNewsPanel from './components/news/MacroNewsPanel';
 import { useMarketFeed } from './hooks/useMarketFeed';
 import { useKeyboardHotkeys } from './hooks/useKeyboardHotkeys';
 import { useTerminalStore } from './store/useTerminalStore';
@@ -131,6 +133,7 @@ export default function App() {
   const [isPopoutOpen, setIsPopoutOpen] = useState(false);
   const [isGuardianOpen, setIsGuardianOpen] = useState(false);
   const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   // View Mode: TERMINAL or LANDING showcase
   const [viewMode, setViewMode] = useState<'TERMINAL' | 'LANDING'>(() => {
@@ -146,6 +149,36 @@ export default function App() {
     onOpenCheatsheet: () => setIsHotkeyOpen(true),
     onOpenPortfolio: () => setIsPortfolioOpen(true),
   });
+
+  // Ctrl+K / Cmd+K Command Palette hotkey
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
+
+  // openModal helper for CommandPaletteModal
+  const handleOpenModalByName = (name: string) => {
+    switch (name) {
+      case 'GUARDIAN': setIsGuardianOpen(true); break;
+      case 'PORTFOLIO': setIsPortfolioOpen(true); break;
+      case 'OPTIONS': setIsOptionChainOpen(true); break;
+      case 'GREEKS': setIsGreeksOpen(true); break;
+      case 'FUNDING': setIsFundingOpen(true); break;
+      case 'LIQUIDATIONS': setIsLiquidationsOpen(true); break;
+      case 'VAULT': setIsVaultOpen(true); break;
+      case 'TAX': setIsTaxOpen(true); break;
+      case 'SCREENER': setIsScreenerOpen(true); break;
+      case 'CALENDAR': setIsCalendarOpen(true); break;
+      case 'SESSIONS': setIsSessionManagerOpen(true); break;
+      default: break;
+    }
+  };
 
   // Global window openers for Screener, Calendar, and Portfolio
   useEffect(() => {
@@ -309,6 +342,13 @@ export default function App() {
         <MiniTerminalPopout onClose={() => setIsPopoutOpen(false)} />
       </PopoutWindow>
 
+      {/* Global Command Palette & Quick Search (Ctrl+K) */}
+      <CommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onOpenModal={handleOpenModalByName}
+      />
+
       {/* Global Terminal Header */}
       {!isChartMaximized && (
         <Header
@@ -332,6 +372,7 @@ export default function App() {
           onTogglePopout={() => setIsPopoutOpen((v) => !v)}
           isPopoutActive={isPopoutOpen}
           onOpenLanding={() => setViewMode('LANDING')}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         />
       )}
 
@@ -389,6 +430,7 @@ export default function App() {
               {activeRightDrawer === 'OBJECT_TREE' && (
                 <ObjectTreePanel onClose={() => setActiveRightDrawer(null)} />
               )}
+              {activeRightDrawer === 'NEWS_FEED' && <MacroNewsPanel />}
             </div>
           </>
         )}
@@ -494,6 +536,22 @@ export default function App() {
 
             <span className="my-1 h-px w-6 bg-grid" />
 
+            {/* Macro News & Tweets Feed Toggle */}
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setActiveRightDrawer((prev) => (prev === 'NEWS_FEED' ? null : 'NEWS_FEED'));
+              }}
+              className={`p-2.5 rounded-xl transition ${
+                activeRightDrawer === 'NEWS_FEED' ? 'clay-btn-active' : 'clay-btn text-slate-300'
+              }`}
+              title="Macro News Wire, Celebrity Tweets & Forex Factory Calendar"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+              </svg>
+            </button>
+
             {/* Option Chain Button */}
             <button
               onClick={() => {
@@ -508,6 +566,20 @@ export default function App() {
               </svg>
             </button>
 
+            {/* Portfolio & PnL Dashboard */}
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setIsPortfolioOpen(true);
+              }}
+              className="p-2.5 rounded-xl clay-btn text-slate-300 transition"
+              title="Portfolio Dashboard & PnL Analytics"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </button>
+
             {/* Economic Calendar */}
             <button
               onClick={() => {
@@ -515,7 +587,7 @@ export default function App() {
                 setIsCalendarOpen(true);
               }}
               className="p-2.5 rounded-xl clay-btn text-slate-300 transition"
-              title="Macro Calendar"
+              title="Macro Economic Calendar"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />

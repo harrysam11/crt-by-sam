@@ -37,6 +37,7 @@ interface HeaderProps {
   terminalMode?: 'SIMPLE' | 'PRO';
   onToggleMode?: () => void;
   onOpenLanding?: () => void;
+  onOpenCommandPalette?: () => void;
 }
 
 export default function Header({
@@ -57,6 +58,7 @@ export default function Header({
   onTogglePopout,
   isPopoutActive,
   onOpenLanding,
+  onOpenCommandPalette,
 }: HeaderProps) {
   const symbol = useTerminalStore((s) => s.symbol);
   const price = useTerminalStore((s) => s.currentPrice);
@@ -100,6 +102,7 @@ export default function Header({
   const [isInstToolsOpen, setIsInstToolsOpen] = useState(false);
   const instToolsRef = useRef<HTMLDivElement>(null);
   const [isLayoutOpen, setIsLayoutOpen] = useState(false);
+  const [newLayoutName, setNewLayoutName] = useState('');
   const layoutRef = useRef<HTMLDivElement>(null);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
@@ -544,6 +547,22 @@ export default function Header({
             <span>Zen</span>
           </button>
 
+          {/* Quick Search & Command Palette Pill (Ctrl+K) */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              onOpenCommandPalette?.();
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg bg-black/40 hover:bg-black/70 border border-white/10 text-slate-300 hover:text-white transition shadow-sm font-sans"
+            title="Search all features, tools, pairs, and layouts (Ctrl+K)"
+          >
+            <svg className="h-3.5 w-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span className="hidden xl:inline text-[11px] text-slate-400">Search tools...</span>
+            <kbd className="rounded border border-white/10 bg-white/5 px-1 py-0.2 text-[9px] font-mono text-muted">Ctrl+K</kbd>
+          </button>
+
           {/* Institutional Suite Dropdown */}
           <div className="relative" ref={instToolsRef}>
             <button
@@ -740,7 +759,7 @@ export default function Header({
           </div>
 
           {/* Multi-Chart Layout Dropdown (TradingView-Grade) */}
-          <div className="relative hidden 2xl:block" ref={layoutRef}>
+          <div className="relative flex items-center" ref={layoutRef}>
             <button
               onClick={() => {
                 audioHaptics.tick();
@@ -749,12 +768,12 @@ export default function Header({
               className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 text-xs font-semibold transition ${
                 isLayoutOpen || layout !== '1x1' ? 'clay-btn-active' : 'clay-btn'
               }`}
-              title="Multi-Chart Layouts & Synchronization"
+              title="Multi-Chart Layouts & Workspace Customization"
             >
               <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
               </svg>
-              <span className="hidden sm:inline">Grid:</span>
+              <span className="hidden sm:inline">Layout:</span>
               <span>{layout}</span>
               <svg className={`h-3 w-3 text-slate-400 transition-transform ${isLayoutOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -762,11 +781,11 @@ export default function Header({
             </button>
 
             {isLayoutOpen && (
-              <div className="absolute right-0 top-full mt-2 z-50 w-72 clay-popover p-3 shadow-2xl select-none font-mono text-xs space-y-3">
+              <div className="absolute right-0 top-full mt-2 z-50 w-80 clay-popover p-3 shadow-2xl select-none font-mono text-xs space-y-3">
                 {/* Grid Pickers */}
                 <div>
                   <span className="text-[10px] uppercase font-bold text-muted block mb-1.5">
-                    Select Grid Layout
+                    Select Chart Grid
                   </span>
                   <div className="grid grid-cols-2 gap-1.5">
                     {[
@@ -792,6 +811,51 @@ export default function Header({
                         <span className="text-[9px] text-muted">{item.desc}</span>
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                {/* Workspace Panes Customization */}
+                <div className="border-t border-grid/60 pt-2">
+                  <span className="text-[10px] uppercase font-bold text-muted block mb-1">
+                    Workspace Panes
+                  </span>
+                  <div className="grid grid-cols-2 gap-1 text-[11px]">
+                    <button
+                      onClick={() => {
+                        audioHaptics.tick();
+                        useDrawingStore.getState().setActiveRightDrawer((prev) => (prev === 'WATCHLIST' ? null : 'WATCHLIST'));
+                      }}
+                      className="px-2 py-1 rounded bg-black/40 hover:bg-black/70 border border-white/5 text-slate-300 hover:text-white text-left transition"
+                    >
+                      Watchlist Drawer
+                    </button>
+                    <button
+                      onClick={() => {
+                        audioHaptics.tick();
+                        useDrawingStore.getState().setActiveRightDrawer((prev) => (prev === 'DOM' ? null : 'DOM'));
+                      }}
+                      className="px-2 py-1 rounded bg-black/40 hover:bg-black/70 border border-white/5 text-slate-300 hover:text-white text-left transition"
+                    >
+                      DOM Orderbook
+                    </button>
+                    <button
+                      onClick={() => {
+                        audioHaptics.tick();
+                        useDrawingStore.getState().setActiveRightDrawer((prev) => (prev === 'NEWS_FEED' ? null : 'NEWS_FEED'));
+                      }}
+                      className="px-2 py-1 rounded bg-black/40 hover:bg-black/70 border border-white/5 text-slate-300 hover:text-white text-left transition"
+                    >
+                      Macro News & Tweets
+                    </button>
+                    <button
+                      onClick={() => {
+                        audioHaptics.tick();
+                        useDrawingStore.getState().setActiveRightDrawer((prev) => (prev === 'ANALYTICS' ? null : 'ANALYTICS'));
+                      }}
+                      className="px-2 py-1 rounded bg-black/40 hover:bg-black/70 border border-white/5 text-slate-300 hover:text-white text-left transition"
+                    >
+                      Seasonals Matrix
+                    </button>
                   </div>
                 </div>
 
@@ -840,12 +904,39 @@ export default function Header({
                   </div>
                 </div>
 
+                {/* Save Current Layout Preset */}
+                <div className="border-t border-grid/60 pt-2">
+                  <span className="text-[10px] uppercase font-bold text-muted block mb-1">
+                    Save Custom Workspace
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="My Pro Setup..."
+                      value={newLayoutName}
+                      onChange={(e) => setNewLayoutName(e.target.value)}
+                      className="flex-1 bg-black/50 border border-white/10 rounded px-2 py-1 text-[11px] text-white focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        if (!newLayoutName.trim()) return;
+                        audioHaptics.tick();
+                        useLayoutStore.getState().saveCurrentLayout(newLayoutName.trim());
+                        setNewLayoutName('');
+                      }}
+                      className="px-2.5 py-1 rounded bg-accent hover:bg-accent/80 text-white font-bold text-[10px] transition"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+
                 {/* Saved Layout Templates */}
                 <div className="border-t border-grid/60 pt-2">
                   <span className="text-[10px] uppercase font-bold text-muted block mb-1">
                     Preset Templates
                   </span>
-                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                  <div className="space-y-1 max-h-28 overflow-y-auto">
                     {savedLayouts.map((tmpl) => (
                       <button
                         key={tmpl.id}
