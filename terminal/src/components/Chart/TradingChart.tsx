@@ -226,6 +226,7 @@ export default function TradingChart({
   // Drawing Tools & Magnet State
   const activeTool = useDrawingStore((s) => s.activeTool);
   const setActiveTool = useDrawingStore((s) => s.setActiveTool);
+  const [showMobileDrawTools, setShowMobileDrawTools] = useState(false);
   const [isObjectTreeOpen, setIsObjectTreeOpen] = useState(false);
   const [drawingsCount, setDrawingsCount] = useState(0);
   const [clearDrawingTrigger, setClearDrawingTrigger] = useState(0);
@@ -2809,33 +2810,54 @@ export default function TradingChart({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
             </svg>
           </button>
+
+          {/* Mobile Drawing Tools Toggle */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setShowMobileDrawTools((v) => !v);
+            }}
+            className={`p-1.5 rounded-full clay-btn transition md:hidden ${
+              showMobileDrawTools ? 'clay-btn-active text-white' : 'text-slate-300'
+            }`}
+            title="Toggle Drawing Tools"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          </button>
         </div>
       </div>
 
 
       {/* Chart Center Area: Docked Left Rail + Canvas */}
       <div className="relative flex flex-1 min-h-0 w-full overflow-hidden">
-        {/* Docked Left Drawing Rail (only on active pane in multi-chart grid) */}
+        {/* Docked Left Drawing Rail (responsive: slideout overlay on mobile, docked rail on desktop) */}
         {(!isMultiChart || isCurrentPaneActive) && (
-          <DrawingToolbar
-            activeTool={activeTool}
-            onSelectTool={setActiveTool}
-            onClearAll={() => setClearDrawingTrigger(Date.now())}
-            drawingsCount={drawingsCount}
-            magnetConfig={magnetConfig}
-            onToggleMagnet={() =>
-              setMagnetConfig((prev) => ({
-                ...prev,
-                enabled: !prev.enabled,
-                mode: prev.mode === 'WEAK' ? 'STRONG' : 'WEAK',
-              }))
-            }
-            isLockedAll={isLockedAll}
-            onToggleLockAll={() => setIsLockedAll((v) => !v)}
-            isHiddenAll={isHiddenAll}
-            onToggleHideAll={() => setIsHiddenAll((v) => !v)}
-            onOpenObjectTree={() => setIsObjectTreeOpen(true)}
-          />
+          <div className={`${showMobileDrawTools ? 'flex absolute left-0 top-0 bottom-0 z-40 bg-[#0d0e15]/95 shadow-2xl border-r border-white/10' : 'hidden'} md:relative md:flex flex-shrink-0 h-full`}>
+            <DrawingToolbar
+              activeTool={activeTool}
+              onSelectTool={(tool) => {
+                setActiveTool(tool);
+                setShowMobileDrawTools(false);
+              }}
+              onClearAll={() => setClearDrawingTrigger(Date.now())}
+              drawingsCount={drawingsCount}
+              magnetConfig={magnetConfig}
+              onToggleMagnet={() =>
+                setMagnetConfig((prev) => ({
+                  ...prev,
+                  enabled: !prev.enabled,
+                  mode: prev.mode === 'WEAK' ? 'STRONG' : 'WEAK',
+                }))
+              }
+              isLockedAll={isLockedAll}
+              onToggleLockAll={() => setIsLockedAll((v) => !v)}
+              isHiddenAll={isHiddenAll}
+              onToggleHideAll={() => setIsHiddenAll((v) => !v)}
+              onOpenObjectTree={() => setIsObjectTreeOpen(true)}
+            />
+          </div>
         )}
 
         {/* Main Chart Canvas & Overlays Container */}

@@ -111,10 +111,10 @@ In Xcode (macOS required):
 - Node.js 18.x or 20.x LTS
 - npm 9.x or higher
 
-### 1. Clone & Install
+### 1. Clone & Install (Root Workspace)
 ```bash
 git clone https://github.com/harrysam11/crt-by-sam.git
-cd crt-by-sam/terminal
+cd crt-by-sam
 npm install
 ```
 
@@ -122,17 +122,26 @@ npm install
 ```bash
 npm run dev
 ```
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+The server automatically binds to `0.0.0.0:5173` for access from localhost, LAN devices, and mobile emulators:
+- **Local Machine**: [http://localhost:5173](http://localhost:5173)
+- **Local Showcase & Landing Page**: [http://localhost:5173/?view=landing](http://localhost:5173/?view=landing)
+- **Mobile Devices (Same Wi-Fi / LAN)**: `http://<YOUR_LAN_IP>:5173` (e.g. `http://192.168.1.50:5173`)
+- **Android Emulator**: `http://10.0.2.2:5173`
 
-- To launch directly into the **Live Terminal**: `http://localhost:5173`
-- To view the **Product Showcase & Landing Page**: `http://localhost:5173/?view=landing`
-
-### 3. Production Build & Verification
+### 3. Production Self-Hosted Server
+For production deployments, run the zero-dependency Node.js production server with built-in API proxying:
 ```bash
 npm run build
-npm run preview
+npm run serve
 ```
-Ensures 0 TypeScript errors and produces optimized production bundles in `terminal/dist/`.
+Listens on `0.0.0.0:5173` with full HTTP + WebSocket streaming and proxy support.
+
+### 4. Native Mobile App Build (Capacitor)
+```bash
+npm run cap:sync    # Sync compiled web assets to native Android and iOS projects
+npm run cap:android # Open Android project in Android Studio
+npm run cap:ios     # Open iOS project in Xcode
+```
 
 ---
 

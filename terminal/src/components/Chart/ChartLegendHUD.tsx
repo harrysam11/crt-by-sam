@@ -81,7 +81,7 @@ export default function ChartLegendHUD({
   return (
     <div className="pointer-events-auto absolute left-3 top-2.5 z-20 flex flex-col gap-1 select-none font-mono text-[11px] leading-tight max-w-[85%]">
       {/* Symbol & Market Status Header */}
-      <div className="flex flex-wrap items-center gap-1.5 bg-panel/75 backdrop-blur-sm px-2 py-1 rounded border border-grid/60 w-fit">
+      <div className="flex flex-wrap items-center gap-1.5 py-0.5 select-none w-fit text-[11px]">
         {/* Toggle hide/unhide legend button */}
         <button
           onClick={() => {
@@ -109,16 +109,16 @@ export default function ChartLegendHUD({
         </button>
         <span className="text-slate-400 font-semibold">{timeframe}</span>
         {countdownText && (
-          <span className="flex items-center gap-1 text-[10.5px] text-[#38bdf8] font-mono px-2 py-0.5 rounded bg-[#38bdf8]/10 border border-[#38bdf8]/30 font-semibold" title="Time remaining until bar close">
+          <span className="flex items-center gap-1 text-[10.5px] text-[#38bdf8] font-mono px-1.5 py-0.5 rounded bg-[#38bdf8]/10 border border-[#38bdf8]/30 font-semibold" title="Time remaining until bar close">
             <span className="h-1.5 w-1.5 rounded-full bg-[#38bdf8] animate-pulse" />
             <span>{countdownText}</span>
           </span>
         )}
-        <span className="text-[10px] text-slate-400 px-1 py-0.2 rounded bg-slate-800/80 border border-grid">BINANCE</span>
+        <span className="text-[10px] text-slate-500 px-1 py-0.2 rounded bg-white/[0.04] hidden sm:inline">BINANCE</span>
 
         {/* OHLC Bar Metrics */}
         {currentOhlc && (
-          <div className="flex flex-wrap items-center gap-2 pl-2 border-l border-grid/80 text-[11px]">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 sm:pl-2 sm:border-l sm:border-grid/80 text-[11px]">
             <span className="text-slate-400 font-semibold">O</span>
             <span className={isUp ? 'text-[#089981]' : 'text-[#f23645]'}>{fmtPrice(currentOhlc.open, symbol)}</span>
 

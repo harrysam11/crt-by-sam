@@ -76,7 +76,9 @@ export default function ChartTradingOverlay({
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
   const [dragCurrentPrice, setDragCurrentPrice] = useState<number | null>(null);
   const [quickQty, setQuickQty] = useState('0.1');
-  const [isQuickTradeCollapsed, setIsQuickTradeCollapsed] = useState(false);
+  const [isQuickTradeCollapsed, setIsQuickTradeCollapsed] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
   const [isPosActionsOpen, setIsPosActionsOpen] = useState(false);
   const [isPosHovered, setIsPosHovered] = useState(false);
 
@@ -189,8 +191,8 @@ export default function ChartTradingOverlay({
       ref={containerRef}
       className="pointer-events-none absolute inset-0 z-20 overflow-hidden font-mono select-none"
     >
-      {/* 1. In-Chart 1-Click Quick Trade Buttons (Top Left) */}
-      <div className="pointer-events-auto absolute top-14 left-3 z-30 flex items-center gap-1 clay-card px-2 py-1 bg-[#09090d]/85 backdrop-blur-md border border-white/5 shadow-lg">
+      {/* 1. In-Chart 1-Click Quick Trade Buttons (Top Left on desktop, Top Right on mobile) */}
+      <div className="pointer-events-auto absolute top-2 right-16 md:top-14 md:left-3 z-30 flex items-center gap-1 clay-card px-2 py-1 bg-[#09090d]/85 backdrop-blur-md border border-white/5 shadow-lg">
         {isQuickTradeCollapsed ? (
           <button
             onClick={() => setIsQuickTradeCollapsed(false)}

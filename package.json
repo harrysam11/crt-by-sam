@@ -1,0 +1,32 @@
+{
+  "name": "crt-by-sam",
+  "version": "2.0.0",
+  "private": true,
+  "description": "CRT Institutional Trading Terminal & TradeXGuardian",
+  "workspaces": [
+    "terminal"
+  ],
+  "scripts": {
+    "dev": "npm --prefix terminal run dev",
+    "build": "npm --prefix terminal run build",
+    "preview": "npm --prefix terminal run preview",
+    "serve": "npm --prefix terminal run serve",
+    "cap:sync": "npm --prefix terminal run cap:sync",
+    "cap:build": "npm --prefix terminal run cap:build",
+    "cap:android": "npm --prefix terminal run cap:android",
+    "cap:ios": "npm --prefix terminal run cap:ios",
+    "start": "npm --prefix terminal run dev"
+  },
+  "keywords": [
+    "trading",
+    "tradingview",
+    "terminal",
+    "orderflow",
+    "propfirm",
+    "crypto",
+    "stocks",
+    "forex"
+  ],
+  "author": "Sam",
+  "license": "MIT"
+}

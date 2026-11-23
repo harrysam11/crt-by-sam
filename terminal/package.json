@@ -4,13 +4,14 @@
   "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "cap:sync": "npx cap sync",
-    "cap:build": "npm run build && npx cap sync",
-    "cap:android": "npx cap open android",
-    "cap:ios": "npx cap open ios"
+    "preview": "vite preview --host",
+    "serve": "node server.mjs",
+    "cap:sync": "cap sync",
+    "cap:build": "npm run build && cap sync",
+    "cap:android": "cap open android",
+    "cap:ios": "cap open ios"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.2",

@@ -298,7 +298,7 @@ export default function Header({
           {fmtPrice(price, symbol)}
         </span>
         <span className="text-xs text-muted font-medium hidden sm:inline">{inst?.currency}</span>
-        <span className={`num text-[10px] sm:text-xs font-semibold px-1 sm:px-1.5 py-0.5 rounded-[4px] border ${
+        <span className={`hidden sm:inline-block num text-[10px] sm:text-xs font-semibold px-1 sm:px-1.5 py-0.5 rounded-[4px] border ${
           change >= 0
             ? 'text-up bg-emerald-500/10 border-emerald-500/25'
             : 'text-down bg-rose-500/10 border-rose-500/25'
@@ -368,17 +368,17 @@ export default function Header({
               audioHaptics.tick();
               setIsAccountOpen((v) => !v);
             }}
-            className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-[6px] border transition ${
+            className={`flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-[6px] border transition ${
               isAccountOpen
                 ? 'border-white/40 bg-white/15 text-white'
                 : 'border-white/[0.08] bg-white/[0.03] hover:border-white/20 text-white'
             }`}
             title="Click to view Account Health, Prop Firm Shield & Drawdown"
           >
-            <span className="text-[10px] text-muted font-medium">Eq</span>
-            <span className="font-bold text-xs">{displayEquity}</span>
+            <span className="text-[10px] text-muted font-medium hidden sm:inline">Eq</span>
+            <span className="font-bold text-[11px] sm:text-xs">{displayEquity}</span>
             <span
-              className={`text-[10px] font-semibold px-1 py-0.5 rounded ${
+              className={`hidden sm:inline-block text-[10px] font-semibold px-1 py-0.5 rounded ${
                 hideDollar
                   ? 'text-zinc-400 bg-white/5'
                   : open >= 0
@@ -538,7 +538,7 @@ export default function Header({
               audioHaptics.tick();
               toggleZenMode();
             }}
-            className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 text-xs font-semibold transition ${
+            className={`hidden sm:flex items-center gap-1 px-2 sm:px-2.5 py-1 text-xs font-semibold transition ${
               zenMode.active
                 ? 'clay-pill-active'
                 : 'clay-pill'
@@ -555,7 +555,7 @@ export default function Header({
               audioHaptics.tick();
               onOpenCommandPalette?.();
             }}
-            className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 text-xs rounded-lg bg-black/40 hover:bg-black/70 border border-white/10 text-slate-300 hover:text-white transition shadow-sm font-sans"
+            className="hidden sm:flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 text-xs rounded-lg bg-black/40 hover:bg-black/70 border border-white/10 text-slate-300 hover:text-white transition shadow-sm font-sans"
             title="Search all features, tools, pairs, and layouts (Ctrl+K)"
           >
             <svg className="h-3.5 w-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -572,7 +572,7 @@ export default function Header({
                 audioHaptics.tick();
                 setIsInstToolsOpen((v) => !v);
               }}
-              className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 text-xs font-semibold transition ${
+              className={`flex items-center gap-1 p-1 sm:px-2.5 sm:py-1 text-xs font-semibold transition ${
                 isInstToolsOpen
                   ? 'clay-pill-active'
                   : 'clay-pill'
@@ -583,13 +583,27 @@ export default function Header({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
               <span className="hidden sm:inline">Tools</span>
-              <svg className={`h-3 w-3 text-slate-400 transition-transform ${isInstToolsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className={`h-3 w-3 text-slate-400 transition-transform hidden sm:inline ${isInstToolsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
 
             {isInstToolsOpen && (
               <div className="absolute right-0 top-full mt-2 z-50 w-64 clay-popover p-2 shadow-2xl select-none font-mono text-xs">
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    useDrawingStore.getState().setActiveRightDrawer((prev) => (prev === 'WATCHLIST' ? null : 'WATCHLIST'));
+                    setIsInstToolsOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                >
+                  <svg className="h-4 w-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                  <span>Watchlist & Markets</span>
+                </button>
+
                 <button
                   onClick={() => {
                     audioHaptics.tick();
@@ -761,7 +775,7 @@ export default function Header({
           </div>
 
           {/* Multi-Chart Layout Dropdown (TradingView-Grade Icon-Only) */}
-          <div className="relative flex items-center" ref={layoutRef}>
+          <div className="relative hidden sm:flex items-center" ref={layoutRef}>
             <button
               onClick={() => {
                 audioHaptics.tick();
@@ -1199,7 +1213,7 @@ export default function Header({
                 audioHaptics.tick();
                 setIsOverflowOpen((v) => !v);
               }}
-              className={`p-1.5 rounded-[6px] border transition flex items-center justify-center ${
+              className={`p-1 sm:p-1.5 rounded-[6px] border transition flex items-center justify-center ${
                 isOverflowOpen ? 'clay-pill-active' : 'clay-btn text-white'
               }`}
               title="Terminal Operations & Quick Access"
@@ -1280,6 +1294,64 @@ export default function Header({
 
                 {/* Quick Navigation Items */}
                 <div className="space-y-1">
+                  {onOpenCommandPalette && (
+                    <button
+                      onClick={() => {
+                        audioHaptics.tick();
+                        onOpenCommandPalette();
+                        setIsOverflowOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                    >
+                      <svg className="h-4 w-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <span>Search Tools & Commands</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      useDrawingStore.getState().setActiveRightDrawer((prev) => (prev === 'WATCHLIST' ? null : 'WATCHLIST'));
+                      setIsOverflowOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
+                    <span>Watchlist & Markets</span>
+                  </button>
+
+                  {onOpenLayoutCustomizer && (
+                    <button
+                      onClick={() => {
+                        audioHaptics.tick();
+                        onOpenLayoutCustomizer();
+                        setIsOverflowOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                    >
+                      <svg className="h-4 w-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      <span>Customize Layout & Multi-Chart</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      toggleZenMode();
+                      setIsOverflowOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                  >
+                    <span className={`h-2 w-2 rounded-full ${zenMode.active ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
+                    <span>Zen Mode: {zenMode.active ? 'ON' : 'OFF'}</span>
+                  </button>
+
                   <button
                     onClick={() => {
                       audioHaptics.tick();

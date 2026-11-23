@@ -280,7 +280,7 @@ export default function FavoritesBar() {
       }}
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={handleResetPos}
-      className="clay-popover fixed z-40 flex items-center gap-1 px-2 py-1 select-none font-mono text-xs shadow-2xl backdrop-blur-md border border-white/[0.08] cursor-move"
+      className="clay-popover fixed z-40 hidden md:flex items-center gap-1 px-2 py-1 select-none font-mono text-xs shadow-2xl backdrop-blur-md border border-white/[0.08] cursor-move"
       title="In-Chart Drawing Toolbar (Drag to reposition, Double-click to reset)"
     >
       {/* Movable Drag Grip Handle */}

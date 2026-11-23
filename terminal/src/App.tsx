@@ -434,8 +434,23 @@ export default function App() {
         {/* Collapsible Right Slideout Drawer */}
         {!isChartMaximized && activeRightDrawer && (
           <>
-            <Splitter dir="v" onDrag={handleResizeRightW} />
-            <div style={{ width: rightW }} className="shrink-0 flex flex-col h-full overflow-hidden bg-panel border-l border-grid z-10 shadow-2xl">
+            <div className="hidden md:block">
+              <Splitter dir="v" onDrag={handleResizeRightW} />
+            </div>
+            <div
+              style={{ width: typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : rightW }}
+              className="shrink-0 flex flex-col h-full overflow-hidden bg-panel border-l border-grid z-30 shadow-2xl fixed md:relative inset-y-0 right-0 md:inset-auto w-full md:w-auto"
+            >
+              {/* Mobile Drawer Close Header */}
+              <div className="md:hidden flex items-center justify-between px-3 py-2 bg-base border-b border-grid">
+                <span className="text-xs font-bold font-mono text-white uppercase">{activeRightDrawer}</span>
+                <button
+                  onClick={() => setActiveRightDrawer(null)}
+                  className="px-2.5 py-1 rounded text-xs bg-slate-800 text-slate-300 hover:text-white"
+                >
+                  Close
+                </button>
+              </div>
               {activeRightDrawer === 'WATCHLIST' && <Watchlist />}
               {activeRightDrawer === 'DOM' && <FootprintDOM />}
               {activeRightDrawer === 'TRADE' && (
@@ -458,7 +473,7 @@ export default function App() {
 
         {/* TradingView-Style Far Right Vertical Icon Dock Rail */}
         {!isChartMaximized && (
-          <aside className="w-[48px] shrink-0 border-l border-grid bg-panel flex flex-col items-center py-3 gap-2.5 z-20 select-none font-mono shadow-clay-card">
+          <aside className="hidden md:flex w-[48px] shrink-0 border-l border-grid bg-panel flex-col items-center py-3 gap-2.5 z-20 select-none font-mono shadow-clay-card">
             {/* Watchlist Toggle */}
             <button
               onClick={() => {
