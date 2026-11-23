@@ -329,10 +329,14 @@ export default function TradingChart({
       closeAllMenus();
     } else {
       const rect = tfMenuRef.current?.getBoundingClientRect();
+      const popoverWidth = Math.min(288, window.innerWidth - 16);
       if (rect) {
+        const leftPos = window.innerWidth < 640
+          ? Math.max(8, (window.innerWidth - popoverWidth) / 2)
+          : Math.max(10, Math.min(window.innerWidth - 300, rect.left));
         setMenuAnchor({
           top: rect.bottom + 4,
-          left: Math.max(10, Math.min(window.innerWidth - 300, rect.left)),
+          left: leftPos,
         });
       }
       setActiveMenu('TF');
@@ -344,10 +348,14 @@ export default function TradingChart({
       closeAllMenus();
     } else {
       const rect = styleMenuRef.current?.getBoundingClientRect();
+      const popoverWidth = Math.min(240, window.innerWidth - 16);
       if (rect) {
+        const leftPos = window.innerWidth < 640
+          ? Math.max(8, (window.innerWidth - popoverWidth) / 2)
+          : Math.max(10, Math.min(window.innerWidth - 260, rect.left));
         setMenuAnchor({
           top: rect.bottom + 4,
-          left: Math.max(10, Math.min(window.innerWidth - 260, rect.left)),
+          left: leftPos,
         });
       }
       setActiveMenu('STYLE');
@@ -1927,7 +1935,25 @@ export default function TradingChart({
 
           {/* Timeframe Favorites & Dropdown */}
           <div className="relative flex items-center shrink-0" ref={tfMenuRef}>
-            <div className="flex items-center gap-0.5">
+            {/* Mobile: Prominent Unified Timeframe Selector Button */}
+            <div className="flex md:hidden items-center">
+              <button
+                onClick={() => {
+                  audioHaptics.tick();
+                  toggleTfMenu();
+                }}
+                className="flex items-center gap-1.5 clay-pill-active px-2.5 py-1 text-xs font-bold transition rounded-lg"
+                title="Select Chart Timeframe"
+              >
+                <span>{timeframe}</span>
+                <svg className={`h-3 w-3 text-slate-300 transition-transform ${isTfMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Desktop: Quick Favorite Timeframe Pills + Dropdown Toggle */}
+            <div className="hidden md:flex items-center gap-0.5">
               {favoriteTimeframes.map((t) => (
                 <button
                   key={t}
@@ -1938,8 +1964,12 @@ export default function TradingChart({
                   }`}
                   onClick={() => {
                     audioHaptics.tick();
-                    setTimeframe(t);
-                    setPaneTimeframe(paneId, t);
+                    if (t === timeframe) {
+                      toggleTfMenu();
+                    } else {
+                      setTimeframe(t);
+                      setPaneTimeframe(paneId, t);
+                    }
                   }}
                 >
                   {t}
@@ -1949,7 +1979,7 @@ export default function TradingChart({
                 <button
                   onClick={() => {
                     audioHaptics.tick();
-                    setIsCustomIntervalModalOpen(true);
+                    toggleTfMenu();
                   }}
                   className="px-2 py-0.5 text-xs clay-pill-active font-bold rounded"
                   title="Active Custom Timeframe (Click to manage)"
@@ -1963,26 +1993,25 @@ export default function TradingChart({
                   audioHaptics.tick();
                   toggleTfMenu();
                 }}
-                className="hidden sm:inline-flex px-1.5 py-0.5 text-xs clay-pill text-[#38bdf8] hover:text-white hover:bg-[#38bdf8]/20 transition rounded font-bold"
+                className="px-1.5 py-0.5 text-xs clay-pill text-[#38bdf8] hover:text-white hover:bg-[#38bdf8]/20 transition rounded font-bold"
                 title="Add Custom Interval"
               >
                 +
               </button>
+              {/* Timeframe Dropdown Toggle */}
+              <button
+                onClick={() => {
+                  audioHaptics.tick();
+                  toggleTfMenu();
+                }}
+                className="p-1 rounded-full clay-btn transition ml-0.5"
+                title="All Timeframes"
+              >
+                <svg className={`h-3 w-3 transition-transform ${isTfMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
             </div>
-
-            {/* Timeframe Dropdown Toggle */}
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                toggleTfMenu();
-              }}
-              className="p-1 rounded-full clay-btn transition ml-0.5"
-              title="All Timeframes"
-            >
-              <svg className={`h-3 w-3 transition-transform ${isTfMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
 
             {/* Timeframe Dropdown Menu with Direct User Input */}
             {isTfMenuOpen && (
@@ -1991,7 +2020,7 @@ export default function TradingChart({
                   top: `${menuAnchor?.top ?? 45}px`,
                   left: `${menuAnchor?.left ?? 10}px`,
                 }}
-                className="fixed z-50 w-72 clay-popover p-2.5 shadow-2xl font-mono text-xs max-h-[85vh] overflow-y-auto"
+                className="fixed z-50 w-72 max-w-[calc(100vw-16px)] clay-popover p-2.5 shadow-2xl font-mono text-xs max-h-[80vh] overflow-y-auto"
               >
                 {/* Direct User Input Form for Custom Interval */}
                 <div className="p-2 border border-[#2d2d3e] bg-black/60 rounded-xl mb-2.5">
@@ -2232,7 +2261,7 @@ export default function TradingChart({
                   <rect x="12" y="16" width="8" height="4" rx="0.5" fill="currentColor" fillOpacity={0.6} />
                 </svg>
               )}
-              <span>{
+              <span className="hidden sm:inline">{
                 chartStyle === 'CANDLE' ? 'Candles' :
                 chartStyle === 'BAR' ? 'Bars' :
                 chartStyle === 'HOLLOW_CANDLE' ? 'Hollow' :
