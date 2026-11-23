@@ -1963,7 +1963,7 @@ export default function TradingChart({
                   audioHaptics.tick();
                   toggleTfMenu();
                 }}
-                className="px-1.5 py-0.5 text-xs clay-pill text-[#38bdf8] hover:text-white hover:bg-[#38bdf8]/20 transition rounded font-bold"
+                className="hidden sm:inline-flex px-1.5 py-0.5 text-xs clay-pill text-[#38bdf8] hover:text-white hover:bg-[#38bdf8]/20 transition rounded font-bold"
                 title="Add Custom Interval"
               >
                 +
@@ -2708,7 +2708,7 @@ export default function TradingChart({
         {/* Right Section: Snapshot, Theme, Settings, Fullscreen */}
         <div className="flex items-center gap-1 shrink-0 ml-auto">
           {/* Chart Snapshot Dropdown Popover (TradingView-style, NO eye-mask) */}
-          <div className="relative" ref={screenshotMenuRef}>
+          <div className="relative hidden sm:block" ref={screenshotMenuRef}>
             <button
               onClick={() => {
                 audioHaptics.tick();
@@ -2764,7 +2764,7 @@ export default function TradingChart({
               audioHaptics.tick();
               toggleThemeMode();
             }}
-            className="p-1.5 rounded-full clay-btn transition"
+            className="p-1.5 rounded-full clay-btn transition hidden sm:inline-flex"
             title={`Toggle Theme (Current: ${themeMode})`}
           >
             {themeMode === 'DARK' ? (
@@ -2803,7 +2803,7 @@ export default function TradingChart({
                 document.exitFullscreen?.();
               }
             }}
-            className="p-1.5 rounded-full clay-btn transition"
+            className="p-1.5 rounded-full clay-btn transition hidden sm:inline-flex"
             title="Toggle Fullscreen"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
