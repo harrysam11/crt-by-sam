@@ -1,0 +1,19 @@
+[package]
+name = "crt-server"
+version = "2.0.0"
+edition = "2021"
+authors = ["Sam"]
+description = "High-Performance Institutional Trading Terminal Server & Market Hub"
+
+[dependencies]
+axum = { version = "0.7", features = ["ws"] }
+tokio = { version = "1.38", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+futures-util = "0.3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio-tungstenite = { version = "0.23", features = ["connect", "rustls-tls-native-roots"] }
+urlencoding = "2.1"

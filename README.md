@@ -129,12 +129,27 @@ The server automatically binds to `0.0.0.0:5173` for access from localhost, LAN 
 - **Android Emulator**: `http://10.0.2.2:5173`
 
 ### 3. Production Self-Hosted Server
-For production deployments, run the zero-dependency Node.js production server with built-in API proxying:
+You can run the terminal server using either Node.js or the high-performance Rust backend:
+
+#### Option A: Zero-Dependency Node.js Server
 ```bash
 npm run build
 npm run serve
 ```
-Listens on `0.0.0.0:5173` with full HTTP + WebSocket streaming and proxy support.
+
+#### Option B: High-Performance Rust Backend (Axum + Tokio + WebSocket Hub)
+```bash
+# Build frontend and Rust server
+npm run build:all
+
+# Launch high-performance Rust server binary
+npm run serve:rust
+# Or run binary directly:
+./server/target/release/crt-server
+```
+- Listens on `0.0.0.0:5173` with Tokio multi-threaded async execution.
+- Includes pre-trade `TradeXGuardian` risk engine and Binance real-time WebSocket tick aggregator.
+- Microsecond latency with zero garbage collection pauses.
 
 ### 4. Native Mobile App Build (Capacitor)
 ```bash
