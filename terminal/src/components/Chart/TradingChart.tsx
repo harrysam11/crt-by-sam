@@ -115,6 +115,7 @@ export default function TradingChart({
   const setTimeframe = useTerminalStore((s) => s.setTimeframe);
   const candles = useTerminalStore((s) => s.candles);
   const error = useTerminalStore((s) => s.error);
+  const isLoadingCandles = useTerminalStore((s) => s.isLoadingCandles);
   const placeOrder = useTerminalStore((s) => s.placeOrder);
   const addAlert = useTerminalStore((s) => s.addAlert);
   const pinePlots = useTerminalStore((s) => s.pinePlots);
@@ -137,6 +138,7 @@ export default function TradingChart({
   const isIndependentPane = Boolean(symbolOverride || timeframeOverride);
   const [localCandles, setLocalCandles] = useState<Candle[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [isLoadingBars, setIsLoadingBars] = useState<boolean>(false);
 
   useEffect(() => {
     if (!isIndependentPane) return;
@@ -148,6 +150,7 @@ export default function TradingChart({
 
     const load = async () => {
       try {
+        setIsLoadingBars(true);
         setLocalError(null);
         const { candles: fetched } = await datafeedHub.getBars(symbol, timeframe, undefined, undefined, ctl.signal);
         if (cancelled) return;
@@ -155,6 +158,10 @@ export default function TradingChart({
       } catch (err: unknown) {
         if (!cancelled && !(err instanceof DOMException)) {
           setLocalError(err instanceof Error ? err.message : 'Failed to load bars');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingBars(false);
         }
       }
     };
@@ -241,6 +248,7 @@ export default function TradingChart({
   const lastDatasetKeyRef = useRef<string>('');
   const [countdownText, setCountdownText] = useState<string>('');
   const [isCustomIntervalModalOpen, setIsCustomIntervalModalOpen] = useState(false);
+  const [activeTimeRange, setActiveTimeRange] = useState<string | null>(null);
 
   // Indicators Modal State
   const [isIndicatorsModalOpen, setIsIndicatorsModalOpen] = useState(false);
@@ -1604,6 +1612,7 @@ export default function TradingChart({
       hasFittedKeyRef.current[datasetKey] = true;
       lastDatasetKeyRef.current = datasetKey;
       try {
+        a.chart.timeScale().resetTimeScale();
         a.chart.timeScale().fitContent();
       } catch {}
     }
@@ -1899,8 +1908,36 @@ export default function TradingChart({
 
   const handleSelectTimeRange = (range: string) => {
     audioHaptics.tick();
+    setActiveTimeRange(range);
+
+    const rangeToTf: Record<string, Timeframe> = {
+      '1D': '5m',
+      '5D': '15m',
+      '1M': '1h',
+      '3M': '2h',
+      '6M': '4h',
+      'YTD': '1d',
+      '1Y': '1d',
+      'ALL': '1w',
+    };
+
+    const targetTf = rangeToTf[range];
+    if (targetTf) {
+      setTimeframe(targetTf);
+      setPaneTimeframe(paneId, targetTf);
+    }
+
     const a = api.current;
-    if (!a || !effectiveCandles.length) return;
+    if (!a) return;
+
+    if (range === 'ALL') {
+      try {
+        a.chart.timeScale().resetTimeScale();
+        a.chart.timeScale().fitContent();
+      } catch {}
+      return;
+    }
+
     const now = Math.floor(Date.now() / 1000);
     let seconds = 86400; // 1D
     if (range === '1D') seconds = 86400;
@@ -1912,17 +1949,16 @@ export default function TradingChart({
       const startOfYear = Math.floor(new Date(new Date().getFullYear(), 0, 1).getTime() / 1000);
       seconds = now - startOfYear;
     } else if (range === '1Y') seconds = 365 * 86400;
-    else if (range === 'ALL') {
-      a.chart.timeScale().fitContent();
-      return;
-    }
 
     const fromTime = (now - seconds) as UTCTimestamp;
     const toTime = (now + 3600) as UTCTimestamp;
     try {
       a.chart.timeScale().setVisibleRange({ from: fromTime, to: toTime });
     } catch {
-      a.chart.timeScale().fitContent();
+      try {
+        a.chart.timeScale().resetTimeScale();
+        a.chart.timeScale().fitContent();
+      } catch {}
     }
   };
 
@@ -1932,7 +1968,10 @@ export default function TradingChart({
       <ChartSkinsLayer />
 
       {/* Institutional TradingView-Style Chart Top Toolbar */}
-      <div className="relative z-30 flex items-center justify-between border-b border-grid bg-panel px-2.5 py-1 select-none text-xs gap-2 overflow-visible">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative z-30 flex items-center justify-between border-b border-grid bg-panel px-2.5 py-1 select-none text-xs gap-2 overflow-visible"
+      >
         {/* Left Section: Symbol, Timeframes, Candle Style, Indicators, Replay, Alert, Undo/Redo, Layers */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none min-w-0 flex-1 py-0.5">
           {/* Symbol Search Trigger */}
@@ -1983,12 +2022,9 @@ export default function TradingChart({
                   }`}
                   onClick={() => {
                     audioHaptics.tick();
-                    if (t === timeframe) {
-                      toggleTfMenu();
-                    } else {
-                      setTimeframe(t);
-                      setPaneTimeframe(paneId, t);
-                    }
+                    setActiveTimeRange(null);
+                    setTimeframe(t);
+                    setPaneTimeframe(paneId, t);
                   }}
                 >
                   {t}
@@ -3203,6 +3239,14 @@ export default function TradingChart({
             </div>
           )}
 
+          {/* Active candle fetching HUD indicator */}
+          {(isIndependentPane ? isLoadingBars : isLoadingCandles) && (
+            <div className="absolute top-3 right-3 z-30 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/85 border border-cyan-400/40 text-[11px] text-cyan-300 font-mono shadow-xl backdrop-blur-md pointer-events-none animate-pulse">
+              <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
+              <span>Updating {timeframe} candles...</span>
+            </div>
+          )}
+
           {/* Loading overlay */}
           {!activeCandles.length && (
             <div className="absolute inset-0 z-30 flex items-center justify-center bg-bg/80 p-6 text-center">
@@ -3229,14 +3273,24 @@ export default function TradingChart({
     </div>
 
       {/* TradingView Bottom Range & Scale Bar */}
-      <div className="h-8 shrink-0 border-t border-grid bg-panel/95 backdrop-blur-md px-2.5 flex items-center justify-between text-[11px] text-slate-300 select-none font-mono z-10 overflow-x-auto scrollbar-none">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="h-8 shrink-0 border-t border-grid bg-panel/95 backdrop-blur-md px-2.5 flex items-center justify-between text-[11px] text-slate-300 select-none font-mono z-10 overflow-x-auto scrollbar-none"
+      >
         {/* Left: Time Range Presets */}
         <div className="flex items-center gap-1 shrink-0 overflow-x-auto scrollbar-none">
           {(['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', 'ALL'] as const).map((r) => (
             <button
               key={r}
-              onClick={() => handleSelectTimeRange(r)}
-              className="px-1.5 sm:px-2 py-0.5 rounded-[4px] bg-white/[0.04] hover:bg-white/15 text-slate-300 hover:text-white border border-white/10 text-[9.5px] sm:text-[10px] font-semibold transition cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSelectTimeRange(r);
+              }}
+              className={`px-1.5 sm:px-2 py-0.5 rounded-[4px] text-[9.5px] sm:text-[10px] font-semibold transition cursor-pointer ${
+                activeTimeRange === r
+                  ? 'bg-white text-black font-bold shadow-sm'
+                  : 'bg-white/[0.04] hover:bg-white/15 text-slate-300 hover:text-white border border-white/10'
+              }`}
             >
               {r}
             </button>

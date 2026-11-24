@@ -35,6 +35,8 @@ pub fn router() -> Router<std::sync::Arc<AppState>> {
         .route("/yahoo/*path", get(yahoo_handler))
         .route("/calendar", get(calendar_handler))
         .route("/calendar/*path", get(calendar_handler))
+        .route("/binance", get(binance_handler))
+        .route("/binance/*path", get(binance_handler))
 }
 
 async fn health_handler(
@@ -157,3 +159,53 @@ async fn calendar_handler(
             .into_response(),
     }
 }
+
+async fn binance_handler(
+    OriginalUri(uri): OriginalUri,
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<AppState>>,
+) -> Response {
+    let full_path = uri.path();
+    let subpath = full_path.strip_prefix("/api/binance").unwrap_or(full_path);
+    let target_subpath = if subpath.starts_with("/api/v3") {
+        subpath.to_string()
+    } else {
+        format!("/api/v3{}", subpath)
+    };
+    let query_str = uri.query().map(|q| format!("?{}", q)).unwrap_or_default();
+    let binance_url = format!("https://api.binance.com{}{}", target_subpath, query_str);
+
+    match state
+        .client
+        .get(&binance_url)
+        .header(
+            header::USER_AGENT,
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        )
+        .send()
+        .await
+    {
+        Ok(resp) => {
+            let status = resp.status();
+            match resp.bytes().await {
+                Ok(bytes) => {
+                    let mut headers = HeaderMap::new();
+                    headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+                    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=1"));
+                    headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*"));
+                    (status, headers, bytes).into_response()
+                }
+                Err(err) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": format!("Failed to read Binance body: {}", err) })),
+                )
+                    .into_response(),
+            }
+        }
+        Err(err) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({ "error": format!("Binance upstream error: {}", err) })),
+        )
+            .into_response(),
+    }
+}
+

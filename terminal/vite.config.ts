@@ -16,6 +16,12 @@ const proxy = {
     rewrite: (p: string) => p.replace(/^\/api\/calendar/, ''),
     headers: { 'User-Agent': 'Mozilla/5.0' },
   },
+  '/api/binance': {
+    target: 'https://api.binance.com',
+    changeOrigin: true,
+    rewrite: (p: string) => p.replace(/^\/api\/binance/, '/api/v3'),
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36' },
+  },
 };
 
 export default defineConfig({

@@ -11,7 +11,31 @@ import { CandleAggregator } from '../aggregator';
 
 import { parseTimeframeToSeconds } from '../../utils/timeframe';
 
-const BINANCE_REST_BASE = 'https://api.binance.com/api/v3';
+const BINANCE_REST_BASES = [
+  'https://api.binance.com/api/v3',
+  'https://api1.binance.com/api/v3',
+  'https://api2.binance.com/api/v3',
+  'https://api3.binance.com/api/v3',
+  'https://data-api.binance.vision/api/v3',
+  '/api/binance',
+];
+
+async function fetchBinanceWithFallback(pathAndQuery: string, signal?: AbortSignal): Promise<Response> {
+  let lastErr: Error | null = null;
+  for (const base of BINANCE_REST_BASES) {
+    try {
+      const url = `${base}${pathAndQuery}`;
+      const res = await fetch(url, { signal });
+      if (res.ok) {
+        return res;
+      }
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
+      lastErr = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+  throw lastErr || new Error('All Binance API mirrors failed');
+}
 
 const BINANCE_NATIVE_INTERVALS = new Set<string>([
   '1s', '1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M',
@@ -52,7 +76,7 @@ export class BinanceAdapter implements IDatafeedAdapter {
 
     // If not in default list and looks like a crypto symbol, query Binance ticker
     try {
-      const res = await fetch(`${BINANCE_REST_BASE}/ticker/price?symbol=${encodeURIComponent(q)}`, { signal });
+      const res = await fetchBinanceWithFallback(`/ticker/price?symbol=${encodeURIComponent(q)}`, signal);
       if (res.ok) {
         const data = (await res.json()) as { symbol: string; price: string };
         return [
@@ -116,12 +140,12 @@ export class BinanceAdapter implements IDatafeedAdapter {
   ): Promise<{ candles: Candle[]; quote: QuoteInfo }> {
     const { isNative, baseInterval, targetSec } = this.getBaseIntervalAndAggregation(timeframe);
     const limit = isNative ? 600 : 1000;
-    let url = `${BINANCE_REST_BASE}/klines?symbol=${encodeURIComponent(symbol)}&interval=${baseInterval}&limit=${limit}`;
+    let pathAndQuery = `/klines?symbol=${encodeURIComponent(symbol)}&interval=${baseInterval}&limit=${limit}`;
     if (fromSec && toSec) {
-      url += `&startTime=${fromSec * 1000}&endTime=${toSec * 1000}`;
+      pathAndQuery += `&startTime=${fromSec * 1000}&endTime=${toSec * 1000}`;
     }
 
-    const res = await fetch(url, { signal });
+    const res = await fetchBinanceWithFallback(pathAndQuery, signal);
     if (!res.ok) {
       throw new Error(`Binance API error: ${res.status} ${res.statusText}`);
     }

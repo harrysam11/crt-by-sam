@@ -95,6 +95,13 @@ const server = http.createServer((req, res) => {
     return proxyRequest(req, res, 'nfs.faireconomy.media', targetPath);
   }
 
+  // 3. Proxy /api/binance -> https://api.binance.com
+  if (pathname.startsWith('/api/binance')) {
+    const subpath = pathname.replace(/^\/api\/binance/, '');
+    const targetPath = (subpath.startsWith('/api/v3') ? subpath : `/api/v3${subpath}`) + url.search;
+    return proxyRequest(req, res, 'api.binance.com', targetPath);
+  }
+
   // 3. Static File Serving from dist/
   let filePath = path.join(DIST_DIR, pathname === '/' ? 'index.html' : pathname);
 

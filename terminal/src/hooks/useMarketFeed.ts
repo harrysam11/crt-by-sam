@@ -93,6 +93,7 @@ export function useMarketFeed(): void {
 
     const load = async () => {
       try {
+        store().setIsLoadingCandles(true);
         const { candles, quote } = await datafeedHub.getBars(symbol, timeframe, undefined, undefined, ctl.signal);
         if (cancelled) return;
         if (!candles.length) throw new Error('No data for this symbol and timeframe.');
@@ -107,6 +108,10 @@ export function useMarketFeed(): void {
       } catch (e) {
         if (cancelled || (e instanceof DOMException && e.name === 'AbortError')) return;
         store().setError(e instanceof Error ? e.message : 'Failed to load data.');
+      } finally {
+        if (!cancelled) {
+          store().setIsLoadingCandles(false);
+        }
       }
     };
 

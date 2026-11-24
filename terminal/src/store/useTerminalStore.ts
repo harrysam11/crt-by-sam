@@ -40,8 +40,10 @@ interface TerminalState {
   balance: number; // USD wallet = start + realized PnL
   status: ConnectionStatus;
   error: string | null;
+  isLoadingCandles: boolean;
   pinePlots: Array<{ title: string; color: string; data: Array<{ time: number; value: number }> }>;
 
+  setIsLoadingCandles: (l: boolean) => void;
   setPinePlots: (plots: Array<{ title: string; color: string; data: Array<{ time: number; value: number }> }>) => void;
   setSymbol: (s: string) => void;
   setTimeframe: (t: Timeframe) => void;
@@ -258,8 +260,10 @@ export const useTerminalStore = create<TerminalState>()(
         balance: START_BALANCE,
         status: 'closed',
         error: null,
+        isLoadingCandles: false,
         pinePlots: [],
 
+        setIsLoadingCandles: (isLoadingCandles) => set({ isLoadingCandles }),
         setPinePlots: (pinePlots) => set({ pinePlots }),
         setSymbol: (symbol) => {
           const safe = sanitizeSymbol(symbol);
@@ -271,7 +275,7 @@ export const useTerminalStore = create<TerminalState>()(
         },
         setTimeframe: (timeframe) => {
           const safe = sanitizeTimeframe(timeframe);
-          set({ timeframe: safe, candles: [], error: null });
+          set({ timeframe: safe, error: null });
           try {
             const layoutState = useLayoutStore.getState();
             layoutState.setPaneTimeframe(layoutState.activePaneId || 'pane-1', safe);
