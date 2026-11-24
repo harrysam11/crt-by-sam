@@ -920,7 +920,7 @@ export default function TradingChart({
     const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
     const isZen = zenMode.active && zenMode.softPastelCandles;
 
-    const chartBgColor = isCustomBg ? 'transparent' : (isLightMode ? '#ffffff' : '#050508');
+    const chartBgColor = isCustomBg ? 'rgba(0, 0, 0, 0)' : (isLightMode ? '#ffffff' : '#050508');
     const chartTextColor = isLightMode ? '#555555' : '#828290';
     const chartGridColor = isLightMode ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.03)';
     const chartBorderColor = isLightMode ? 'rgba(0, 0, 0, 0.1)' : '#1e1e26';
@@ -1283,7 +1283,7 @@ export default function TradingChart({
       layout: {
         background: {
           type: ColorType.Solid,
-          color: isCustomBg ? 'transparent' : '#0b0e14',
+          color: isCustomBg ? 'rgba(0, 0, 0, 0)' : '#0b0e14',
         },
       },
     });
@@ -1363,7 +1363,7 @@ export default function TradingChart({
     }
 
     const gridBase = isLight ? '0, 0, 0' : '255, 255, 255';
-    const chartBg = isCustomBg ? 'transparent' : (isLight ? '#ffffff' : '#050508');
+    const chartBg = isCustomBg ? 'rgba(0, 0, 0, 0)' : (isLight ? '#ffffff' : '#050508');
     const chartText = isLight ? '#555555' : '#828290';
     const chartBorder = isLight ? 'rgba(0, 0, 0, 0.1)' : '#1e1e26';
 

@@ -11,26 +11,26 @@ export interface WallpaperPreset {
 }
 
 export const WALLPAPER_PRESETS: WallpaperPreset[] = [
-  // 1. MP4 Video Loops
+  // 1. MP4 Video Loops (Self-hosted 100% offline-ready & instant playback)
   {
     name: 'Cyber Grid (MP4)',
     type: 'VIDEO',
     category: 'VIDEO',
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-code-31911-large.mp4',
+    url: '/videos/cyber_grid.mp4',
     description: 'High-framerate cybernetic data screens',
   },
   {
     name: 'Neon Matrix Stream (MP4)',
     type: 'VIDEO',
     category: 'VIDEO',
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-matrix-style-code-screen-animation-39749-large.mp4',
+    url: '/videos/matrix_stream.mp4',
     description: 'Continuous green matrix digital rainfall',
   },
   {
     name: 'Hyperspace Tunnel (MP4)',
     type: 'VIDEO',
     category: 'VIDEO',
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-stars-in-space-background-1610-large.mp4',
+    url: '/videos/hyperspace_stars.mp4',
     description: 'Ambient cosmic particle drift',
   },
 
@@ -83,13 +83,55 @@ export const WALLPAPER_PRESETS: WallpaperPreset[] = [
 
 export default function ChartSkinsLayer() {
   const themeConfig = usePsychologyStore((s) => s.themeConfig);
-  const { wallpaperType, mediaUrl, overlayOpacity, blurAmount = 0 } = themeConfig;
+  const {
+    wallpaperType,
+    mediaUrl,
+    overlayOpacity,
+    blurAmount = 0,
+    fitMode = 'cover',
+    scale = 1.0,
+    offsetX = 0,
+    offsetY = 0,
+    rotation = 0,
+    flipH = false,
+    flipV = false,
+    playbackSpeed = 1.0,
+  } = themeConfig;
 
+  const videoRef = React.useRef<HTMLVideoElement>(null);
   const safeMediaUrl = sanitizeMediaUrl(mediaUrl);
+
+  React.useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = true;
+      videoRef.current.defaultMuted = true;
+      videoRef.current.playbackRate = Math.max(0.25, Math.min(3.0, playbackSpeed));
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {});
+      }
+    }
+  }, [playbackSpeed, safeMediaUrl]);
 
   if (wallpaperType === 'SOLID' || !safeMediaUrl) {
     return null;
   }
+
+  // Calculate transform string: pan/relocate, zoom/scale, flip, and rotation
+  const transforms: string[] = [];
+  if (blurAmount > 0) transforms.push('scale(1.03)');
+  if (offsetX !== 0 || offsetY !== 0) transforms.push(`translate(${offsetX}%, ${offsetY}%)`);
+  const sx = scale * (flipH ? -1 : 1);
+  const sy = scale * (flipV ? -1 : 1);
+  if (sx !== 1 || sy !== 1) transforms.push(`scale(${sx}, ${sy})`);
+  if (rotation !== 0) transforms.push(`rotate(${rotation}deg)`);
+
+  const mediaStyle: React.CSSProperties = {
+    objectFit: fitMode as React.CSSProperties['objectFit'],
+    transform: transforms.length > 0 ? transforms.join(' ') : undefined,
+    transformOrigin: 'center center',
+    transition: 'transform 0.1s ease-out',
+  };
 
   return (
     <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden select-none">
@@ -98,29 +140,34 @@ export default function ChartSkinsLayer() {
         className="h-full w-full"
         style={{
           filter: blurAmount > 0 ? `blur(${blurAmount}px)` : undefined,
-          transform: blurAmount > 0 ? 'scale(1.05)' : undefined,
         }}
       >
         {wallpaperType === 'VIDEO' ? (
           <video
+            ref={videoRef}
             autoPlay
             loop
             muted
             playsInline
-            className="h-full w-full object-cover"
+            className="h-full w-full"
+            style={mediaStyle}
             src={safeMediaUrl}
           />
         ) : wallpaperType === 'GIF' ? (
           <img
             src={safeMediaUrl}
             alt="Chart Wallpaper GIF"
-            className="h-full w-full object-cover"
+            className="h-full w-full"
+            style={mediaStyle}
             loading="eager"
           />
         ) : (
-          <div
-            className="h-full w-full bg-cover bg-center bg-no-repeat"
-            style={{ backgroundImage: `url("${encodeURI(safeMediaUrl)}")` }}
+          <img
+            src={safeMediaUrl}
+            alt="Chart Wallpaper"
+            className="h-full w-full"
+            style={mediaStyle}
+            loading="eager"
           />
         )}
       </div>

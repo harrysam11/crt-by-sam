@@ -22,12 +22,23 @@ export interface ZenModeConfig {
   breathingGuideActive: boolean;
 }
 
+export type WallpaperFitMode = 'cover' | 'contain' | 'fill' | 'none';
+
 export interface CustomThemeConfig {
   wallpaperType: 'SOLID' | 'IMAGE' | 'GIF' | 'VIDEO';
   mediaUrl: string | null;       // Canvas background MP4, WebM, GIF, PNG, or WebP URL
   overlayOpacity: number;        // 0.1 to 0.95 for readability
   blurAmount?: number;           // 0 to 12px blur for aesthetics
   accentColor: string;
+  // Sizing, crop, scale & relocation controls
+  fitMode?: WallpaperFitMode;    // 'cover' (fill/crop), 'contain' (fit whole), 'fill' (stretch), 'none' (original)
+  scale?: number;                // 0.25 to 3.0 (zoom / resize factor)
+  offsetX?: number;              // -100 to 100 (% horizontal pan / relocate)
+  offsetY?: number;              // -100 to 100 (% vertical pan / relocate)
+  rotation?: number;             // 0, 90, 180, 270 degrees
+  flipH?: boolean;               // Horizontal mirror flip
+  flipV?: boolean;               // Vertical mirror flip
+  playbackSpeed?: number;        // 0.25 to 2.0x video playback rate
 }
 
 export interface JournalChecklist {

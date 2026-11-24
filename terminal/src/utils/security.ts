@@ -103,7 +103,7 @@ const ALLOWED_WALLPAPER_EXTENSIONS: ReadonlySet<string> = new Set<string>([
   '.webm',
 ]);
 
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB cap to prevent client memory exhaustion
+const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100MB cap for rich high-definition video loops and backgrounds
 
 export interface FileValidationResult {
   ok: boolean;
@@ -121,7 +121,7 @@ export function validateWallpaperFile(file: File): FileValidationResult {
   if (file.size > MAX_FILE_SIZE_BYTES) {
     return {
       ok: false,
-      error: `File size exceeds maximum allowed limit of 50MB (received ${(file.size / (1024 * 1024)).toFixed(1)}MB).`,
+      error: `File size exceeds maximum allowed limit of 100MB (received ${(file.size / (1024 * 1024)).toFixed(1)}MB).`,
     };
   }
 
@@ -170,6 +170,14 @@ export function sanitizeMediaUrl(rawUrl: string | null | undefined): string | nu
       }
     } catch {
       return null;
+    }
+    return null;
+  }
+
+  // Handle safe relative URLs (e.g. /videos/cyber_grid.mp4)
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+    if (/^\/[a-zA-Z0-9_\-\.\/]+$/.test(trimmed)) {
+      return trimmed;
     }
     return null;
   }

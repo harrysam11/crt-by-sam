@@ -52,6 +52,14 @@ const DEFAULT_THEME: CustomThemeConfig = {
   mediaUrl: null,
   overlayOpacity: 0.82,
   accentColor: '#4c8dff',
+  fitMode: 'cover',
+  scale: 1.0,
+  offsetX: 0,
+  offsetY: 0,
+  rotation: 0,
+  flipH: false,
+  flipV: false,
+  playbackSpeed: 1.0,
 };
 
 export const usePsychologyStore = create<PsychologyState>()(
