@@ -122,6 +122,12 @@ interface DrawingState {
           | null)
   ) => void;
 
+  isLeftOrderPaneOpen: boolean;
+  leftOrderSide: 'BUY' | 'SELL';
+  openLeftOrderPane: (side?: 'BUY' | 'SELL') => void;
+  closeLeftOrderPane: () => void;
+  toggleLeftOrderPane: () => void;
+
   editingDrawingModalItem: DrawingItem | null;
   setEditingDrawingModalItem: (item: DrawingItem | null) => void;
 
@@ -222,6 +228,12 @@ export const useDrawingStore = create<DrawingState>()(
               ? drawerOrUpdater(s.activeRightDrawer)
               : drawerOrUpdater,
         })),
+
+      isLeftOrderPaneOpen: false,
+      leftOrderSide: 'BUY',
+      openLeftOrderPane: (side = 'BUY') => set({ isLeftOrderPaneOpen: true, leftOrderSide: side }),
+      closeLeftOrderPane: () => set({ isLeftOrderPaneOpen: false }),
+      toggleLeftOrderPane: () => set((s) => ({ isLeftOrderPaneOpen: !s.isLeftOrderPaneOpen })),
 
       editingDrawingModalItem: null,
       setEditingDrawingModalItem: (item) => set({ editingDrawingModalItem: item }),

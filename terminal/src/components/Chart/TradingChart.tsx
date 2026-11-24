@@ -44,6 +44,7 @@ import DeepStudiesOverlay from './DeepStudiesOverlay';
 import PriceScaleActionFlyout from './PriceScaleActionFlyout';
 import SymbolSearchModal from '../Search/SymbolSearchModal';
 import PineDrawingsOverlay from './PineDrawingsOverlay';
+import OnChartNewsOverlay from './OnChartNewsOverlay';
 import CustomIntervalModal from './CustomIntervalModal';
 import {
   parseTimeframeToSeconds,
@@ -2759,6 +2760,18 @@ export default function TradingChart({
                         }));
                       },
                     },
+                    {
+                      id: 'newsEvents',
+                      label: 'News & Macro Events',
+                      desc: 'Interactive economic release flags & news articles',
+                      active: chartSettings.showEventsOnChart !== false,
+                      onToggle: () => {
+                        setChartSettings((prev) => ({
+                          ...prev,
+                          showEventsOnChart: prev.showEventsOnChart === false ? true : false,
+                        }));
+                      },
+                    },
                   ].map((layer) => (
                     <button
                       key={layer.id}
@@ -3200,6 +3213,14 @@ export default function TradingChart({
             showPositions={chartSettings.showPositionsOnChart}
             showOrders={chartSettings.showOrdersOnChart}
             showQuickTrade={chartSettings.showQuickTradeButtons !== false}
+          />
+
+          {/* TradingView-Style On-Chart News & Macro Events Overlay */}
+          <OnChartNewsOverlay
+            chartApi={chartApi}
+            seriesApi={seriesApi}
+            symbol={symbol}
+            visible={chartSettings.showEventsOnChart !== false}
           />
 
           {/* Risk Sizing HUD Widget */}

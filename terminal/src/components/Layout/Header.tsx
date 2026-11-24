@@ -39,6 +39,7 @@ interface HeaderProps {
   onOpenLanding?: () => void;
   onOpenCommandPalette?: () => void;
   onOpenLayoutCustomizer?: () => void;
+  onOpenQuantAI?: () => void;
 }
 
 export default function Header({
@@ -61,6 +62,7 @@ export default function Header({
   onOpenLanding,
   onOpenCommandPalette,
   onOpenLayoutCustomizer,
+  onOpenQuantAI,
 }: HeaderProps) {
   const symbol = useTerminalStore((s) => s.symbol);
   const price = useTerminalStore((s) => s.currentPrice);
@@ -71,6 +73,19 @@ export default function Header({
   const marketOpen = useTerminalStore((s) => s.quotes[s.symbol]?.open);
   const open = useTerminalStore((s) => Object.values(s.positions).reduce((a, p) => a + p.unrealizedPnl, 0));
   const trades = useTerminalStore((s) => s.trades);
+  const accounts = useTerminalStore((s) => s.accounts || []);
+  const activeAccountId = useTerminalStore((s) => s.activeAccountId);
+  const switchAccount = useTerminalStore((s) => s.switchAccount);
+  const createAccount = useTerminalStore((s) => s.createAccount);
+  const resetAccountBalance = useTerminalStore((s) => s.resetAccountBalance);
+  const activeAccount = accounts.find((a) => a.id === activeAccountId) || accounts[0];
+
+  const [isNewAccountModalOpen, setIsNewAccountModalOpen] = useState(false);
+  const [newAccName, setNewAccName] = useState('');
+  const [newAccType, setNewAccType] = useState<'PAPER' | 'PROP_FIRM' | 'BINANCE_FUTURES' | 'BYBIT' | 'DEMO'>('PROP_FIRM');
+  const [newAccBalance, setNewAccBalance] = useState('50000');
+  const [newAccCurrency, setNewAccCurrency] = useState('USD');
+  const [newAccFirm, setNewAccFirm] = useState('Apex Trader Funding');
   const inst = getInstrument(symbol);
 
   // Psychology Zen & KillSwitch
@@ -292,9 +307,9 @@ export default function Header({
       </div>
 
       {/* Left Symbol & Price Cluster */}
-      <div className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap min-w-0 shrink-0 mr-3 sm:mr-6">
-        <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate">{labelOf(symbol)}</span>
-        <span className={`num text-xs sm:text-base font-bold transition-colors ${dir === 'up' ? 'text-up' : dir === 'down' ? 'text-down' : 'text-slate-100'}`}>
+      <div className="flex items-center gap-1 sm:gap-2 whitespace-nowrap min-w-0 shrink truncate mr-1 sm:mr-4">
+        <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate max-w-[75px] xs:max-w-none">{labelOf(symbol)}</span>
+        <span className={`num text-xs sm:text-base font-bold transition-colors shrink-0 ${dir === 'up' ? 'text-up' : dir === 'down' ? 'text-down' : 'text-slate-100'}`}>
           {fmtPrice(price, symbol)}
         </span>
         <span className="text-xs text-muted font-medium hidden sm:inline">{inst?.currency}</span>
@@ -375,6 +390,10 @@ export default function Header({
             }`}
             title="Click to view Account Health, Prop Firm Shield & Drawdown"
           >
+            {/* Account Type Badge (e.g. SIM, APEX, TS, BN) */}
+            <span className="hidden sm:inline-block px-1 py-0.2 rounded text-[8.5px] font-bold uppercase bg-accent/20 text-accent border border-accent/30">
+              {activeAccount?.type === 'PAPER' ? 'SIM' : activeAccount?.type === 'PROP_FIRM' ? (activeAccount?.name.split(' ')[0] || 'PROP') : activeAccount?.type === 'BINANCE_FUTURES' ? 'BN' : 'ACC'}
+            </span>
             <span className="text-[10px] text-muted font-medium hidden sm:inline">Eq</span>
             <span className="font-bold text-[11px] sm:text-xs">{displayEquity}</span>
             <span
@@ -399,7 +418,7 @@ export default function Header({
           </button>
 
           {isAccountOpen && (
-            <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 z-50 w-80 max-w-[calc(100vw-24px)] clay-popover p-3.5 shadow-2xl select-none font-mono text-xs space-y-3">
+            <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 z-50 w-84 max-w-[calc(100vw-24px)] clay-popover p-3.5 shadow-2xl select-none font-mono text-xs space-y-3">
               {/* Account Popover Header */}
               <div className="flex items-center justify-between border-b border-grid/60 pb-2">
                 <div className="flex items-center gap-1.5">
@@ -413,6 +432,50 @@ export default function Header({
                 >
                   {isMasked ? 'Unmask' : 'Mask'}
                 </button>
+              </div>
+
+              {/* Institutional Multi-Account Switcher Section */}
+              <div className="p-2.5 rounded-lg border border-accent/20 bg-accent/[0.04] space-y-2">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="font-bold uppercase tracking-wider text-slate-300">Trading Account</span>
+                  <button
+                    onClick={() => setIsNewAccountModalOpen(true)}
+                    className="text-accent hover:underline flex items-center gap-0.5 font-semibold text-[10px]"
+                  >
+                    <span>+ Add Account</span>
+                  </button>
+                </div>
+
+                {/* Account Selector Dropdown */}
+                <select
+                  value={activeAccountId}
+                  onChange={(e) => {
+                    audioHaptics.tick();
+                    switchAccount(e.target.value);
+                  }}
+                  className="w-full bg-[#0a0a10] border border-grid/80 rounded px-2 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-accent cursor-pointer"
+                >
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} ({acc.type}) — {acc.currency} {acc.balance.toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Acc #: <strong className="text-white">{activeAccount?.accountNumber || 'SIM-94812'}</strong></span>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Reset balance of ${activeAccount?.name}?`)) {
+                        resetAccountBalance(activeAccount?.id || '');
+                      }
+                    }}
+                    className="text-slate-400 hover:text-rose-400 transition"
+                    title="Reset Account to Starting Balance"
+                  >
+                    Reset Balance
+                  </button>
+                </div>
               </div>
 
               {/* 4 Key Metrics in compact 2x2 grid */}
@@ -532,6 +595,22 @@ export default function Header({
 
         {/* Feature Toggles Cluster */}
         <div className="flex items-center gap-1 sm:gap-1.5 border-l border-grid pl-1.5 sm:pl-2">
+          {/* Quant & AI Assistant Button */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              if (onOpenQuantAI) onOpenQuantAI();
+              else if (window.__openQuantAI) window.__openQuantAI();
+            }}
+            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-xs font-semibold rounded-lg border border-accent/40 bg-accent/15 hover:bg-accent/25 text-accent transition"
+            title="Open Quant & AI Assistant (Ollama Local / Cloud)"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span className="hidden sm:inline">Quant AI</span>
+          </button>
+
           {/* Zen Mode Button */}
           <button
             onClick={() => {
@@ -590,6 +669,20 @@ export default function Header({
 
             {isInstToolsOpen && (
               <div className="absolute right-0 top-full mt-2 z-50 w-64 clay-popover p-2 shadow-2xl select-none font-mono text-xs">
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    useDrawingStore.getState().toggleLeftOrderPane();
+                    setIsInstToolsOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                >
+                  <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>Order Execution Pane</span>
+                </button>
+
                 <button
                   onClick={() => {
                     audioHaptics.tick();
@@ -1595,6 +1688,106 @@ export default function Header({
           {pingMs > 0 && <span className="text-white font-bold">{pingMs}ms</span>}
         </button>
       </div>
+
+      {/* New Custom Account Modal */}
+      {isNewAccountModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 font-mono select-none">
+          <div className="w-full max-w-md clay-popover p-5 shadow-2xl border border-white/15 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-2 border-b border-grid/60">
+              <span className="font-bold text-white text-xs uppercase tracking-wider">Connect New Trading Account</span>
+              <button
+                onClick={() => setIsNewAccountModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-[10px] uppercase text-muted block mb-1">Account Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. TopStep 150K Funded"
+                  value={newAccName}
+                  onChange={(e) => setNewAccName(e.target.value)}
+                  className="w-full bg-[#0d0d14] border border-grid rounded px-2.5 py-1.5 text-white focus:outline-none focus:border-accent"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase text-muted block mb-1">Account Type</label>
+                <select
+                  value={newAccType}
+                  onChange={(e) => setNewAccType(e.target.value as any)}
+                  className="w-full bg-[#0d0d14] border border-grid rounded px-2.5 py-1.5 text-white focus:outline-none focus:border-accent"
+                >
+                  <option value="PROP_FIRM">Prop Firm Funded Account</option>
+                  <option value="PAPER">Paper Trading Simulation</option>
+                  <option value="BINANCE_FUTURES">Binance Futures Live</option>
+                  <option value="BYBIT">Bybit Derivatives Live</option>
+                  <option value="DEMO">Demo Scalping</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] uppercase text-muted block mb-1">Starting Balance</label>
+                  <input
+                    type="number"
+                    value={newAccBalance}
+                    onChange={(e) => setNewAccBalance(e.target.value)}
+                    className="w-full bg-[#0d0d14] border border-grid rounded px-2.5 py-1.5 text-white focus:outline-none focus:border-accent"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase text-muted block mb-1">Currency</label>
+                  <select
+                    value={newAccCurrency}
+                    onChange={(e) => setNewAccCurrency(e.target.value)}
+                    className="w-full bg-[#0d0d14] border border-grid rounded px-2.5 py-1.5 text-white focus:outline-none focus:border-accent"
+                  >
+                    <option value="USD">USD ($)</option>
+                    <option value="USDT">USDT</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-grid/60">
+              <button
+                onClick={() => setIsNewAccountModalOpen(false)}
+                className="px-3 py-1.5 rounded text-xs text-slate-300 hover:text-white bg-slate-800 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const bal = parseFloat(newAccBalance);
+                  if (!newAccName.trim() || isNaN(bal) || bal <= 0) return;
+                  createAccount({
+                    name: newAccName.trim(),
+                    type: newAccType,
+                    balance: bal,
+                    currency: newAccCurrency,
+                    leverageLimit: newAccType === 'PROP_FIRM' ? 20 : 100,
+                    accountNumber: `${newAccType.slice(0, 3)}-${Math.floor(10000 + Math.random() * 90000)}`,
+                  });
+                  setIsNewAccountModalOpen(false);
+                  setNewAccName('');
+                }}
+                className="px-4 py-1.5 rounded text-xs font-bold text-black bg-accent hover:brightness-110 transition"
+              >
+                Create Account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

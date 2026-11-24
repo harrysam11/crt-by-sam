@@ -19,6 +19,85 @@ const MAX_TRADES = 500;
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
+export interface TradingAccount {
+  id: string;
+  name: string;
+  type: 'PAPER' | 'PROP_FIRM' | 'BINANCE_FUTURES' | 'BYBIT' | 'DEMO';
+  balance: number;
+  currency: string;
+  leverageLimit: number;
+  firmName?: string;
+  accountNumber?: string;
+  positions?: Record<string, Position>;
+  orders?: Order[];
+  trades?: Trade[];
+}
+
+export const DEFAULT_ACCOUNTS: TradingAccount[] = [
+  {
+    id: 'acc-paper-1',
+    name: 'Paper Simulation',
+    type: 'PAPER',
+    balance: START_BALANCE,
+    currency: 'USD',
+    leverageLimit: 100,
+    accountNumber: 'SIM-94812',
+    positions: {},
+    orders: [],
+    trades: [],
+  },
+  {
+    id: 'acc-apex-50k',
+    name: 'Apex Trader 50K',
+    type: 'PROP_FIRM',
+    firmName: 'Apex Trader Funding',
+    balance: 50000,
+    currency: 'USD',
+    leverageLimit: 20,
+    accountNumber: 'APEX-50K-8812',
+    positions: {},
+    orders: [],
+    trades: [],
+  },
+  {
+    id: 'acc-topstep-100k',
+    name: 'Topstep 100K Funded',
+    type: 'PROP_FIRM',
+    firmName: 'Topstep Trading',
+    balance: 100000,
+    currency: 'USD',
+    leverageLimit: 20,
+    accountNumber: 'TS-100K-3940',
+    positions: {},
+    orders: [],
+    trades: [],
+  },
+  {
+    id: 'acc-binance-live',
+    name: 'Binance Futures Live',
+    type: 'BINANCE_FUTURES',
+    balance: 25480,
+    currency: 'USDT',
+    leverageLimit: 50,
+    accountNumber: 'BN-FUT-0291',
+    positions: {},
+    orders: [],
+    trades: [],
+  },
+  {
+    id: 'acc-demo-scalp',
+    name: 'Scalper Demo',
+    type: 'DEMO',
+    balance: 5000,
+    currency: 'USD',
+    leverageLimit: 100,
+    accountNumber: 'DEMO-7718',
+    positions: {},
+    orders: [],
+    trades: [],
+  },
+];
+
 export interface PlaceOrderRequest {
   symbol: string; side: OrderSide; type: 'MARKET' | 'LIMIT'; qty: number; leverage: number;
   price?: number; stopLoss?: number; takeProfit?: number; trailStopPct?: number;
@@ -44,6 +123,13 @@ interface TerminalState {
   isLoadingCandles: boolean;
   pinePlots: Array<{ title: string; color: string; data: Array<{ time: number; value: number }> }>;
   pineDrawings: PineDrawingOutput | null;
+
+  accounts: TradingAccount[];
+  activeAccountId: string;
+  switchAccount: (accountId: string) => void;
+  createAccount: (acc: Omit<TradingAccount, 'id' | 'positions' | 'orders' | 'trades'>) => void;
+  deleteAccount: (accountId: string) => void;
+  resetAccountBalance: (accountId: string, newBalance?: number) => void;
 
   setIsLoadingCandles: (l: boolean) => void;
   setPinePlots: (plots: Array<{ title: string; color: string; data: Array<{ time: number; value: number }> }>) => void;
@@ -261,6 +347,8 @@ export const useTerminalStore = create<TerminalState>()(
         trades: [],
         alerts: [],
         balance: START_BALANCE,
+        accounts: DEFAULT_ACCOUNTS,
+        activeAccountId: 'acc-paper-1',
         status: 'closed',
         error: null,
         isLoadingCandles: false,
@@ -840,7 +928,98 @@ export const useTerminalStore = create<TerminalState>()(
           notifyAlert('Trailing Stop Set', `${labelOf(symbol)} TSL @ ${trailPct}% — trigger: ${fmtPrice(triggerPrice, symbol)}`);
         },
 
-        resetAccount: () => set({ positions: {}, orders: [], trades: [], balance: START_BALANCE }),
+        switchAccount: (accountId: string) => {
+          const s = get();
+          if (s.activeAccountId === accountId) return;
+          const target = s.accounts.find((a) => a.id === accountId);
+          if (!target) return;
+
+          // Snapshot current account
+          const updatedAccounts = s.accounts.map((acc) => {
+            if (acc.id === s.activeAccountId) {
+              return {
+                ...acc,
+                balance: s.balance,
+                positions: s.positions,
+                orders: s.orders,
+                trades: s.trades,
+              };
+            }
+            return acc;
+          });
+
+          set({
+            accounts: updatedAccounts,
+            activeAccountId: accountId,
+            balance: target.balance,
+            positions: target.positions || {},
+            orders: target.orders || [],
+            trades: target.trades || [],
+          });
+          notifyAlert('Account Switched', `Active account: ${target.name} (${target.type})`);
+        },
+
+        createAccount: (acc) => {
+          const newAcc: TradingAccount = {
+            ...acc,
+            id: `acc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            positions: {},
+            orders: [],
+            trades: [],
+          };
+          set((s) => ({
+            accounts: [...s.accounts, newAcc],
+          }));
+          notifyAlert('Account Created', `Created ${newAcc.name}`);
+        },
+
+        deleteAccount: (accountId) => {
+          const s = get();
+          if (s.accounts.length <= 1) return;
+          const remaining = s.accounts.filter((a) => a.id !== accountId);
+          if (s.activeAccountId === accountId) {
+            const nextAcc = remaining[0];
+            set({
+              accounts: remaining,
+              activeAccountId: nextAcc.id,
+              balance: nextAcc.balance,
+              positions: nextAcc.positions || {},
+              orders: nextAcc.orders || [],
+              trades: nextAcc.trades || [],
+            });
+          } else {
+            set({ accounts: remaining });
+          }
+        },
+
+        resetAccountBalance: (accountId, newBalance) => {
+          const s = get();
+          const target = s.accounts.find((a) => a.id === accountId);
+          const bal = newBalance ?? (target ? target.balance : START_BALANCE);
+          const updatedAccounts = s.accounts.map((a) => {
+            if (a.id === accountId) {
+              return { ...a, balance: bal, positions: {}, orders: [], trades: [] };
+            }
+            return a;
+          });
+          if (s.activeAccountId === accountId) {
+            set({
+              accounts: updatedAccounts,
+              balance: bal,
+              positions: {},
+              orders: [],
+              trades: [],
+            });
+          } else {
+            set({ accounts: updatedAccounts });
+          }
+          notifyAlert('Account Reset', `Account reset with balance ${bal}`);
+        },
+
+        resetAccount: () => {
+          const s = get();
+          s.resetAccountBalance(s.activeAccountId);
+        },
       };
     },
     {
@@ -850,6 +1029,7 @@ export const useTerminalStore = create<TerminalState>()(
       partialize: (s) => ({
         symbol: s.symbol, timeframe: s.timeframe, instruments: s.instruments, positions: s.positions,
         orders: s.orders, trades: s.trades, alerts: s.alerts, balance: s.balance,
+        accounts: s.accounts, activeAccountId: s.activeAccountId,
       }),
       onRehydrateStorage: () => (state) => { if (state) registerInstruments(state.instruments); },
     },

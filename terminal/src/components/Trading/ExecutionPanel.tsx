@@ -11,6 +11,8 @@ import { audioHaptics } from '../../utils/notify';
 import GuardianConfirmModal from '../guardian/GuardianConfirmModal';
 import type { OrderSide } from '../../types/terminal';
 
+import { useDrawingStore } from '../../store/useDrawingStore';
+
 // Global declaration for Risk HUD auto-fill
 declare global {
   interface Window {
@@ -24,7 +26,19 @@ const num = (v: string) => {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 };
 
-export default function ExecutionPanel() {
+interface ExecutionPanelProps {
+  initialSide?: OrderSide;
+  onClose?: () => void;
+  showHeader?: boolean;
+}
+
+export default function ExecutionPanel({
+  initialSide,
+  onClose,
+  showHeader = false,
+}: ExecutionPanelProps = {}) {
+  const storeLeftOrderSide = useDrawingStore((s) => s.leftOrderSide);
+  const activeSide = initialSide || storeLeftOrderSide || 'BUY';
   const symbol = useTerminalStore((s) => s.symbol);
   const price = useTerminalStore((s) => s.currentPrice);
   const placeOrder = useTerminalStore((s) => s.placeOrder);
@@ -262,7 +276,30 @@ export default function ExecutionPanel() {
   };
 
   return (
-    <div className="shrink-0 border-t border-grid bg-panel p-3 font-mono text-xs">
+    <div className="shrink-0 border-t md:border-t-0 bg-panel p-3 font-mono text-xs flex flex-col h-full overflow-y-auto">
+      {/* Optional Top Header when opened as Left Order Pane or Standalone */}
+      {(showHeader || onClose) && (
+        <div className="flex items-center justify-between pb-2 mb-2 border-b border-grid">
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${activeSide === 'BUY' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400 animate-pulse'}`} />
+            <span className="font-bold text-white text-[11px] uppercase tracking-wider">
+              {symbol} Order Execution
+            </span>
+          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-white p-1 rounded hover:bg-white/5 transition"
+              title="Close Order Pane"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Guardian Confirmation Modal */}
       {guardianModal?.isOpen && (
         <GuardianConfirmModal
@@ -424,14 +461,18 @@ export default function ExecutionPanel() {
         <button
           onClick={() => submit('BUY')}
           disabled={killSwitch.isLocked || guardianEmergencyLocked}
-          className="rounded bg-up py-2 font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+          className={`rounded bg-up py-2 font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 ${
+            activeSide === 'BUY' ? 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-black font-extrabold shadow-lg shadow-emerald-950/40' : 'opacity-85'
+          }`}
         >
           Buy / Long
         </button>
         <button
           onClick={() => submit('SELL')}
           disabled={killSwitch.isLocked || guardianEmergencyLocked}
-          className="rounded bg-down py-2 font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+          className={`rounded bg-down py-2 font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 ${
+            activeSide === 'SELL' ? 'ring-2 ring-rose-400 ring-offset-1 ring-offset-black font-extrabold shadow-lg shadow-rose-950/40' : 'opacity-85'
+          }`}
         >
           Sell / Short
         </button>

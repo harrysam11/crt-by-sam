@@ -12,6 +12,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ISeriesApi, SeriesType, IChartApi } from 'lightweight-charts';
 import { useTerminalStore, positionPnlUsd } from '../../store/useTerminalStore';
+import { useDrawingStore } from '../../store/useDrawingStore';
 import { fmtPrice, fmtQty, fmtUsd, labelOf } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
 import { toUsd } from '../../services/instruments';
@@ -175,17 +176,25 @@ export default function ChartTradingOverlay({
   const otherOrders = orders.filter((o) => o.type !== 'STOP_LOSS' && o.type !== 'TAKE_PROFIT');
 
   // Quick Trade handler
-  const handleQuickTrade = (side: 'BUY' | 'SELL') => {
+  const handleQuickTrade = (side: 'BUY' | 'SELL', e?: React.MouseEvent) => {
     audioHaptics.tick();
     const qtyNum = parseFloat(quickQty);
-    if (!qtyNum || qtyNum <= 0) return;
-    placeOrder({
-      symbol,
-      side,
-      type: 'MARKET',
-      qty: qtyNum,
-      leverage: 10,
-    });
+    // If shift key is held, execute instant market order immediately
+    if (e?.shiftKey && qtyNum > 0) {
+      placeOrder({
+        symbol,
+        side,
+        type: 'MARKET',
+        qty: qtyNum,
+        leverage: 10,
+      });
+      return;
+    }
+    // Open the left Order Execution Panel pre-filled with side and quantity
+    useDrawingStore.getState().openLeftOrderPane(side);
+    if (window.__setExecutionValues && qtyNum > 0) {
+      window.__setExecutionValues({ qty: quickQty });
+    }
   };
 
   return (
@@ -213,9 +222,9 @@ export default function ChartTradingOverlay({
             <>
               {/* Instant SELL Button */}
               <button
-                onClick={() => handleQuickTrade('SELL')}
+                onClick={(e) => handleQuickTrade('SELL', e)}
                 className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500 hover:text-white transition"
-                title="Instant Market SELL"
+                title="Open Sell Order Pane (Hold Shift for Instant Market Fill)"
               >
                 SELL {currentPrice ? fmtPrice(currentPrice, symbol) : ''}
               </button>
@@ -231,9 +240,9 @@ export default function ChartTradingOverlay({
 
               {/* Instant BUY Button */}
               <button
-                onClick={() => handleQuickTrade('BUY')}
+                onClick={(e) => handleQuickTrade('BUY', e)}
                 className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500 hover:text-white transition"
-                title="Instant Market BUY"
+                title="Open Buy Order Pane (Hold Shift for Instant Market Fill)"
               >
                 BUY {currentPrice ? fmtPrice(currentPrice, symbol) : ''}
               </button>

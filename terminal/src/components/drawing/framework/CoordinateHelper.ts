@@ -26,6 +26,8 @@ export class CoordinateHelper {
         const lastTime = this.candles[cLen - 1].time;
         const step = cLen > 1 ? (lastTime - firstTime) / (cLen - 1) : 60;
 
+        let targetLogical: number | null = null;
+
         if (time >= firstTime && time <= lastTime) {
           let low = 0;
           let high = cLen - 1;
@@ -53,24 +55,65 @@ export class CoordinateHelper {
             const span = this.candles[bestIdx].time - prevTime;
             if (span > 0) fractionalLogical = bestIdx - (this.candles[bestIdx].time - time) / span;
           }
-
-          if (typeof timeScale.logicalToCoordinate === 'function') {
-            const lCoord = timeScale.logicalToCoordinate(fractionalLogical);
-            if (lCoord !== null && typeof lCoord === 'number' && !isNaN(lCoord)) return lCoord;
-          }
+          targetLogical = fractionalLogical;
         } else if (time > lastTime) {
           const futureBars = (time - lastTime) / (step || 60);
-          const logical = cLen - 1 + futureBars;
-          if (typeof timeScale.logicalToCoordinate === 'function') {
-            const lCoord = timeScale.logicalToCoordinate(logical);
-            if (lCoord !== null && typeof lCoord === 'number' && !isNaN(lCoord)) return lCoord;
-          }
+          targetLogical = (cLen - 1) + futureBars;
         } else if (time < firstTime) {
           const pastBars = (time - firstTime) / (step || 60);
-          const logical = pastBars;
-          if (typeof timeScale.logicalToCoordinate === 'function') {
-            const lCoord = timeScale.logicalToCoordinate(logical);
-            if (lCoord !== null && typeof lCoord === 'number' && !isNaN(lCoord)) return lCoord;
+          targetLogical = pastBars;
+        }
+
+        if (targetLogical !== null && typeof timeScale.logicalToCoordinate === 'function') {
+          const directCoord = timeScale.logicalToCoordinate(targetLogical);
+          if (directCoord !== null && typeof directCoord === 'number' && !isNaN(directCoord)) {
+            return directCoord;
+          }
+
+          // Extrapolate linearly using visible range reference coordinates
+          let refLogical = 0;
+          let refCoord: number | null = null;
+          let barSpacing = 8;
+
+          const visibleRange = typeof timeScale.getVisibleLogicalRange === 'function' 
+            ? timeScale.getVisibleLogicalRange() 
+            : null;
+
+          if (visibleRange && typeof visibleRange.from === 'number' && typeof visibleRange.to === 'number') {
+            const mid = Math.round((visibleRange.from + visibleRange.to) / 2);
+            const cMid = timeScale.logicalToCoordinate(mid);
+            const cMid1 = timeScale.logicalToCoordinate(mid + 1);
+            if (cMid !== null && cMid1 !== null) {
+              refLogical = mid;
+              refCoord = cMid;
+              barSpacing = Math.max(0.1, cMid1 - cMid);
+            }
+          }
+
+          if (refCoord === null) {
+            const midIdx = Math.floor(cLen / 2);
+            const cMid = timeScale.logicalToCoordinate(midIdx);
+            const cMid1 = timeScale.logicalToCoordinate(midIdx + 1);
+            if (cMid !== null && cMid1 !== null) {
+              refLogical = midIdx;
+              refCoord = cMid;
+              barSpacing = Math.max(0.1, cMid1 - cMid);
+            } else {
+              const c0 = timeScale.logicalToCoordinate(0);
+              const c1 = timeScale.logicalToCoordinate(1);
+              if (c0 !== null) {
+                refLogical = 0;
+                refCoord = c0;
+                if (c1 !== null) barSpacing = Math.max(0.1, c1 - c0);
+              }
+            }
+          }
+
+          if (refCoord !== null) {
+            const extrapolated = refCoord + (targetLogical - refLogical) * barSpacing;
+            if (!isNaN(extrapolated)) {
+              return extrapolated;
+            }
           }
         }
       }

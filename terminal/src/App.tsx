@@ -35,6 +35,7 @@ import CommandPaletteModal from './components/common/CommandPaletteModal';
 import MacroNewsPanel from './components/news/MacroNewsPanel';
 import LayoutCustomizerModal from './components/Layout/LayoutCustomizerModal';
 import AppDownloadModal from './components/landing/AppDownloadModal';
+import QuantAIAgentModal from './features/ai/QuantAIAgentModal';
 import { useMarketFeed } from './hooks/useMarketFeed';
 import { useKeyboardHotkeys } from './hooks/useKeyboardHotkeys';
 import { useTerminalStore } from './store/useTerminalStore';
@@ -82,6 +83,9 @@ export default function App() {
   const [isBottomMaximized, setIsBottomMaximized] = useState(false);
   const activeRightDrawer = useDrawingStore((s) => s.activeRightDrawer);
   const setActiveRightDrawer = useDrawingStore((s) => s.setActiveRightDrawer);
+  const isLeftOrderPaneOpen = useDrawingStore((s) => s.isLeftOrderPaneOpen);
+  const closeLeftOrderPane = useDrawingStore((s) => s.closeLeftOrderPane);
+  const leftOrderSide = useDrawingStore((s) => s.leftOrderSide);
 
   const handleToggleBottomCollapse = () => {
     setIsBottomCollapsed((prev) => {
@@ -135,6 +139,18 @@ export default function App() {
   const [isPopoutOpen, setIsPopoutOpen] = useState(false);
   const [isGuardianOpen, setIsGuardianOpen] = useState(false);
   const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
+  const [isQuantAIOpen, setIsQuantAIOpen] = useState(false);
+  const [quantAIInitialPrompt, setQuantAIInitialPrompt] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    window.__openQuantAI = (prompt?: string) => {
+      setQuantAIInitialPrompt(prompt);
+      setIsQuantAIOpen(true);
+    };
+    return () => {
+      delete window.__openQuantAI;
+    };
+  }, []);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isLayoutCustomizerOpen, setIsLayoutCustomizerOpen] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
@@ -394,10 +410,22 @@ export default function App() {
           onOpenLanding={() => setViewMode('LANDING')}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onOpenLayoutCustomizer={() => setIsLayoutCustomizerOpen(true)}
+          onOpenQuantAI={() => setIsQuantAIOpen(true)}
         />
       )}
 
       <div className="flex min-h-0 flex-1 relative overflow-hidden">
+        {/* Left Order Execution Drawer (TradingView-Style Left Order Pane) */}
+        {isLeftOrderPaneOpen && (
+          <aside className="shrink-0 flex flex-col h-full w-[310px] sm:w-[330px] bg-panel border-r border-grid z-30 shadow-2xl relative select-none animate-in slide-in-from-left duration-150 overflow-y-auto fixed md:relative inset-y-0 left-0 md:inset-auto">
+            <ExecutionPanel
+              initialSide={leftOrderSide}
+              showHeader={true}
+              onClose={closeLeftOrderPane}
+            />
+          </aside>
+        )}
+
         {/* Main Center Area: Chart + Bottom Positions */}
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {!isBottomMaximized && (
@@ -474,6 +502,20 @@ export default function App() {
         {/* TradingView-Style Far Right Vertical Icon Dock Rail */}
         {!isChartMaximized && (
           <aside className="hidden md:flex w-[48px] shrink-0 border-l border-grid bg-panel flex-col items-center py-3 gap-2.5 z-20 select-none font-mono shadow-clay-card">
+            {/* Quant & AI Assistant Toggle */}
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setIsQuantAIOpen(true);
+              }}
+              className="p-2.5 rounded-xl transition clay-btn text-accent hover:text-white"
+              title="Quant & AI Assistant (Ollama Local / Cloud)"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </button>
+
             {/* Watchlist Toggle */}
             <button
               onClick={() => {
@@ -633,6 +675,16 @@ export default function App() {
         )}
 
       </div>
+
+      {/* Institutional Quant & AI Assistant Modal */}
+      <QuantAIAgentModal
+        isOpen={isQuantAIOpen}
+        onClose={() => {
+          setIsQuantAIOpen(false);
+          setQuantAIInitialPrompt(undefined);
+        }}
+        initialPrompt={quantAIInitialPrompt}
+      />
     </div>
   );
 }
