@@ -1,5 +1,5 @@
 export type AssetCategory = 'CRYPTO' | 'FOREX' | 'COMMODITY' | 'US_STOCK' | 'IN_STOCK' | 'INDEX';
-export type Provider = 'binance' | 'yahoo' | 'custom';
+export type Provider = 'binance' | 'yahoo' | 'custom' | 'metaquotes';
 export type Timeframe = '1s' | '1m' | '3m' | '5m' | '15m' | '30m' | '1h' | '2h' | '4h' | '1d' | '1w' | '1M' | (string & {});
 export type ChartStyle = 'CANDLE' | 'BAR' | 'HOLLOW_CANDLE' | 'HEIKIN_ASHI' | 'LINE' | 'AREA' | 'BASELINE' | 'FOOTPRINT';
 export type PriceScaleType = 'NORMAL' | 'LOGARITHMIC' | 'PERCENTAGE';

@@ -9,10 +9,12 @@ import type { DatafeedSubscription, IDatafeedAdapter, UserCustomProviderConfig }
 import { BinanceAdapter } from './BinanceAdapter';
 import { YahooAdapter } from './YahooAdapter';
 import { CustomUserAdapter } from './CustomUserAdapter';
+import { MetaQuotesAdapter } from './MetaQuotesAdapter';
 import { DEFAULT_INSTRUMENTS } from '../instruments';
 
 class DatafeedHub {
   private binanceAdapter = new BinanceAdapter();
+  private metaquotesAdapter = new MetaQuotesAdapter();
   private yahooAdapter = new YahooAdapter();
   private customAdapter = new CustomUserAdapter();
 
@@ -20,6 +22,7 @@ class DatafeedHub {
 
   private getAdapterForSymbol(symbol: string): IDatafeedAdapter {
     if (this.customAdapter.supportsSymbol(symbol)) return this.customAdapter;
+    if (this.metaquotesAdapter.supportsSymbol(symbol)) return this.metaquotesAdapter;
     if (this.binanceAdapter.supportsSymbol(symbol)) return this.binanceAdapter;
     return this.yahooAdapter;
   }
@@ -38,14 +41,16 @@ class DatafeedHub {
       return DEFAULT_INSTRUMENTS.filter((i) => !category || (category as string) === 'ALL' || i.category === category);
     }
 
-    const [binanceHits, yahooHits, customHits] = await Promise.allSettled([
+    const [binanceHits, metaquotesHits, yahooHits, customHits] = await Promise.allSettled([
       this.binanceAdapter.searchSymbols(q, category, signal),
+      this.metaquotesAdapter.searchSymbols(q, category, signal),
       this.yahooAdapter.searchSymbols(q, category, signal),
       this.customAdapter.searchSymbols(q, category, signal),
     ]);
 
     const results = new Map<string, Instrument>();
     if (binanceHits.status === 'fulfilled') binanceHits.value.forEach((i) => results.set(i.id, i));
+    if (metaquotesHits.status === 'fulfilled') metaquotesHits.value.forEach((i) => results.set(i.id, i));
     if (yahooHits.status === 'fulfilled') yahooHits.value.forEach((i) => results.set(i.id, i));
     if (customHits.status === 'fulfilled') customHits.value.forEach((i) => results.set(i.id, i));
 

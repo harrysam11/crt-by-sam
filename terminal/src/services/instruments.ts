@@ -18,6 +18,17 @@ export const DEFAULT_INSTRUMENTS: Instrument[] = [
   I('USDCAD=X', 'USD/CAD', 'US Dollar / CAD', 'FOREX', 'yahoo', 'CAD', 5),
   I('USDINR=X', 'USD/INR', 'US Dollar / Rupee', 'FOREX', 'yahoo', 'INR', 3),
 
+  // MetaQuotes & Direct 0-Delay Forex & Metals
+  I('XAUUSD', 'XAU/USD', 'Gold Spot (MetaQuotes 0s Real-Time)', 'COMMODITY', 'metaquotes', 'USD', 2),
+  I('XAGUSD', 'XAG/USD', 'Silver Spot (MetaQuotes 0s Real-Time)', 'COMMODITY', 'metaquotes', 'USD', 3),
+  I('EURUSD', 'EUR/USD', 'Euro / US Dollar (MetaQuotes 0s)', 'FOREX', 'metaquotes', 'USD', 5),
+  I('GBPUSD', 'GBP/USD', 'British Pound / US Dollar (MetaQuotes 0s)', 'FOREX', 'metaquotes', 'USD', 5),
+  I('USDJPY', 'USD/JPY', 'US Dollar / Japanese Yen (MetaQuotes 0s)', 'FOREX', 'metaquotes', 'JPY', 3),
+  I('AUDUSD', 'AUD/USD', 'Australian Dollar / USD (MetaQuotes 0s)', 'FOREX', 'metaquotes', 'USD', 5),
+  I('USDCAD', 'USD/CAD', 'US Dollar / Canadian Dollar (MetaQuotes 0s)', 'FOREX', 'metaquotes', 'CAD', 5),
+  I('USDCHF', 'USD/CHF', 'US Dollar / Swiss Franc (MetaQuotes 0s)', 'FOREX', 'metaquotes', 'CHF', 5),
+  I('NZDUSD', 'NZD/USD', 'New Zealand Dollar / USD (MetaQuotes 0s)', 'FOREX', 'metaquotes', 'USD', 5),
+
   I('PAXGUSDT', 'XAU/USD', 'Gold Spot (Binance Real-Time 0s Delay)', 'COMMODITY', 'binance', 'USD', 2),
   I('GC=F', 'GC=F', 'Gold Comex Futures (15m Delay)', 'COMMODITY', 'yahoo', 'USD', 2),
   I('SI=F', 'XAG/USD', 'Silver Spot & Comex Futures', 'COMMODITY', 'yahoo', 'USD', 3),
@@ -58,6 +69,7 @@ export const CATEGORY_LABEL: Record<AssetCategory, string> = {
 /** Supported multi-timeframes across providers. Custom resolutions are aggregated dynamically. */
 export const TIMEFRAMES: Record<Provider, Timeframe[]> = {
   binance: ['1s', '1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'],
+  metaquotes: ['1s', '1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'],
   yahoo: ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'],
   custom: ['1m', '5m', '15m', '1h', '4h', '1d'],
 };

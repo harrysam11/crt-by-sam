@@ -15,7 +15,7 @@ mod routes;
 mod ws;
 
 use engine::{RiskRules, TradeXGuardian};
-use market::{start_binance_feed, PriceStore};
+use market::{start_binance_feed, start_metaquotes_feed, PriceStore};
 use routes::AppState;
 use ws::{ws_handler, WsState};
 
@@ -36,6 +36,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 3. Start Binance real-time stream in background
     start_binance_feed(price_store.clone(), price_tx.clone());
+
+    // 4. Start MetaQuotes real-time Forex and Metals stream in background
+    start_metaquotes_feed(price_store.clone(), price_tx.clone());
 
     // 4. Initialize TradeXGuardian Risk Engine
     let guardian = Arc::new(Mutex::new(TradeXGuardian::new(RiskRules::default())));
