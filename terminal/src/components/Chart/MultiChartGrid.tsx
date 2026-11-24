@@ -96,7 +96,7 @@ export default function MultiChartGrid() {
   const p3 = panes['pane-3'] || { paneId: 'pane-3', symbol: globalSymbol, timeframe: '4h' };
   const p4 = panes['pane-4'] || { paneId: 'pane-4', symbol: globalSymbol, timeframe: '1d' };
 
-  // Keep single chart mode or sync-enabled charts strictly in lockstep with globalSymbol
+  // Keep single chart mode or sync-enabled charts strictly in lockstep with globalSymbol & globalTimeframe
   useEffect(() => {
     if (layout === '1x1' || syncSymbol) {
       if (panes['pane-1']?.symbol !== globalSymbol) {
@@ -105,12 +105,23 @@ export default function MultiChartGrid() {
     }
   }, [globalSymbol, layout, syncSymbol, panes]);
 
+  useEffect(() => {
+    if (layout === '1x1' || syncTimeframe) {
+      if (panes['pane-1']?.timeframe !== globalTimeframe) {
+        useLayoutStore.getState().setPaneTimeframe('pane-1', globalTimeframe);
+      }
+    }
+  }, [globalTimeframe, layout, syncTimeframe, panes]);
+
   // Select pane and sync to top nav header immediately
   const handleSelectPane = (targetPaneId: string) => {
+    if (targetPaneId === activePaneId) return;
     setActivePaneId(targetPaneId);
-    const targetPane = panes[targetPaneId];
+    const targetPane = useLayoutStore.getState().panes[targetPaneId];
     if (targetPane) {
-      useTerminalStore.getState().setSymbol(targetPane.symbol);
+      if (targetPane.symbol) {
+        useTerminalStore.getState().setSymbol(targetPane.symbol);
+      }
       if (targetPane.timeframe) {
         useTerminalStore.getState().setTimeframe(targetPane.timeframe);
       }
@@ -417,15 +428,8 @@ export default function MultiChartGrid() {
       {/* Grid Container with Active Pane Focus Rings & Resizable Splitters */}
       <div ref={gridContainerRef} className="flex-1 min-h-0 w-full h-full relative">
         {layout === '1x1' && (
-          <div
-            className={`h-full w-full relative ${activePaneId === 'pane-1' ? 'ring-1 ring-white/30' : ''}`}
-            onClick={() => handleSelectPane('pane-1')}
-          >
-            <TradingChart
-              paneId="pane-1"
-              symbolOverride={globalSymbol}
-              timeframeOverride={p1.timeframe}
-            />
+          <div className="h-full w-full relative">
+            <TradingChart paneId="pane-1" />
           </div>
         )}
 

@@ -143,6 +143,9 @@ export default function TradingChart({
     const ctl = new AbortController();
     let cancelled = false;
 
+    // Reset local candles immediately on symbol or timeframe change to prevent stale display
+    setLocalCandles([]);
+
     const load = async () => {
       try {
         setLocalError(null);
@@ -234,7 +237,8 @@ export default function TradingChart({
   const [isLockedAll, setIsLockedAll] = useState(false);
   const [isHiddenAll, setIsHiddenAll] = useState(false);
   const pineSeriesRef = useRef<ISeriesApi<'Line'>[]>([]);
-  const hasFittedSymbolRef = useRef<Record<string, boolean>>({});
+  const hasFittedKeyRef = useRef<Record<string, boolean>>({});
+  const lastDatasetKeyRef = useRef<string>('');
   const [countdownText, setCountdownText] = useState<string>('');
   const [isCustomIntervalModalOpen, setIsCustomIntervalModalOpen] = useState(false);
 
@@ -1592,11 +1596,26 @@ export default function TradingChart({
     );
 
     live.current = { closes, lastTime: displayCandles[n - 1].time, emaPrev: e[n - 2] ?? null, lastEma: e[n - 1] ?? null };
-    const isInitialLoad = !hasFittedSymbolRef.current[symbol];
-    if (isInitialLoad) {
-      hasFittedSymbolRef.current[symbol] = true;
-      a.chart.timeScale().fitContent();
+
+    // Fit viewport on initial load or whenever symbol / timeframe resolution changes
+    const datasetKey = `${symbol}_${timeframe}`;
+    const needsFit = !hasFittedKeyRef.current[datasetKey] || lastDatasetKeyRef.current !== datasetKey;
+    if (needsFit) {
+      hasFittedKeyRef.current[datasetKey] = true;
+      lastDatasetKeyRef.current = datasetKey;
+      try {
+        a.chart.timeScale().fitContent();
+      } catch {}
     }
+
+    try {
+      a.chart.applyOptions({
+        timeScale: {
+          secondsVisible: /s$/.test(timeframe),
+        },
+      });
+    } catch {}
+
     const lastBar = displayCandles[n - 1];
     writeOhlc(lastBar);
     setCurrentOhlc({ open: lastBar.open, high: lastBar.high, low: lastBar.low, close: lastBar.close, volume: lastBar.volume });
@@ -1607,7 +1626,7 @@ export default function TradingChart({
       rsi: r[n - 1] ?? null,
       oi: oiBars.length ? oiBars[oiBars.length - 1].totalOI : null,
     });
-  }, [effectiveCandles, symbol, chartStyle]);
+  }, [effectiveCandles, symbol, timeframe, chartStyle]);
 
   // Live Countdown to Bar Close Timer
   useEffect(() => {
