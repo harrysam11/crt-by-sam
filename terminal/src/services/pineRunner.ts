@@ -1,13 +1,15 @@
 /**
- * Institutional Pine Script v4/v5 Transpiler & Execution Runner.
- * Powered by PineTS open-source runtime.
+ * Institutional Pine Script v4/v5/v6 Transpiler & Execution Runner.
+ * Powered by PineTS runtime.
  * Evaluates Pine Script against live terminal candle streams and returns
- * typed plot series for direct Lightweight Charts line rendering.
+ * typed plot series and geometry drawings (boxes, lines, labels, tables)
+ * for direct Lightweight Charts canvas rendering.
  * ZERO EMOJI POLICY strictly enforced.
  */
 
 import { PineTS } from 'pinets';
 import type { Candle } from '../types/terminal';
+import crtModelPine from '../features/pine/presets/crtModel.pine?raw';
 
 export interface PinePlotOutput {
   title: string;
@@ -15,14 +17,74 @@ export interface PinePlotOutput {
   data: Array<{ time: number; value: number }>;
 }
 
+export interface PineDrawingBox {
+  id: number;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  bgcolor?: string;
+  border_color?: string;
+  border_width?: number;
+  border_style?: string;
+  text?: string;
+  text_color?: string;
+}
+
+export interface PineDrawingLine {
+  id: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color?: string;
+  width?: number;
+  style?: string;
+}
+
+export interface PineDrawingLabel {
+  id: number;
+  x: number;
+  y: number;
+  text?: string;
+  color?: string;
+  textcolor?: string;
+  style?: string;
+}
+
+export interface PineDrawingTable {
+  id: number;
+  position?: string;
+  columns: number;
+  rows: number;
+  cells: Array<Array<{
+    text?: string;
+    bgcolor?: string;
+    text_color?: string;
+  }>>;
+}
+
+export interface PineDrawingOutput {
+  boxes: PineDrawingBox[];
+  lines: PineDrawingLine[];
+  labels: PineDrawingLabel[];
+  tables: PineDrawingTable[];
+}
+
 export interface PineExecutionResult {
   ok: boolean;
   plots: PinePlotOutput[];
+  drawings?: PineDrawingOutput;
   error?: string;
   runtimeMs?: number;
 }
 
 export const PRESET_PINE_SCRIPTS = [
+  {
+    name: 'CRT Model Pro - Sam',
+    description: 'Candle Range Theory with HTF boxes, PSP correlation, CISD projections, True Opens & live dashboard.',
+    code: crtModelPine,
+  },
   {
     name: 'Dual EMA Ribbon (9 & 21)',
     description: 'Fast and slow exponential moving averages with trend coloring.',
@@ -86,7 +148,7 @@ export async function executePineScript(
 
   try {
     // Format candles for PineTS market data format
-    const pineCandles = candles.map((c, i) => {
+    const pineCandles = candles.map((c) => {
       const openTimeMs = c.time > 10000000000 ? c.time : c.time * 1000;
       return {
         openTime: openTimeMs,
@@ -133,10 +195,31 @@ export async function executePineScript(
       }
     }
 
+    function extractLast(data: any): any[] {
+      if (!data || !Array.isArray(data) || data.length === 0) return [];
+      const last = data[data.length - 1];
+      return Array.isArray(last?.value) ? last.value.filter((item: any) => !item._deleted) : [];
+    }
+
+    const drawings: PineDrawingOutput = {
+      boxes: extractLast(result?.plots?.__boxes__?.data),
+      lines: extractLast(result?.plots?.__lines__?.data),
+      labels: extractLast(result?.plots?.__labels__?.data),
+      tables: extractLast(result?.plots?.__tables__?.data),
+    };
+
+    const hasOutputs =
+      plots.length > 0 ||
+      drawings.boxes.length > 0 ||
+      drawings.lines.length > 0 ||
+      drawings.labels.length > 0 ||
+      drawings.tables.length > 0;
+
     const runtimeMs = Math.round(performance.now() - startTime);
     return {
-      ok: true,
+      ok: hasOutputs,
       plots,
+      drawings,
       runtimeMs,
     };
   } catch (err: any) {

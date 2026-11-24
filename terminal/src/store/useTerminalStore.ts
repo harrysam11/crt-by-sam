@@ -10,6 +10,7 @@ import type {
 } from '../types/terminal';
 import { useExecutionEngineStore } from './useExecutionEngineStore';
 import { useLayoutStore } from './useLayoutStore';
+import type { PineDrawingOutput } from '../services/pineRunner';
 
 export const START_BALANCE = 10000; // USD
 export const LEVERAGES = [1, 2, 5, 10, 20, 50, 100];
@@ -42,9 +43,11 @@ interface TerminalState {
   error: string | null;
   isLoadingCandles: boolean;
   pinePlots: Array<{ title: string; color: string; data: Array<{ time: number; value: number }> }>;
+  pineDrawings: PineDrawingOutput | null;
 
   setIsLoadingCandles: (l: boolean) => void;
   setPinePlots: (plots: Array<{ title: string; color: string; data: Array<{ time: number; value: number }> }>) => void;
+  setPineDrawings: (drawings: PineDrawingOutput | null) => void;
   setSymbol: (s: string) => void;
   setTimeframe: (t: Timeframe) => void;
   setCandles: (c: Candle[]) => void;
@@ -262,9 +265,11 @@ export const useTerminalStore = create<TerminalState>()(
         error: null,
         isLoadingCandles: false,
         pinePlots: [],
+        pineDrawings: null,
 
         setIsLoadingCandles: (isLoadingCandles) => set({ isLoadingCandles }),
         setPinePlots: (pinePlots) => set({ pinePlots }),
+        setPineDrawings: (pineDrawings) => set({ pineDrawings }),
         setSymbol: (symbol) => {
           const safe = sanitizeSymbol(symbol);
           set((s) => ({ symbol: safe, candles: [], error: null, currentPrice: s.prices[safe] ?? 0 }));

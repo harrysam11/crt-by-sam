@@ -63,6 +63,8 @@ export default function IndicatorsModal({ isOpen, onClose }: IndicatorsModalProp
   const timeframe = useTerminalStore((s) => s.timeframe);
   const pinePlots = useTerminalStore((s) => s.pinePlots);
   const setPinePlots = useTerminalStore((s) => s.setPinePlots);
+  const pineDrawings = useTerminalStore((s) => s.pineDrawings);
+  const setPineDrawings = useTerminalStore((s) => s.setPineDrawings);
 
   const allTemplates = useMemo(() => {
     return [...customTemplates, ...BUILT_IN_INDICATOR_TEMPLATES];
@@ -137,11 +139,25 @@ export default function IndicatorsModal({ isOpen, onClose }: IndicatorsModalProp
     setPineStatus(`Evaluating ${name}...`);
     try {
       const res = await executePineScript(code, candles, symbol, timeframe);
-      if (res.ok && res.plots.length > 0) {
+      const hasOutput =
+        res.plots.length > 0 ||
+        (res.drawings &&
+          (res.drawings.boxes.length > 0 ||
+            res.drawings.lines.length > 0 ||
+            res.drawings.labels.length > 0 ||
+            res.drawings.tables.length > 0));
+
+      if (res.ok && hasOutput) {
         setPinePlots(res.plots);
-        setPineStatus(`Applied ${name} (${res.plots.length} series)`);
+        setPineDrawings(res.drawings || null);
+        const drawingsCount =
+          (res.drawings?.boxes.length || 0) +
+          (res.drawings?.lines.length || 0) +
+          (res.drawings?.labels.length || 0) +
+          (res.drawings?.tables.length || 0);
+        setPineStatus(`Applied ${name} (${res.plots.length} series, ${drawingsCount} drawings)`);
       } else {
-        setPineStatus(res.error || 'No plot outputs generated');
+        setPineStatus(res.error || 'No plot outputs or drawings generated');
       }
     } catch (err: unknown) {
       setPineStatus(err instanceof Error ? err.message : 'Execution failed');
@@ -151,7 +167,8 @@ export default function IndicatorsModal({ isOpen, onClose }: IndicatorsModalProp
   const handleClearPine = () => {
     audioHaptics.tick();
     setPinePlots([]);
-    setPineStatus('Cleared Pine plots');
+    setPineDrawings(null);
+    setPineStatus('Cleared Pine plots and drawings');
   };
 
   if (!isOpen) return null;
@@ -438,12 +455,12 @@ export default function IndicatorsModal({ isOpen, onClose }: IndicatorsModalProp
             )}
           </div>
           <div className="flex items-center gap-2">
-            {pinePlots.length > 0 && (
+            {(pinePlots.length > 0 || (pineDrawings && (pineDrawings.boxes.length > 0 || pineDrawings.lines.length > 0 || pineDrawings.tables.length > 0))) && (
               <button
                 onClick={handleClearPine}
                 className="px-2.5 py-1 rounded-lg bg-rose-950/40 border border-rose-800/60 text-rose-300 text-[11px] hover:text-white transition"
               >
-                Clear Pine Plots ({pinePlots.length})
+                Clear Pine Studies
               </button>
             )}
             <button

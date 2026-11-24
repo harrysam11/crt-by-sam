@@ -43,6 +43,7 @@ import VolumeProfileOverlay from './VolumeProfileOverlay';
 import DeepStudiesOverlay from './DeepStudiesOverlay';
 import PriceScaleActionFlyout from './PriceScaleActionFlyout';
 import SymbolSearchModal from '../Search/SymbolSearchModal';
+import PineDrawingsOverlay from './PineDrawingsOverlay';
 import CustomIntervalModal from './CustomIntervalModal';
 import {
   parseTimeframeToSeconds,
@@ -3183,6 +3184,12 @@ export default function TradingChart({
             seriesApi={seriesApi}
             chartApi={chartApi}
             onExecuteOrders={handleExecuteCanvasOrders}
+          />
+
+          {/* Pine Script Geometry & Drawings Overlay (CRT Boxes, Lines, Labels, Tables) */}
+          <PineDrawingsOverlay
+            chartApi={chartApi}
+            seriesApi={seriesApi}
           />
 
           {/* Interactive In-Chart Trading & Order Drag Overlay */}

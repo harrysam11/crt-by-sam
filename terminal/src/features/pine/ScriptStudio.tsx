@@ -88,21 +88,36 @@ export default function ScriptStudio({ onApplyPlots, onClearPlots }: ScriptStudi
       }
     } else {
       const result = await executePineScript(pineCode, candles, symbol, timeframe);
-      if (result.ok && result.plots.length > 0) {
+      const hasOutput =
+        result.plots.length > 0 ||
+        (result.drawings &&
+          (result.drawings.boxes.length > 0 ||
+            result.drawings.lines.length > 0 ||
+            result.drawings.labels.length > 0 ||
+            result.drawings.tables.length > 0));
+
+      if (result.ok && hasOutput) {
         setStatus('ACTIVE');
         setErrorMessage(null);
         const totalPoints = result.plots.reduce((acc, p) => acc + p.data.length, 0);
+        const drawingsCount =
+          (result.drawings?.boxes.length || 0) +
+          (result.drawings?.lines.length || 0) +
+          (result.drawings?.labels.length || 0) +
+          (result.drawings?.tables.length || 0);
+
         setMetrics({
           runtimeMs: result.runtimeMs || 0,
-          plotCount: result.plots.length,
+          plotCount: result.plots.length + drawingsCount,
           pointsCount: totalPoints,
         });
         if (onApplyPlots) {
           onApplyPlots(result.plots);
         }
+        useTerminalStore.getState().setPineDrawings(result.drawings || null);
       } else {
         setStatus('ERROR');
-        setErrorMessage(result.error || 'Pine compilation error: No plots generated.');
+        setErrorMessage(result.error || 'Pine compilation error: No plots or drawings generated.');
         audioHaptics.error();
       }
     }
@@ -116,6 +131,7 @@ export default function ScriptStudio({ onApplyPlots, onClearPlots }: ScriptStudi
     if (onClearPlots) {
       onClearPlots();
     }
+    useTerminalStore.getState().setPineDrawings(null);
   };
 
   const lineCount = activeCode.split('\n').length;
