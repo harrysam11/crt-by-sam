@@ -19,6 +19,7 @@ import SymbolSearchModal from '../Search/SymbolSearchModal';
 import { drawingEvents } from '../drawing/framework/DrawingEvents';
 import { useIndicatorsStore } from '../../store/useIndicatorsStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useCloudStorageStore } from '../../store/useCloudStorageStore';
 import type { ChartStyle, Timeframe } from '../../types/terminal';
 
 import { TIMEFRAMES } from '../../services/instruments';
@@ -1868,6 +1869,20 @@ export default function Header({
                   {isSyncing && <span className="text-[9px] text-amber-300">Syncing...</span>}
                 </button>
 
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    setIsUserMenuOpen(false);
+                    useCloudStorageStore.getState().openModal();
+                  }}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-200 hover:text-white transition"
+                >
+                  <svg className="h-3.5 w-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 00-9.78 2.096A4.001 4.001 0 003 15z" />
+                  </svg>
+                  <span>Cloud Storage (BYOS)</span>
+                </button>
+
                 {onOpenSettings && (
                   <button
                     onClick={() => {
@@ -1883,6 +1898,7 @@ export default function Header({
                     <span>Profile Settings</span>
                   </button>
                 )}
+
 
                 <div className="border-t border-grid/60 pt-1">
                   <button
@@ -2208,6 +2224,16 @@ export default function Header({
                       <span>Trading Sessions & DB Backup</span>
                     </button>
                   )}
+
+                  <button
+                    onClick={() => { audioHaptics.tick(); useCloudStorageStore.getState().openModal(); setIsOverflowOpen(false); }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 00-9.78 2.096A4.001 4.001 0 003 15z" />
+                    </svg>
+                    <span>Cloud Storage (BYOS - Gist / OPFS)</span>
+                  </button>
 
                   {onOpenGuardian && (
                     <button

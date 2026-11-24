@@ -1,25 +1,30 @@
 /**
- * Institutional Quant & AI Assistant Modal.
- * Integrates Local Ollama (DeepSeek-R1 / Llama 3 / Mistral) and Cloud API (OpenAI / Gemini / Anthropic compatible).
- * Features:
- *  - Chart Price Action & Technical Structure Audit
- *  - Macro News & Fundamentals Impact Debrief
- *  - PineScript Strategy & Quant Code Builder
- *  - Software & Terminal Interactive Guide
+ * QuantAIAgentModal.tsx
+ * Institutional Quant & AI Assistant Modal powered by Model Context Protocol (MCP).
+ * Connects directly to:
+ *  - Remote MCP Streamable HTTP / SSE Servers (dmcharts standard)
+ *  - Anthropic Claude 3.5 (Sonnet / Haiku) with Native Tool Calling
+ *  - OpenAI / OpenRouter / Groq / DeepSeek with Tool Calling
+ *  - Google Gemini 1.5 (Flash / Pro) with Function Declarations
+ *  - Local Ollama (Desktop / Self-Hosted)
+ * Client-Side Tool Calling: executes real-time market data, orderflow, and risk checks
+ * with ZERO inference load on the Railway server.
  * ZERO EMOJI POLICY strictly enforced.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useTerminalStore } from '../../store/useTerminalStore';
 import { audioHaptics } from '../../utils/notify';
-import { queryLocalOllama } from '../../services/aiBehavioralInsights';
 import { fmtPrice } from '../../utils/formatters';
+import { queryMcpAgent, McpProviderType, McpConfig } from '../../services/mcp/mcpClient';
+import { TERMINALX_MCP_TOOLS } from '../../services/mcp/mcpTools';
 
 export interface ChatMessage {
   id: string;
   sender: 'USER' | 'AI';
   text: string;
   timestamp: number;
+  toolCalls?: { tool: string; args: any; output: string }[];
 }
 
 interface QuantAIAgentModalProps {
@@ -27,8 +32,6 @@ interface QuantAIAgentModalProps {
   onClose: () => void;
   initialPrompt?: string;
 }
-
-type AIProvider = 'OLLAMA' | 'CLOUD_API';
 
 declare global {
   interface Window {
@@ -50,51 +53,38 @@ export default function QuantAIAgentModal({
     return accs.find((a) => a.id === s.activeAccountId) || accs[0];
   });
 
-  const [provider, setProvider] = useState<AIProvider>(() => {
+  const [provider, setProvider] = useState<McpProviderType>(() => {
     try {
-      return (localStorage.getItem('crt_ai_provider') as AIProvider) || 'OLLAMA';
+      return (localStorage.getItem('terminalx_ai_provider') as McpProviderType) || 'OPENAI_OPENROUTER';
     } catch {
-      return 'OLLAMA';
+      return 'OPENAI_OPENROUTER';
     }
   });
 
-  const [ollamaEndpoint, setOllamaEndpoint] = useState(() => {
+  const [endpoint, setEndpoint] = useState(() => {
     try {
-      return localStorage.getItem('crt_ollama_endpoint') || 'http://localhost:11434/api/generate';
-    } catch {
-      return 'http://localhost:11434/api/generate';
-    }
-  });
-
-  const [ollamaModel, setOllamaModel] = useState(() => {
-    try {
-      return localStorage.getItem('crt_ollama_model') || 'deepseek-r1:latest';
-    } catch {
-      return 'deepseek-r1:latest';
-    }
-  });
-
-  const [cloudEndpoint, setCloudEndpoint] = useState(() => {
-    try {
-      return localStorage.getItem('crt_cloud_endpoint') || 'https://api.openai.com/v1/chat/completions';
+      return (
+        localStorage.getItem('terminalx_ai_endpoint') ||
+        'https://api.openai.com/v1/chat/completions'
+      );
     } catch {
       return 'https://api.openai.com/v1/chat/completions';
     }
   });
 
-  const [cloudApiKey, setCloudApiKey] = useState(() => {
+  const [apiKey, setApiKey] = useState(() => {
     try {
-      return localStorage.getItem('crt_cloud_apikey') || '';
+      return localStorage.getItem('terminalx_ai_apikey') || '';
     } catch {
       return '';
     }
   });
 
-  const [cloudModel, setCloudModel] = useState(() => {
+  const [model, setModel] = useState(() => {
     try {
-      return localStorage.getItem('crt_cloud_model') || 'deepseek-chat';
+      return localStorage.getItem('terminalx_ai_model') || 'gpt-4o-mini';
     } catch {
-      return 'deepseek-chat';
+      return 'gpt-4o-mini';
     }
   });
 
@@ -103,13 +93,13 @@ export default function QuantAIAgentModal({
     {
       id: 'init-1',
       sender: 'AI',
-      text: `Quant & AI Assistant initialized. Connected to active symbol ${symbol} (${timeframe}). Ask any technical analysis, macro fundamentals, PineScript logic, or terminal usage questions.`,
+      text: `TerminalX MCP Quant Engine active. Connected to ${symbol} (${timeframe}).\nEquipped with 6 real-time tools: Market Quotes, Orderflow Imbalance, TradeXGuardian Risk, Lot Sizing, Macro Calendar, and PineScript Audit.\n\nAll tools execute in your browser with zero server latency or load.`,
       timestamp: Date.now(),
     },
   ]);
   const [inputVal, setInputVal] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [ollamaConnected, setOllamaConnected] = useState<boolean | null>(null);
+  const [expandedToolIndex, setExpandedToolIndex] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -117,43 +107,44 @@ export default function QuantAIAgentModal({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  // Handle initial prompt passed to modal
   useEffect(() => {
     if (initialPrompt && isOpen) {
       handleSend(initialPrompt);
     }
   }, [initialPrompt, isOpen]);
 
-  // Test local Ollama connection on open
-  useEffect(() => {
-    if (provider !== 'OLLAMA' || !isOpen) return;
-    const testOllama = async () => {
-      try {
-        const rootUrl = ollamaEndpoint.replace(/\/api\/.*$/, '');
-        const res = await fetch(`${rootUrl}/api/tags`, { method: 'GET' });
-        setOllamaConnected(res.ok);
-      } catch {
-        setOllamaConnected(false);
-      }
-    };
-    testOllama();
-  }, [provider, ollamaEndpoint, isOpen]);
+  // Quick preset loader when switching provider
+  const handleSelectProvider = (p: McpProviderType) => {
+    setProvider(p);
+    if (p === 'ANTHROPIC') {
+      setEndpoint('https://api.anthropic.com/v1/messages');
+      setModel('claude-3-5-sonnet-20241022');
+    } else if (p === 'GOOGLE_GEMINI') {
+      setEndpoint('https://generativelanguage.googleapis.com/v1beta/models');
+      setModel('gemini-1.5-flash');
+    } else if (p === 'MCP_SERVER') {
+      setEndpoint('http://localhost:3000/mcp');
+      setModel('mcp-agent');
+    } else if (p === 'LOCAL_OLLAMA') {
+      setEndpoint('http://localhost:11434/api/generate');
+      setModel('deepseek-r1:latest');
+    } else {
+      setEndpoint('https://api.openai.com/v1/chat/completions');
+      setModel('gpt-4o-mini');
+    }
+  };
 
-  // Save config settings
   const handleSaveConfig = () => {
     try {
-      localStorage.setItem('crt_ai_provider', provider);
-      localStorage.setItem('crt_ollama_endpoint', ollamaEndpoint);
-      localStorage.setItem('crt_ollama_model', ollamaModel);
-      localStorage.setItem('crt_cloud_endpoint', cloudEndpoint);
-      localStorage.setItem('crt_cloud_apikey', cloudApiKey);
-      localStorage.setItem('crt_cloud_model', cloudModel);
+      localStorage.setItem('terminalx_ai_provider', provider);
+      localStorage.setItem('terminalx_ai_endpoint', endpoint);
+      localStorage.setItem('terminalx_ai_apikey', apiKey);
+      localStorage.setItem('terminalx_ai_model', model);
     } catch {}
     setShowConfig(false);
     audioHaptics.tick();
   };
 
-  // Build Context Snapshot for on-chart analysis
   const buildChartContext = () => {
     const recent = (candles || []).slice(-15);
     const candleSummary = recent
@@ -188,103 +179,89 @@ ${candleSummary || 'Data loading...'}`;
     if (!userPromptText) setInputVal('');
     setIsLoading(true);
 
-    const context = buildChartContext();
-    const fullPrompt = `${context}\n\nUSER REQUEST:\n${textToSend}\n\nINSTRUCTION: Provide an institutional, ultra-concise, technical answer. Format mathematical levels, orderflow bias, and code cleanly. No emojis.`;
-
-    let reply = '';
-
-    if (provider === 'OLLAMA') {
-      const res = await queryLocalOllama(fullPrompt, ollamaModel, ollamaEndpoint);
-      reply = res.response;
-    } else {
-      // Cloud API provider (OpenAI compatible)
-      try {
-        const res = await fetch(cloudEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${cloudApiKey}`,
-          },
-          body: JSON.stringify({
-            model: cloudModel,
-            messages: [
-              {
-                role: 'system',
-                content:
-                  'You are an institutional quantitative trading AI and algorithmic software specialist. You give concise, data-driven answers without fluff or emojis.',
-              },
-              { role: 'user', content: fullPrompt },
-            ],
-            temperature: 0.2,
-          }),
-        });
-
-        if (!res.ok) {
-          throw new Error(`Cloud API returned HTTP ${res.status}`);
-        }
-        const data = await res.json();
-        reply = data.choices?.[0]?.message?.content || 'No response generated.';
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Unknown network failure';
-        reply = `Cloud API Request Failed: ${msg}. Please check your Endpoint, API Key, and Model name in settings.`;
-      }
-    }
-
-    const aiMsg: ChatMessage = {
-      id: `ai-${Date.now()}`,
-      sender: 'AI',
-      text: reply,
-      timestamp: Date.now(),
+    const contextSnapshot = buildChartContext();
+    const config: McpConfig = {
+      provider,
+      endpoint,
+      apiKey,
+      model,
     };
 
-    setMessages((prev) => [...prev, aiMsg]);
+    try {
+      const res = await queryMcpAgent(textToSend.trim(), config, contextSnapshot);
+      const aiMsg: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        sender: 'AI',
+        text: res.reply,
+        timestamp: Date.now(),
+        toolCalls: res.toolCallsExecuted,
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+    } catch (err: any) {
+      const errorMsg: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        sender: 'AI',
+        text: `Execution Error: ${err.message || 'Failed to reach AI provider'}.\nPlease verify your API Key and Endpoint in MCP settings (gear icon).`,
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    }
+
     setIsLoading(false);
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-5 font-mono select-none">
-      <div className="flex flex-col h-[90vh] max-h-[820px] w-full max-w-3xl rounded-xl bg-panel text-primary shadow-2xl border border-grid overflow-hidden animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-3 sm:p-5 font-mono select-none">
+      <div className="flex flex-col h-[90vh] max-h-[840px] w-full max-w-3xl rounded-xl bg-panel text-slate-200 shadow-2xl border border-grid overflow-hidden animate-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-grid bg-surface/80">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-grid bg-panel/90">
           <div className="flex items-center gap-2.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-accent animate-pulse" />
-            <span className="font-bold text-primary text-xs uppercase tracking-wider">
-              Quant & AI Assistant ({provider === 'OLLAMA' ? 'Local Ollama' : 'Cloud API'})
-            </span>
-            <span className="text-[10px] text-muted border border-grid px-1.5 py-0.5 rounded">
-              {symbol} · {timeframe}
-            </span>
-            {provider === 'OLLAMA' && ollamaConnected !== null && (
-              <span
-                className={`text-[9.5px] px-1.5 py-0.5 rounded font-bold ${
-                  ollamaConnected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
-                }`}
-              >
-                {ollamaConnected ? 'Ollama Online' : 'Ollama Offline'}
+            <div className="h-7 w-7 rounded bg-cyan-400 text-black font-black text-[11px] flex items-center justify-center font-mono shadow-xs">
+              MCP
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-white text-xs font-heading">QUANT &amp; AI AGENT</span>
+                <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-bold uppercase">
+                  {provider.replace('_', ' ')}
+                </span>
+                <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-white/5 text-slate-400 border border-white/10">
+                  {TERMINALX_MCP_TOOLS.length} Tools Active
+                </span>
+              </div>
+              <span className="text-[10px] text-muted block -mt-0.5">
+                Model Context Protocol • Client-Side Zero Server Load
               </span>
-            )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => {
                 audioHaptics.tick();
                 setShowConfig((v) => !v);
               }}
-              className="p-1 rounded text-muted hover:text-primary hover:bg-surface transition"
-              title="Configure AI Provider & Model"
+              className={`p-1.5 rounded transition ${
+                showConfig ? 'bg-cyan-500/20 text-cyan-300' : 'text-muted hover:text-white hover:bg-white/5'
+              }`}
+              title="MCP Engine & Provider Settings"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </button>
             <button
               onClick={onClose}
-              className="p-1 rounded text-muted hover:text-primary hover:bg-surface transition"
-              title="Close"
+              className="p-1.5 text-muted hover:text-white rounded hover:bg-white/5 transition"
+              title="Close Assistant"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -293,135 +270,150 @@ ${candleSummary || 'Data loading...'}`;
           </div>
         </div>
 
-        {/* Configuration Panel Dropdown */}
+        {/* MCP Engine Configuration Drawer */}
         {showConfig && (
-          <div className="bg-surface/50 p-4 border-b border-grid space-y-3 text-xs animate-in slide-in-from-top-2 duration-150">
-            <div className="flex items-center justify-between pb-1 border-b border-grid">
-              <span className="font-bold text-primary text-[11px] uppercase">AI Engine Settings</span>
-              <div className="flex items-center gap-1 bg-surface p-0.5 rounded border border-grid">
+          <div className="border-b border-grid bg-black/40 p-3.5 text-xs space-y-3 animate-in slide-in-from-top duration-150">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-white text-[11px] uppercase tracking-wider">
+                MCP AI Provider (Bring Your Own Key)
+              </span>
+              <span className="text-[10px] text-muted">Runs 100% Client-Side</span>
+            </div>
+
+            {/* Provider Switcher Tabs */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 p-1 rounded-lg bg-surface border border-grid text-[10px]">
+              {(
+                [
+                  { id: 'OPENAI_OPENROUTER', label: 'OpenAI / Groq' },
+                  { id: 'ANTHROPIC', label: 'Claude 3.5' },
+                  { id: 'GOOGLE_GEMINI', label: 'Gemini 1.5' },
+                  { id: 'MCP_SERVER', label: 'Remote MCP' },
+                  { id: 'LOCAL_OLLAMA', label: 'Local Ollama' },
+                ] as const
+              ).map((p) => (
                 <button
-                  onClick={() => setProvider('OLLAMA')}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    provider === 'OLLAMA' ? 'bg-accent text-black' : 'text-muted hover:text-primary'
+                  key={p.id}
+                  onClick={() => handleSelectProvider(p.id)}
+                  className={`py-1.5 px-2 rounded font-bold transition text-center ${
+                    provider === p.id
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                      : 'text-muted hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  Local Ollama
+                  {p.label}
                 </button>
-                <button
-                  onClick={() => setProvider('CLOUD_API')}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    provider === 'CLOUD_API' ? 'bg-accent text-black' : 'text-muted hover:text-primary'
-                  }`}
-                >
-                  Cloud API
-                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-2">
+                <label className="text-[10px] uppercase text-muted block mb-1 font-semibold">
+                  API Endpoint / SSE URL
+                </label>
+                <input
+                  type="text"
+                  value={endpoint}
+                  onChange={(e) => setEndpoint(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full bg-surface border border-grid rounded px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase text-muted block mb-1 font-semibold">
+                  Model Identifier
+                </label>
+                <input
+                  type="text"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="e.g. gpt-4o, claude-3-5-sonnet"
+                  className="w-full bg-surface border border-grid rounded px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-400"
+                />
               </div>
             </div>
 
-            {provider === 'OLLAMA' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] uppercase text-muted block mb-1">Ollama API Endpoint</label>
-                  <input
-                    type="text"
-                    value={ollamaEndpoint}
-                    onChange={(e) => setOllamaEndpoint(e.target.value)}
-                    placeholder="http://localhost:11434/api/generate"
-                    className="w-full bg-surface border border-grid rounded px-2 py-1 text-primary text-xs focus:outline-none focus:border-accent"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase text-muted block mb-1">Model Name</label>
-                  <select
-                    value={ollamaModel}
-                    onChange={(e) => setOllamaModel(e.target.value)}
-                    className="w-full bg-surface border border-grid rounded px-2 py-1 text-primary text-xs focus:outline-none focus:border-accent"
-                  >
-                    <option value="deepseek-r1:latest">DeepSeek-R1 (Institutional Reasoning)</option>
-                    <option value="llama3:latest">Llama 3 (Meta)</option>
-                    <option value="mistral:latest">Mistral 7B</option>
-                    <option value="qwen2.5:latest">Qwen 2.5 Coder</option>
-                  </select>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] uppercase text-muted block mb-1">API Base URL</label>
-                    <input
-                      type="text"
-                      value={cloudEndpoint}
-                      onChange={(e) => setCloudEndpoint(e.target.value)}
-                      placeholder="https://api.openai.com/v1/chat/completions"
-                      className="w-full bg-surface border border-grid rounded px-2 py-1 text-primary text-xs focus:outline-none focus:border-accent"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] uppercase text-muted block mb-1">Model ID</label>
-                    <input
-                      type="text"
-                      value={cloudModel}
-                      onChange={(e) => setCloudModel(e.target.value)}
-                      placeholder="e.g. deepseek-chat, gpt-4o-mini, claude-3-5-sonnet"
-                      className="w-full bg-surface border border-grid rounded px-2 py-1 text-primary text-xs focus:outline-none focus:border-accent"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase text-muted block mb-1">API Key</label>
-                  <input
-                    type="password"
-                    value={cloudApiKey}
-                    onChange={(e) => setCloudApiKey(e.target.value)}
-                    placeholder="sk-..."
-                    className="w-full bg-surface border border-grid rounded px-2 py-1 text-primary text-xs focus:outline-none focus:border-accent"
-                  />
-                </div>
+            {provider !== 'LOCAL_OLLAMA' && (
+              <div>
+                <label className="text-[10px] uppercase text-muted block mb-1 font-semibold">
+                  API Key (Stored only in your browser localStorage)
+                </label>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={
+                    provider === 'ANTHROPIC'
+                      ? 'sk-ant-...'
+                      : provider === 'GOOGLE_GEMINI'
+                      ? 'AIzaSy...'
+                      : 'sk-...'
+                  }
+                  className="w-full bg-surface border border-grid rounded px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-400"
+                />
               </div>
             )}
 
-            <div className="flex justify-end pt-2">
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[10px] text-muted">
+                Available Tools: Quote, Orderflow, Risk Guardian, Position Sizing, Calendar, PineScript
+              </span>
               <button
                 onClick={handleSaveConfig}
-                className="px-3 py-1 bg-accent text-black font-bold rounded text-xs hover:brightness-110"
+                className="px-3.5 py-1.5 bg-cyan-400 hover:bg-cyan-300 text-black font-bold rounded text-xs transition font-heading"
               >
-                Save Settings
+                Save MCP Settings
               </button>
             </div>
           </div>
         )}
 
-        {/* Quick Prompt Pills Bar */}
-        <div className="flex items-center gap-1.5 px-3 py-2 bg-surface/40 border-b border-grid overflow-x-auto text-[10.5px]">
-          <span className="text-muted text-[10px] uppercase shrink-0">Prompts:</span>
+        {/* Quick Prompts Bar */}
+        <div className="flex items-center gap-1.5 px-3 py-2 bg-panel/50 border-b border-grid overflow-x-auto text-[10.5px]">
+          <span className="text-muted text-[10px] uppercase shrink-0 font-bold">Actions:</span>
           <button
-            onClick={() => handleSend(`Perform an institutional Price Action & Liquidity Audit for ${symbol} on the ${timeframe} chart. Identify market structure, key order blocks, liquidity sweep levels, and high-probability invalidation zones.`)}
-            className="shrink-0 px-2.5 py-1 rounded-full bg-surface hover:bg-surface/80 text-secondary hover:text-primary border border-grid transition"
+            onClick={() =>
+              handleSend(
+                `Use the get_market_quote and get_orderflow_imbalance tools to analyze the current structure and volume bias for ${symbol} on the ${timeframe} timeframe.`
+              )
+            }
+            className="shrink-0 px-2.5 py-1 rounded-full bg-surface hover:bg-white/10 text-slate-300 hover:text-white border border-grid transition"
           >
-            Chart TA & Liquidity Audit
+            Audit Quote &amp; Orderflow
           </button>
           <button
-            onClick={() => handleSend(`Provide a macroeconomic and fundamentals debrief. How are recent CPI, rates, and yields impacting ${symbol}? Give directional orderflow bias.`)}
-            className="shrink-0 px-2.5 py-1 rounded-full bg-surface hover:bg-surface/80 text-secondary hover:text-primary border border-grid transition"
+            onClick={() =>
+              handleSend(
+                `Use the calculate_position_size tool to determine my exact lot size on ${symbol} with $500 risk and a 25-pip stop loss.`
+              )
+            }
+            className="shrink-0 px-2.5 py-1 rounded-full bg-surface hover:bg-white/10 text-slate-300 hover:text-white border border-grid transition"
           >
-            Macro & News Impact
+            Calculate Lot Size ($500 Risk)
           </button>
           <button
-            onClick={() => handleSend(`Write a PineScript v5 indicator or strategy for Candle Range Theory (CRT) and Turtle Soup liquidity sweeps with clean visual plots and alerts.`)}
-            className="shrink-0 px-2.5 py-1 rounded-full bg-surface hover:bg-surface/80 text-secondary hover:text-primary border border-grid transition"
+            onClick={() =>
+              handleSend(
+                `Use the check_guardian_risk tool to audit my current TradeXGuardian daily drawdown buffer, discipline score, and active trade rules.`
+              )
+            }
+            className="shrink-0 px-2.5 py-1 rounded-full bg-surface hover:bg-white/10 text-slate-300 hover:text-white border border-grid transition"
           >
-            PineScript Strategy Builder
+            Check TradeXGuardian Rules
           </button>
           <button
-            onClick={() => handleSend(`Explain how to use the Footprint DOM ladder, order flow delta, and the multi-account switcher in this trading terminal.`)}
-            className="shrink-0 px-2.5 py-1 rounded-full bg-surface hover:bg-surface/80 text-secondary hover:text-primary border border-grid transition"
+            onClick={() =>
+              handleSend(
+                `Use the fetch_macro_calendar tool to retrieve upcoming high-impact economic news events that could induce volatility today.`
+              )
+            }
+            className="shrink-0 px-2.5 py-1 rounded-full bg-surface hover:bg-white/10 text-slate-300 hover:text-white border border-grid transition"
           >
-            Software & Terminal Help
+            Fetch Volatility Catalysts
           </button>
         </div>
 
-        {/* Messages List Area */}
+        {/* Chat Messages List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3.5 text-xs bg-bg/50">
           {messages.map((m) => (
             <div
@@ -429,16 +421,56 @@ ${candleSummary || 'Data loading...'}`;
               className={`flex flex-col ${m.sender === 'USER' ? 'items-end' : 'items-start'}`}
             >
               <div className="flex items-center gap-2 mb-1 text-[10px] text-muted">
-                <span className="font-bold text-primary uppercase">
-                  {m.sender === 'USER' ? 'You' : 'Quant AI'}
+                <span className="font-bold text-white uppercase">
+                  {m.sender === 'USER' ? 'You' : 'Quant AI (MCP)'}
                 </span>
                 <span>{new Date(m.timestamp).toLocaleTimeString()}</span>
               </div>
+
+              {/* Tool Execution Badges */}
+              {m.toolCalls && m.toolCalls.length > 0 && (
+                <div className="mb-2 space-y-1 w-full max-w-[88%]">
+                  {m.toolCalls.map((tc, idx) => {
+                    const key = `${m.id}-tool-${idx}`;
+                    const isExpanded = expandedToolIndex === key;
+                    return (
+                      <div
+                        key={key}
+                        className="rounded border border-cyan-500/30 bg-cyan-500/10 p-2 text-[11px]"
+                      >
+                        <div
+                          className="flex items-center justify-between cursor-pointer"
+                          onClick={() => setExpandedToolIndex(isExpanded ? null : key)}
+                        >
+                          <span className="font-bold text-cyan-300">
+                            [MCP Tool Executed: {tc.tool}]
+                          </span>
+                          <span className="text-[9.5px] text-muted hover:text-white">
+                            {isExpanded ? 'Hide Payload' : 'View Payload'}
+                          </span>
+                        </div>
+                        {isExpanded && (
+                          <div className="mt-1.5 pt-1.5 border-t border-cyan-500/20 text-[10px] text-slate-300 font-mono space-y-1">
+                            <div>
+                              <strong className="text-muted">Arguments:</strong>{' '}
+                              {JSON.stringify(tc.args)}
+                            </div>
+                            <div>
+                              <strong className="text-muted">Result:</strong> {tc.output}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               <div
                 className={`max-w-[88%] rounded-xl p-3 leading-relaxed select-text whitespace-pre-wrap ${
                   m.sender === 'USER'
-                    ? 'bg-accent/15 text-primary border border-accent/30'
-                    : 'bg-surface text-primary border border-grid'
+                    ? 'bg-cyan-500/15 text-white border border-cyan-500/30'
+                    : 'bg-surface text-slate-200 border border-grid'
                 }`}
               >
                 {m.text}
@@ -448,46 +480,44 @@ ${candleSummary || 'Data loading...'}`;
 
           {isLoading && (
             <div className="flex flex-col items-start animate-pulse">
-              <div className="flex items-center gap-1.5 text-[10px] text-accent mb-1 font-bold">
-                <span className="h-2 w-2 rounded-full bg-accent animate-ping" />
-                <span>Quant AI Thinking & Analyzing Order Flow...</span>
+              <div className="flex items-center gap-2 mb-1 text-[10px] text-muted">
+                <span className="font-bold text-cyan-300 uppercase">Quant AI</span>
+                <span>Querying MCP &amp; Executing Tools...</span>
               </div>
-              <div className="max-w-[88%] rounded-xl p-3 bg-surface border border-grid text-muted">
-                Evaluating price levels, technical market structure, and macro confluence...
+              <div className="rounded-xl p-3 bg-surface border border-grid text-muted text-xs flex items-center gap-2">
+                <span className="h-3 w-3 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                <span>Running client-side model inference &amp; tool validation...</span>
               </div>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Chat Input Bar */}
-        <div className="p-3 bg-surface/80 border-t border-grid">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
+        {/* Input Bar */}
+        <div className="p-3 bg-panel/90 border-t border-grid flex items-center gap-2">
+          <input
+            type="text"
+            value={inputVal}
+            onChange={(e) => setInputVal(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
             }}
-            className="flex items-center gap-2"
+            placeholder={`Ask MCP Agent about ${symbol}, orderflow, risk rules, or PineScript...`}
+            className="flex-1 bg-surface border border-grid rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition"
+          />
+          <button
+            onClick={() => handleSend()}
+            disabled={!inputVal.trim() || isLoading}
+            className="px-4 py-2 bg-cyan-400 hover:bg-cyan-300 disabled:opacity-40 text-black font-bold text-xs rounded-lg transition font-heading cursor-pointer flex items-center gap-1.5"
           >
-            <input
-              type="text"
-              value={inputVal}
-              onChange={(e) => setInputVal(e.target.value)}
-              placeholder={`Ask Quant AI about ${symbol}, technicals, macro, or terminal features...`}
-              disabled={isLoading}
-              className="flex-1 bg-surface border border-grid rounded-lg px-3 py-2 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !inputVal.trim()}
-              className="px-4 py-2 rounded-lg bg-accent text-black font-bold text-xs hover:brightness-110 disabled:opacity-40 transition flex items-center gap-1.5"
-            >
-              <span>Send</span>
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-            </button>
-          </form>
+            <span>Execute</span>
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>

@@ -37,6 +37,7 @@ import LayoutCustomizerModal from './components/Layout/LayoutCustomizerModal';
 import AppDownloadModal from './components/landing/AppDownloadModal';
 import QuantAIAgentModal from './features/ai/QuantAIAgentModal';
 import AuthModal from './components/auth/AuthModal';
+import CloudStorageModal from './components/storage/CloudStorageModal';
 import { useMarketFeed } from './hooks/useMarketFeed';
 import { useKeyboardHotkeys } from './hooks/useKeyboardHotkeys';
 import { useTerminalStore } from './store/useTerminalStore';
@@ -45,6 +46,7 @@ import { useLayoutStore } from './store/useLayoutStore';
 import { useDrawingStore } from './store/useDrawingStore';
 import { useGuardianStore } from './store/useGuardianStore';
 import { useAuthStore } from './store/useAuthStore';
+import { useCloudStorageStore } from './store/useCloudStorageStore';
 import { getInstrument } from './services/instruments';
 
 import { audioHaptics } from './utils/notify';
@@ -155,6 +157,7 @@ export default function App() {
     (window as any).__terminalStore = useTerminalStore;
     (window as any).__guardianStore = useGuardianStore;
     (window as any).__drawingStore = useDrawingStore;
+    (window as any).__cloudStorageStore = useCloudStorageStore;
     window.__openQuantAI = (prompt?: string) => {
       setQuantAIInitialPrompt(prompt);
       setIsQuantAIOpen(true);
@@ -749,6 +752,9 @@ export default function App() {
         }}
         initialPrompt={quantAIInitialPrompt}
       />
+
+      {/* Bring-Your-Own-Storage (BYOS) Modal */}
+      <CloudStorageModal />
     </div>
   );
 }
