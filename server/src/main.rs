@@ -1,23 +1,29 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
-use axum::{routing::get, Router};
+use axum::{routing::get, Extension, Router};
 use tokio::sync::{broadcast, Mutex, RwLock};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod auth;
+mod db;
 mod engine;
 mod market;
+mod rate_limit;
 mod routes;
 mod ws;
 
+use db::DbPool;
 use engine::{RiskRules, TradeXGuardian};
 use market::{start_binance_feed, start_metaquotes_feed, PriceStore};
+use rate_limit::RateLimiter;
 use routes::AppState;
 use ws::{ws_handler, WsState};
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,30 +31,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "crt_server=info,tower_http=info".into()),
+                .unwrap_or_else(|_| "terminalx_server=info,tower_http=info".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // 2. Shared In-Memory Stores
+    // 2. Initialize Database Pool (PostgreSQL / SQLite fallback)
+    let db = DbPool::init().await?;
+
+    // 3. Shared In-Memory Stores
     let price_store: PriceStore = Arc::new(RwLock::new(HashMap::new()));
     let (price_tx, _) = broadcast::channel(2048);
 
-    // 3. Start Binance real-time stream in background
+    // 4. Start Real-time Data Feeds in background
     start_binance_feed(price_store.clone(), price_tx.clone());
-
-    // 4. Start MetaQuotes real-time Forex and Metals stream in background
     start_metaquotes_feed(price_store.clone(), price_tx.clone());
 
-    // 4. Initialize TradeXGuardian Risk Engine
+    // 5. Initialize TradeXGuardian Risk Engine
     let guardian = Arc::new(Mutex::new(TradeXGuardian::new(RiskRules::default())));
 
-    // 5. State containers
+    // 6. Rate Limiters
+    let auth_limiter = RateLimiter::new(20, Duration::from_secs(60)); // 20 attempts/min per IP
+    let proxy_limiter = RateLimiter::new(240, Duration::from_secs(60)); // 240 requests/min per IP
+
+    // 7. State containers
     let app_state = Arc::new(AppState {
         start_time: Instant::now(),
         client: reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
+            .timeout(Duration::from_secs(10))
             .build()?,
+        db,
     });
 
     let ws_state = Arc::new(WsState {
@@ -57,26 +69,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         guardian,
     });
 
-    // 6. CORS configuration (Permissive for self-hosted LAN / Mobile emulators)
+    // 8. CORS configuration
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // 7. Static file serving with SPA fallback
+    // 9. Static file serving with SPA fallback
     let dist_path = std::env::var("DIST_PATH").unwrap_or_else(|_| "../terminal/dist".to_string());
     let static_service = ServeDir::new(&dist_path)
         .not_found_service(ServeFile::new(format!("{}/index.html", dist_path)));
 
-    // 8. Assemble Main Axum Router with Security Headers & CORS
+    // 10. Assemble Main Axum Router with Auth, Rate Limiting, Security Headers & CORS
     let app = Router::new()
         .nest("/api", routes::router().with_state(app_state))
         .route("/ws", get(ws_handler).with_state(ws_state))
         .fallback_service(static_service)
+        .layer(Extension(auth_limiter))
+        .layer(Extension(proxy_limiter))
         .layer(axum::middleware::from_fn(security_headers_middleware))
         .layer(cors);
 
-    // 9. Determine listening port and interface
+    // 11. Determine listening port and interface
     let port: u16 = std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse().ok())
@@ -85,8 +99,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
     println!("===============================================================");
-    println!("CRT Institutional Terminal - High-Performance Rust Server v2.0");
-    println!("Engine: Tokio Async + Axum WebSocket Hub");
+    println!("TerminalX - High-Performance Institutional Server & Engine v2.0");
+    println!("Engine: Tokio Async + Axum WebSocket Hub + SQLite/PostgreSQL DB");
     println!("Listening on: http://0.0.0.0:{}", port);
     println!("WebSocket Hub: ws://0.0.0.0:{}/ws", port);
     println!("Static Web Assets: {}", dist_path);

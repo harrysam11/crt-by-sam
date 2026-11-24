@@ -1,21 +1,27 @@
 version: '3.8'
 
 services:
-  crt-terminal:
+  terminalx:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: crt-terminal
+    container_name: terminalx-app
     restart: unless-stopped
     ports:
       - "5173:5173"
     environment:
       - PORT=5173
       - DIST_PATH=/app/terminal/dist
-      - RUST_LOG=info,crt_server=info
+      - RUST_LOG=info,terminalx_server=info
+      - DATABASE_URL=sqlite:/app/terminalx.db?mode=rwc
+    volumes:
+      - terminalx_data:/app
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5173/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+
+volumes:
+  terminalx_data:

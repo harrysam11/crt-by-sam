@@ -24,6 +24,11 @@ Thumbs.db
 .idea/
 *.sw?
 
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
 # External repos & temporary bundles
 rea/
 scratch/
@@ -31,3 +36,4 @@ scratch/
 *.bundle
 *.tmp
 *.bak
+

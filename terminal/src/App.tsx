@@ -36,6 +36,7 @@ import MacroNewsPanel from './components/news/MacroNewsPanel';
 import LayoutCustomizerModal from './components/Layout/LayoutCustomizerModal';
 import AppDownloadModal from './components/landing/AppDownloadModal';
 import QuantAIAgentModal from './features/ai/QuantAIAgentModal';
+import AuthModal from './components/auth/AuthModal';
 import { useMarketFeed } from './hooks/useMarketFeed';
 import { useKeyboardHotkeys } from './hooks/useKeyboardHotkeys';
 import { useTerminalStore } from './store/useTerminalStore';
@@ -43,7 +44,9 @@ import { useDerivativesStore } from './store/useDerivativesStore';
 import { useLayoutStore } from './store/useLayoutStore';
 import { useDrawingStore } from './store/useDrawingStore';
 import { useGuardianStore } from './store/useGuardianStore';
+import { useAuthStore } from './store/useAuthStore';
 import { getInstrument } from './services/instruments';
+
 import { audioHaptics } from './utils/notify';
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -180,14 +183,38 @@ export default function App() {
   const [isLayoutCustomizerOpen, setIsLayoutCustomizerOpen] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
-  // View Mode: TERMINAL or LANDING showcase
+  // View Mode: TERMINAL or LANDING showcase (Router based on pathname)
   const [viewMode, setViewMode] = useState<'TERMINAL' | 'LANDING'>(() => {
     try {
-      const url = new URL(window.location.href);
-      if (url.searchParams.get('view') === 'landing') return 'LANDING';
+      const path = window.location.pathname;
+      const search = window.location.search;
+      if (path === '/app' || search.includes('symbol=') || search.includes('view=terminal')) {
+        return 'TERMINAL';
+      }
+      if (path === '/' || path === '') {
+        return 'LANDING';
+      }
     } catch {}
-    return 'TERMINAL';
+    return 'LANDING';
   });
+
+  // Init Auth Session & Popstate History Navigation
+  useEffect(() => {
+    useAuthStore.getState().initSession();
+
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      const search = window.location.search;
+      if (path === '/app' || search.includes('symbol=') || search.includes('view=terminal')) {
+        setViewMode('TERMINAL');
+      } else {
+        setViewMode('LANDING');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
 
   // Global Keyboard Hotkeys Listener
   useKeyboardHotkeys({
@@ -262,17 +289,22 @@ export default function App() {
             if (targetSymbol) {
               useTerminalStore.getState().setSymbol(targetSymbol);
             }
+            window.history.pushState(null, '', '/app');
             setViewMode('TERMINAL');
           }}
           onOpenGuardian={() => {
+            window.history.pushState(null, '', '/app');
             setViewMode('TERMINAL');
             setIsGuardianOpen(true);
           }}
           onOpenPortfolio={() => {
+            window.history.pushState(null, '', '/app');
             setViewMode('TERMINAL');
             setIsPortfolioOpen(true);
           }}
         />
+        <AuthModal />
+
         <GuardianModal
           isOpen={isGuardianOpen}
           onClose={() => setIsGuardianOpen(false)}
@@ -398,6 +430,9 @@ export default function App() {
         onOpenModal={handleOpenModalByName}
       />
 
+      {/* User Authentication & Cloud Sync Modal */}
+      <AuthModal />
+
       {/* Multi-Chart Workspace & Panes Customizer Modal */}
       <LayoutCustomizerModal
         isOpen={isLayoutCustomizerOpen}
@@ -432,12 +467,16 @@ export default function App() {
           }}
           onTogglePopout={() => setIsPopoutOpen((v) => !v)}
           isPopoutActive={isPopoutOpen}
-          onOpenLanding={() => setViewMode('LANDING')}
+          onOpenLanding={() => {
+            window.history.pushState(null, '', '/');
+            setViewMode('LANDING');
+          }}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onOpenLayoutCustomizer={() => setIsLayoutCustomizerOpen(true)}
           onOpenQuantAI={() => setIsQuantAIOpen(true)}
         />
       )}
+
 
       <div className="flex min-h-0 flex-1 relative overflow-hidden">
         {/* Left Order Execution Drawer (TradingView-Style Left Order Pane) */}

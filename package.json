@@ -1,8 +1,8 @@
 {
-  "name": "crt-by-sam",
+  "name": "terminalx",
   "version": "2.0.0",
   "private": true,
-  "description": "CRT Institutional Trading Terminal & TradeXGuardian",
+  "description": "TerminalX - Institutional Trading Platform, Market Engine & TradeXGuardian",
   "workspaces": [
     "terminal"
   ],

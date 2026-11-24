@@ -1,9 +1,9 @@
 [package]
-name = "crt-server"
+name = "terminalx-server"
 version = "2.0.0"
 edition = "2021"
 authors = ["Sam"]
-description = "High-Performance Institutional Trading Terminal Server & Market Hub"
+description = "TerminalX - High-Performance Institutional Trading Terminal Server & Market Hub"
 
 [dependencies]
 axum = { version = "0.7", features = ["ws"] }
@@ -17,3 +17,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tokio-tungstenite = { version = "0.23", features = ["connect", "rustls-tls-native-roots"] }
 urlencoding = "2.1"
+argon2 = "0.5"
+jsonwebtoken = "9.3"
+uuid = { version = "1.8", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "sqlite", "postgres"] }
+

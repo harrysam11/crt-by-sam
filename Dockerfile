@@ -1,7 +1,8 @@
 # ==============================================================================
-# CRT Institutional Terminal - Production Multi-Stage Dockerfile
+# TerminalX - Production Multi-Stage Dockerfile
+# Single-Container Architecture for Railway & Cloud Orchestrators
 # Stage 1: Build React/Vite Frontend
-# Stage 2: Build Rust Axum/Tokio Server
+# Stage 2: Build Rust Axum/Tokio Engine with SQLite & PostgreSQL
 # Stage 3: Minimal Production Runtime
 # ==============================================================================
 
@@ -44,10 +45,10 @@ RUN cargo build --release
 FROM debian:bookworm-slim AS runner
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl sqlite3 libsqlite3-0 && rm -rf /var/lib/apt/lists/*
 
 # Copy built binary from Stage 2
-COPY --from=backend-builder /app/server/target/release/crt-server /app/crt-server
+COPY --from=backend-builder /app/server/target/release/terminalx-server /app/terminalx-server
 
 # Copy built frontend assets from Stage 1
 COPY --from=frontend-builder /app/terminal/dist /app/terminal/dist
@@ -55,12 +56,12 @@ COPY --from=frontend-builder /app/terminal/dist /app/terminal/dist
 # Set production environment variables
 ENV PORT=5173
 ENV DIST_PATH=/app/terminal/dist
-ENV RUST_LOG=info,crt_server=info
+ENV RUST_LOG=info,terminalx_server=info
 
 EXPOSE 5173
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:5173/api/health || exit 1
+  CMD curl -f http://localhost:${PORT:-5173}/api/health || exit 1
 
-ENTRYPOINT ["/app/crt-server"]
+ENTRYPOINT ["/app/terminalx-server"]

@@ -18,7 +18,9 @@ import MobileConnectModal from '../Network/MobileConnectModal';
 import SymbolSearchModal from '../Search/SymbolSearchModal';
 import { drawingEvents } from '../drawing/framework/DrawingEvents';
 import { useIndicatorsStore } from '../../store/useIndicatorsStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import type { ChartStyle, Timeframe } from '../../types/terminal';
+
 import { TIMEFRAMES } from '../../services/instruments';
 
 const DOT = { open: 'bg-up', connecting: 'bg-yellow-400', reconnecting: 'bg-yellow-400', closed: 'bg-down' } as const;
@@ -150,11 +152,21 @@ export default function Header({
   const [isCandleColorOpen, setIsCandleColorOpen] = useState(false);
   const [isLayersMenuOpen, setIsLayersMenuOpen] = useState(false);
   const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const tfMenuRef = useRef<HTMLDivElement>(null);
   const styleMenuRef = useRef<HTMLDivElement>(null);
   const candleColorRef = useRef<HTMLDivElement>(null);
   const layersMenuRef = useRef<HTMLDivElement>(null);
   const snapshotRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const openAuthModal = useAuthStore((s) => s.openAuthModal);
+  const syncWorkspace = useAuthStore((s) => s.syncWorkspace);
+  const isSyncing = useAuthStore((s) => s.isSyncing);
+  const logout = useAuthStore((s) => s.logout);
+
 
   // Live Candle Color sync
   const [candleSettings, setCandleSettings] = useState<{ candleUpColor: string; candleDownColor: string }>(() => {
@@ -240,6 +252,9 @@ export default function Header({
       if (snapshotRef.current && !snapshotRef.current.contains(target)) {
         setIsSnapshotOpen(false);
       }
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setIsUserMenuOpen(false);
+      }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -252,9 +267,10 @@ export default function Header({
         setIsCandleColorOpen(false);
         setIsLayersMenuOpen(false);
         setIsSnapshotOpen(false);
+        setIsUserMenuOpen(false);
       }
     };
-    if (isInstToolsOpen || isLayoutOpen || isAccountOpen || isOverflowOpen || isTfMenuOpen || isStyleMenuOpen || isCandleColorOpen || isLayersMenuOpen || isSnapshotOpen) {
+    if (isInstToolsOpen || isLayoutOpen || isAccountOpen || isOverflowOpen || isTfMenuOpen || isStyleMenuOpen || isCandleColorOpen || isLayersMenuOpen || isSnapshotOpen || isUserMenuOpen) {
       window.addEventListener('mousedown', handleClickOutside);
       window.addEventListener('keydown', handleKeyDown);
     }
@@ -262,7 +278,8 @@ export default function Header({
       window.removeEventListener('mousedown', handleClickOutside);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isInstToolsOpen, isLayoutOpen, isAccountOpen, isOverflowOpen, isTfMenuOpen, isStyleMenuOpen, isCandleColorOpen, isLayersMenuOpen, isSnapshotOpen]);
+  }, [isInstToolsOpen, isLayoutOpen, isAccountOpen, isOverflowOpen, isTfMenuOpen, isStyleMenuOpen, isCandleColorOpen, isLayersMenuOpen, isSnapshotOpen, isUserMenuOpen]);
+
 
   // Colour the price by tick direction
   const prev = useRef(price);
@@ -413,11 +430,29 @@ export default function Header({
       {/* Left Section: Symbol, Timeframes, Candle Style, Indicators, Replay, Undo/Redo */}
       <div className="flex items-center gap-1 sm:gap-1.5 overflow-visible min-w-0 shrink py-0.5">
         {/* Brand Pill */}
-        <div className="flex items-center gap-1 shrink-0">
-          <span className="font-heading font-black tracking-tighter text-white text-[11px] px-1.5 py-0.5 rounded bg-white/10 border border-white/15">
-            CRT
+        <a
+          href="/"
+          onClick={(e) => {
+            e.preventDefault();
+            audioHaptics.tick();
+            if (onOpenLanding) {
+              onOpenLanding();
+            } else {
+              window.history.pushState(null, '', '/');
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            }
+          }}
+          className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded hover:bg-white/10 transition group cursor-pointer"
+          title="TerminalX Home & Landing"
+        >
+          <span className="font-heading font-black tracking-tighter text-black text-[10px] px-1.5 py-0.2 rounded bg-cyan-400 font-mono shadow-xs">
+            TX
           </span>
-        </div>
+          <span className="hidden lg:inline text-xs font-black tracking-tight text-white group-hover:text-cyan-300 transition">
+            TerminalX
+          </span>
+        </a>
+
 
         <span className="h-4 w-px bg-grid shrink-0" />
 
@@ -1777,6 +1812,96 @@ export default function Header({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
             </svg>
           </button>
+
+          {/* User Account & Cloud Sync Pill */}
+          <div className="relative shrink-0" ref={userMenuRef}>
+            {isAuthenticated ? (
+              <button
+                onClick={() => {
+                  audioHaptics.tick();
+                  setIsUserMenuOpen((v) => !v);
+                }}
+                className="flex items-center gap-1.5 px-2 py-1 rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-semibold transition"
+                title="User Account & Cloud Workspace Sync"
+              >
+                <span className={`h-2 w-2 rounded-full ${isSyncing ? 'bg-amber-400 animate-spin' : 'bg-emerald-400'}`} />
+                <span className="hidden md:inline font-bold text-white text-[11px]">{user?.username}</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  audioHaptics.tick();
+                  openAuthModal('LOGIN');
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition font-mono shrink-0"
+                title="Sign In to sync your workspace"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+                <span className="hidden sm:inline">Sign In</span>
+              </button>
+            )}
+
+            {isUserMenuOpen && isAuthenticated && (
+              <div className="absolute right-0 top-full mt-1.5 z-50 w-60 clay-popover p-2.5 rounded-xl shadow-2xl select-none font-mono text-xs border border-white/10 backdrop-blur-md space-y-2">
+                <div className="border-b border-grid/60 pb-2">
+                  <div className="font-bold text-white">{user?.username}</div>
+                  <div className="text-[10px] text-muted truncate">{user?.email}</div>
+                </div>
+
+                <button
+                  onClick={async () => {
+                    audioHaptics.tick();
+                    await syncWorkspace();
+                    setIsUserMenuOpen(false);
+                  }}
+                  disabled={isSyncing}
+                  className="flex w-full items-center justify-between px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-200 hover:text-white transition"
+                >
+                  <span className="flex items-center gap-2">
+                    <svg className="h-3.5 w-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>Sync Workspace</span>
+                  </span>
+                  {isSyncing && <span className="text-[9px] text-amber-300">Syncing...</span>}
+                </button>
+
+                {onOpenSettings && (
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      setIsUserMenuOpen(false);
+                      onOpenSettings('PROFILE');
+                    }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-200 hover:text-white transition"
+                  >
+                    <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <span>Profile Settings</span>
+                  </button>
+                )}
+
+                <div className="border-t border-grid/60 pt-1">
+                  <button
+                    onClick={() => {
+                      logout();
+                      setIsUserMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 transition text-left"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
 
           {/* Responsive Overflow Quick Menu */}
           <div className="relative shrink-0" ref={overflowRef}>

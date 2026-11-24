@@ -1,12 +1,13 @@
 /**
  * LandingPage.tsx
- * Institutional Landing Page & Feature Showcase for CRT Terminal & TradeXGuardian.
+ * Institutional Landing Page & Feature Showcase for TerminalX & TradeXGuardian.
  *
  * Designed to Linear / Raycast / TradingView institutional standard:
  * - Soft-card clay panels with subtle borders and micro-interactions.
  * - Interactive Prop Firm Challenge Calculator wired to real useGuardianStore.
  * - Live market ticker strip connected to real useTerminalStore quotes.
- * - Interactive Guardian violation simulation playground.
+ * - Cloud workspace persistence (PostgreSQL / SQLite) with Argon2id auth.
+ * - 0s Real-time Spot Gold (XAUUSD), Silver (XAGUSD), and Forex feeds.
  * - ZERO EMOJI POLICY strictly enforced.
  */
 
@@ -15,6 +16,7 @@ import { useTerminalStore } from '../../store/useTerminalStore';
 import { useGuardianStore } from '../../store/useGuardianStore';
 import { usePsychologyStore } from '../../store/usePsychologyStore';
 import { useLayoutStore } from '../../store/useLayoutStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { fmtPrice, fmtPct, fmtUsd } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
 import AppDownloadModal from './AppDownloadModal';
@@ -35,9 +37,13 @@ export default function LandingPage({
   const watchlist = useTerminalStore((s) => s.watchlist);
   const quotes = useTerminalStore((s) => s.quotes);
 
+  const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const openAuthModal = useAuthStore((s) => s.openAuthModal);
+
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
-  // Prop Firm Challenge Calculator State (Live & Real)
+  // Prop Firm Challenge Calculator State
   const [accountSize, setAccountSize] = useState<number>(50000);
   const [maxDailyLossPct, setMaxDailyLossPct] = useState<number>(5);
   const [maxTotalLossPct, setMaxTotalLossPct] = useState<number>(10);
@@ -50,15 +56,6 @@ export default function LandingPage({
   const maxTotalLossUsd = useMemo(() => accountSize * (maxTotalLossPct / 100), [accountSize, maxTotalLossPct]);
   const profitTargetUsd = useMemo(() => accountSize * (profitTargetPct / 100), [accountSize, profitTargetPct]);
   const maxRiskPerTradeUsd = useMemo(() => maxDailyLossUsd / Math.max(1, maxTradesPerDay), [maxDailyLossUsd, maxTradesPerDay]);
-
-  // Safe lot size estimations based on 25-pip stop loss
-  const safeLotSizes = useMemo(() => {
-    return {
-      forex: +(maxRiskPerTradeUsd / (25 * 10)).toFixed(2), // 25 pips @ $10/pip for standard lot
-      gold: +(maxRiskPerTradeUsd / (2.5 * 100)).toFixed(2), // $2.50 gold move on 100oz contract
-      btc: +(maxRiskPerTradeUsd / 1200).toFixed(3), // $1200 BTC move per coin
-    };
-  }, [maxRiskPerTradeUsd]);
 
   // Apply Prop Firm configuration directly to TradeXGuardian and Psychology Store
   const handleApplyRulesToGuardian = () => {
@@ -89,31 +86,32 @@ export default function LandingPage({
     setTimeout(() => setRuleApplied(false), 3000);
   };
 
-  // Guardian Simulator Demo State
-  const [simScenario, setSimScenario] = useState<'OVERTRADING' | 'SL_TOO_WIDE' | 'TIME_WINDOW' | null>(null);
+  const handleLaunch = (symbol?: string) => {
+    audioHaptics.tick();
+    if (symbol) {
+      useTerminalStore.getState().setSymbol(symbol);
+    }
+    onLaunchTerminal(symbol);
+  };
 
   return (
-    <div className="min-h-screen bg-bg text-slate-200 font-mono flex flex-col selection:bg-sky-500/20 selection:text-sky-300">
+    <div className="min-h-screen bg-bg text-slate-200 font-mono flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300">
       {/* Top Announcement & Live Market Ticker Strip */}
       <div className="border-b border-grid bg-panel/70 backdrop-blur-md px-4 py-2 text-xs flex items-center justify-between overflow-x-auto gap-4">
         <div className="flex items-center gap-3 shrink-0">
-          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-bold text-white text-[11px] uppercase tracking-wider">Market Feeds</span>
+          <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+          <span className="font-bold text-white text-[11px] uppercase tracking-wider">Live Feeds (0s Delay)</span>
         </div>
 
         <div className="flex items-center gap-4 text-xs whitespace-nowrap overflow-x-auto py-0.5">
-          {['BTCUSDT', 'ETHUSDT', 'SOLUSDT', '^NSEI'].map((sym) => {
+          {['XAUUSD', 'BTCUSDT', 'ETHUSDT', 'EURUSD', 'SOLUSDT'].map((sym) => {
             const item = watchlist[sym];
             const p = quotes[sym]?.price ?? item?.price ?? 0;
             const chg = item?.change ?? 0;
             return (
               <button
                 key={sym}
-                onClick={() => {
-                  audioHaptics.tick();
-                  useTerminalStore.getState().setSymbol(sym);
-                  onLaunchTerminal(sym);
-                }}
+                onClick={() => handleLaunch(sym)}
                 className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-grid/50 bg-white/[0.02] hover:bg-white/10 hover:border-white/20 transition cursor-pointer"
                 title={`Click to open ${sym} on Live Terminal`}
               >
@@ -144,62 +142,61 @@ export default function LandingPage({
       {/* Primary Navigation Bar */}
       <nav className="border-b border-grid bg-panel/90 backdrop-blur-md px-6 py-3.5 sticky top-0 z-40 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center">
-            <svg className="h-4 w-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
+          <div className="flex items-center justify-center h-8 w-8 rounded bg-cyan-400 text-black font-black text-xs font-mono shadow-xs">
+            TX
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-white tracking-wider text-sm">CRT TERMINAL</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">
-                TradeXGuardian
+              <span className="font-bold text-white tracking-wider text-sm font-heading">TERMINALX</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                PRO RISK
               </span>
             </div>
-            <span className="text-[10px] text-muted block -mt-0.5">Prevention-First Institutional Trading</span>
+            <span className="text-[10px] text-muted block -mt-0.5">Institutional Platform & TradeXGuardian</span>
           </div>
         </div>
 
         <div className="hidden md:flex items-center gap-6 text-xs text-slate-300">
-          <a href="#guardian" className="hover:text-white transition">Guardian Engine</a>
+          <a href="#features" className="hover:text-white transition">Platform Features</a>
+          <a href="#guardian" className="hover:text-white transition">Guardian Shield</a>
           <a href="#calculator" className="hover:text-white transition">Prop Calculator</a>
-          <a href="#features" className="hover:text-white transition">Order Flow Suite</a>
-          <a href="#security" className="hover:text-white transition">Key Vault</a>
+          <a href="#security" className="hover:text-white transition">Cloud & Security</a>
         </div>
 
         <div className="flex items-center gap-2.5">
+          {isAuthenticated ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-xs">
+              <span className="h-2 w-2 rounded-full bg-cyan-400" />
+              <span className="text-white font-bold">{user?.username}</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => openAuthModal('LOGIN')}
+              className="clay-btn px-3 py-1.5 text-xs font-semibold text-cyan-300 hover:text-white flex items-center gap-1.5"
+            >
+              Sign In
+            </button>
+          )}
+
           <button
             onClick={() => {
               audioHaptics.tick();
               setIsDownloadModalOpen(true);
             }}
-            className="clay-btn px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5"
+            className="clay-btn px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white hidden sm:flex items-center gap-1.5"
             title="Download App for iOS, Android, and Desktop"
           >
             <svg className="h-3.5 w-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            <span className="hidden sm:inline">Download App</span>
+            <span className="hidden md:inline">Download</span>
           </button>
-          {onOpenGuardian && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenGuardian();
-              }}
-              className="clay-btn px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white hidden sm:flex items-center gap-1.5"
-            >
-              Guardian Rules
-            </button>
-          )}
+
           <button
-            onClick={() => {
-              audioHaptics.tick();
-              onLaunchTerminal();
-            }}
-            className="clay-btn-active px-4 py-1.5 text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-lg"
+            onClick={() => handleLaunch()}
+            className="clay-btn-active px-4 py-1.5 text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-lg bg-cyan-400 hover:bg-cyan-300 text-black font-heading"
           >
-            <span>Launch Web Terminal</span>
+            <span>Launch Terminal</span>
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
@@ -209,30 +206,27 @@ export default function LandingPage({
 
       {/* Hero Section */}
       <section className="relative px-6 pt-16 pb-20 max-w-7xl mx-auto w-full flex flex-col items-center text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-sky-500/30 bg-sky-500/10 text-sky-300 text-xs font-semibold mb-6">
-          <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
-          <span>No Automated Bots • Zero Signals • Pure Capital Protection</span>
+        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 text-xs font-semibold mb-6">
+          <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+          <span>Zero Exchange Delay • 0s Spot Gold & Forex • Institutional Prop Shield</span>
         </div>
 
         <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight max-w-4xl leading-tight font-heading">
-          You decide how to trade. <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-teal-300 to-emerald-400">
-            TradeXGuardian controls the discipline.
+          Institutional Speed. <br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400">
+            Uncompromising Capital Discipline.
           </span>
         </h1>
 
         <p className="mt-6 text-sm sm:text-base text-slate-400 max-w-2xl leading-relaxed font-sans">
-          The institutional prevention-only trading system that sits between you and the market.
-          Blocks revenge-trading, overleveraging, and daily drawdown breaches before an order ever reaches your broker.
+          TerminalX pairs zero-second latency direct market feeds with the TradeXGuardian pre-trade risk engine.
+          Block revenge trading, eliminate fat-finger errors, and pass funded account challenges with mathematical certainty.
         </p>
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <button
-            onClick={() => {
-              audioHaptics.tick();
-              onLaunchTerminal();
-            }}
-            className="clay-btn-active px-6 py-2.5 text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-xl font-heading"
+            onClick={() => handleLaunch()}
+            className="clay-btn-active px-6 py-2.5 text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-xl font-heading bg-cyan-400 hover:bg-cyan-300 text-black"
           >
             <span>Enter Live Terminal</span>
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -240,18 +234,14 @@ export default function LandingPage({
             </svg>
           </button>
 
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              setIsDownloadModalOpen(true);
-            }}
-            className="clay-btn px-5 py-2.5 text-sm font-semibold text-accent hover:text-white transition flex items-center gap-2"
-          >
-            <svg className="h-4 w-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-            <span>Download for iOS &amp; Android</span>
-          </button>
+          {!isAuthenticated && (
+            <button
+              onClick={() => openAuthModal('REGISTER')}
+              className="clay-btn px-5 py-2.5 text-sm font-semibold text-cyan-300 hover:text-white transition flex items-center gap-2"
+            >
+              <span>Create Free Account</span>
+            </button>
+          )}
 
           <a
             href="#calculator"
@@ -259,18 +249,6 @@ export default function LandingPage({
           >
             <span>Configure Prop Shield</span>
           </a>
-
-          {onOpenPortfolio && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenPortfolio();
-              }}
-              className="clay-btn px-5 py-2.5 text-sm font-semibold text-[#38bdf8] hover:text-white transition"
-            >
-              <span>Portfolio & AI Journal</span>
-            </button>
-          )}
         </div>
 
         {/* Live Terminal Preview Soft Card */}
@@ -280,12 +258,12 @@ export default function LandingPage({
               <span className="h-3 w-3 rounded-full bg-red-500/80" />
               <span className="h-3 w-3 rounded-full bg-yellow-500/80" />
               <span className="h-3 w-3 rounded-full bg-emerald-500/80" />
-              <span className="text-xs text-muted ml-2 font-medium">CRT Terminal v2.0 • Live Prevention Engine</span>
+              <span className="text-xs text-muted ml-2 font-medium">TerminalX v2.0 • Live Prevention Engine</span>
             </div>
             <div className="flex items-center gap-2 text-[11px] text-muted">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               <span>Guardian Active</span>
-              <span className="text-white font-bold px-1.5 py-0.5 rounded bg-white/5 border border-white/10">100% Score</span>
+              <span className="text-white font-bold px-1.5 py-0.5 rounded bg-white/5 border border-white/10">100% Discipline Score</span>
             </div>
           </div>
 
@@ -294,17 +272,17 @@ export default function LandingPage({
             <div className="lg:col-span-2 clay-inset p-4 rounded-lg space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-base font-bold text-white">BTCUSDT Perpetual</span>
-                  <span className="text-xs text-muted ml-2 font-medium">Binance Futures</span>
+                  <span className="text-base font-bold text-white">XAUUSD Spot Gold</span>
+                  <span className="text-xs text-cyan-300 ml-2 font-medium">Direct MetaQuotes 0s Feed</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-up bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                    London / NY Overlap Active
+                    London / NY Session Active
                   </span>
                 </div>
               </div>
 
-              {/* Mock Order Execution with Intercept Preview */}
+              {/* Intercept Alert */}
               <div className="border border-amber-500/40 bg-amber-500/10 rounded-lg p-3 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
@@ -313,22 +291,19 @@ export default function LandingPage({
                     </svg>
                     <span className="font-bold text-amber-300">Guardian Pre-Trade Intercept Active</span>
                   </div>
-                  <span className="text-[10px] text-amber-400 uppercase font-semibold">Risk Error Confirmation</span>
+                  <span className="text-[10px] text-amber-400 uppercase font-semibold">Risk Guardrail Protected</span>
                 </div>
                 <p className="text-[11px] text-slate-300">
-                  Your planned Stop Loss ($1,250) is 2.5x larger than configured standard ($500). Expected risk exceeds maximum trade limit.
+                  Planned trade risk conforms to maximum allowable daily loss ($2,500.00). Trailing drawdown buffer: 7.2%.
                 </p>
                 <div className="flex items-center gap-2 pt-1">
                   <button
-                    onClick={() => {
-                      audioHaptics.tick();
-                      onLaunchTerminal('BTCUSDT');
-                    }}
+                    onClick={() => handleLaunch('XAUUSD')}
                     className="clay-btn px-3 py-1 text-[11px] font-bold text-white hover:border-white/40"
                   >
-                    Adjust Risk in Terminal
+                    Open Live XAUUSD Chart
                   </button>
-                  <span className="text-[10px] text-muted">Order held before broker submission</span>
+                  <span className="text-[10px] text-muted">Zero delay execution environment</span>
                 </div>
               </div>
 
@@ -344,7 +319,7 @@ export default function LandingPage({
                 </div>
                 <div className="p-2 rounded bg-white/[0.02] border border-grid/50">
                   <span className="text-[10px] text-muted block uppercase">Remaining Trades</span>
-                  <span className="font-bold text-sky-400 text-sm mt-0.5 block">3 of 3 Allowed</span>
+                  <span className="font-bold text-cyan-400 text-sm mt-0.5 block">3 of 3 Allowed</span>
                 </div>
               </div>
             </div>
@@ -366,11 +341,11 @@ export default function LandingPage({
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted">Revenge Cooldown:</span>
-                    <span className="text-emerald-400 font-semibold">30 Min</span>
+                    <span className="text-emerald-400 font-semibold">30 Min Locked</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted">Killzone Window:</span>
-                    <span className="text-emerald-400 font-semibold">London & NY</span>
+                    <span className="text-emerald-400 font-semibold">London &amp; NY</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted">Martingale Guard:</span>
@@ -380,14 +355,106 @@ export default function LandingPage({
               </div>
 
               <button
-                onClick={() => {
-                  audioHaptics.tick();
-                  onLaunchTerminal();
-                }}
-                className="w-full clay-btn py-2 text-center text-xs font-bold text-white hover:text-sky-300 transition"
+                onClick={() => handleLaunch()}
+                className="w-full clay-btn py-2 text-center text-xs font-bold text-white hover:text-cyan-300 transition"
               >
-                Open Terminal HUD
+                Launch Trading Workspace
               </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 6 Core Institutional Capabilities Section */}
+      <section id="features" className="border-t border-grid bg-panel/30 px-6 py-16">
+        <div className="max-w-6xl mx-auto w-full">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">Institutional Suite</span>
+            <h2 className="text-2xl sm:text-4xl font-extrabold text-white mt-2 font-heading">
+              Built for Professional Operators
+            </h2>
+            <p className="mt-3 text-xs sm:text-sm text-slate-400">
+              TerminalX brings institutional hedge-fund grade tools directly to your browser with zero bloat and absolute security.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {/* 1. 0s Latency Feed */}
+            <div className="clay-card p-5 space-y-3">
+              <div className="h-9 w-9 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+                <svg className="h-5 w-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-bold text-white font-heading">0s Direct Metals &amp; Forex</h3>
+              <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                Real-time WebSocket tick streamer for Spot Gold (XAUUSD), Silver (XAGUSD), and Forex. Bypasses 15-minute exchange delays completely.
+              </p>
+            </div>
+
+            {/* 2. TradingView Precision Drawings */}
+            <div className="clay-card p-5 space-y-3">
+              <div className="h-9 w-9 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-bold text-white font-heading">TradingView Precision Vectors</h3>
+              <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                Trendlines, Fibonacci levels, Pitchforks, Gann fans, and Brush tools with custom opacity sliders, border widths, and multi-selection.
+              </p>
+            </div>
+
+            {/* 3. PineScript Runtime */}
+            <div className="clay-card p-5 space-y-3">
+              <div className="h-9 w-9 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center">
+                <svg className="h-5 w-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-bold text-white font-heading">PineScript v5 Runtime</h3>
+              <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                Execute custom PineScript indicator algorithms directly client-side. Zero remote compilation latency.
+              </p>
+            </div>
+
+            {/* 4. TradeXGuardian */}
+            <div className="clay-card p-5 space-y-3">
+              <div className="h-9 w-9 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
+                <svg className="h-5 w-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-bold text-white font-heading">Prop Firm Risk Shield</h3>
+              <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                Enforce daily drawdown limits, maximum contracts, and lockout periods before orders ever reach your broker API.
+              </p>
+            </div>
+
+            {/* 5. Cloud Workspace Persistence */}
+            <div className="clay-card p-5 space-y-3">
+              <div className="h-9 w-9 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center">
+                <svg className="h-5 w-5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 00-9.78 2.096A4.001 4.001 0 003 15z" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-bold text-white font-heading">PostgreSQL &amp; SQLite Sync</h3>
+              <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                Seamless cloud sync for your chart drawings, custom indicator setups, chart wallpaper skins, and multi-pane grid layouts.
+              </p>
+            </div>
+
+            {/* 6. Order Flow & Footprint DOM */}
+            <div className="clay-card p-5 space-y-3">
+              <div className="h-9 w-9 rounded-lg bg-teal-500/10 border border-teal-500/30 flex items-center justify-center">
+                <svg className="h-5 w-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-bold text-white font-heading">Microstructure &amp; Order Flow</h3>
+              <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                Real-time Footprint delta clusters, Volume Profile (VPVR), Depth of Market (DOM) ladder, and liquidation waterfall tracking.
+              </p>
             </div>
           </div>
         </div>
@@ -397,11 +464,11 @@ export default function LandingPage({
       <section id="calculator" className="border-t border-grid bg-panel/40 px-6 py-16">
         <div className="max-w-6xl mx-auto w-full">
           <div className="text-center max-w-2xl mx-auto mb-10">
-            <span className="text-xs font-bold uppercase tracking-wider text-sky-400">Production Feature</span>
-            <h2 className="text-2xl sm:text-4xl font-extrabold text-white mt-2">
-              Prop Firm Challenge Calculator & Shield
+            <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">Funded Trader Engine</span>
+            <h2 className="text-2xl sm:text-4xl font-extrabold text-white mt-2 font-heading">
+              Prop Firm Challenge Calculator
             </h2>
-            <p className="mt-3 text-xs sm:text-sm text-slate-400">
+            <p className="mt-3 text-xs sm:text-sm text-slate-400 font-sans">
               Configure your exact funded firm parameters. Click apply to instantly lock these limits into your TradeXGuardian risk engine.
             </p>
           </div>
@@ -449,7 +516,7 @@ export default function LandingPage({
                   step="0.5"
                   value={maxDailyLossPct}
                   onChange={(e) => setMaxDailyLossPct(parseFloat(e.target.value))}
-                  className="w-full accent-sky-400 bg-black/40 h-1.5 rounded cursor-pointer"
+                  className="w-full accent-cyan-400 bg-black/40 h-1.5 rounded cursor-pointer"
                 />
               </div>
 
@@ -466,7 +533,7 @@ export default function LandingPage({
                   step="0.5"
                   value={maxTotalLossPct}
                   onChange={(e) => setMaxTotalLossPct(parseFloat(e.target.value))}
-                  className="w-full accent-sky-400 bg-black/40 h-1.5 rounded cursor-pointer"
+                  className="w-full accent-cyan-400 bg-black/40 h-1.5 rounded cursor-pointer"
                 />
               </div>
 
@@ -498,7 +565,7 @@ export default function LandingPage({
               <div className="pt-2">
                 <button
                   onClick={handleApplyRulesToGuardian}
-                  className="w-full clay-btn-active py-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full clay-btn-active py-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer bg-cyan-400 hover:bg-cyan-300 text-black font-heading"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -518,257 +585,72 @@ export default function LandingPage({
                 <div className="mt-4 space-y-3 text-xs">
                   <div className="p-3 rounded-lg bg-white/[0.02] border border-grid/60">
                     <span className="text-[10px] text-muted block uppercase">Max Risk Allocation / Trade</span>
-                    <span className="text-base font-bold text-emerald-400 mt-0.5 block">
-                      {fmtUsd(maxRiskPerTradeUsd)}
+                    <span className="text-base font-bold text-cyan-300 mt-0.5 block">{fmtUsd(maxRiskPerTradeUsd)}</span>
+                    <span className="text-[10px] text-muted block mt-1">
+                      Allowed risk per trade based on {maxTradesPerDay} max daily executions
                     </span>
-                    <span className="text-[10px] text-muted">
-                      Limits risk to {+(maxDailyLossPct / maxTradesPerDay).toFixed(2)}% per position
-                    </span>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-white/[0.02] border border-grid/60">
-                    <span className="text-[10px] text-muted block uppercase">Safe Max Lot Sizes (25-pip SL)</span>
-                    <div className="grid grid-cols-3 gap-2 mt-2 text-center">
-                      <div className="p-1.5 rounded bg-black/40 border border-grid/40">
-                        <span className="text-[10px] text-muted block">Forex (EURUSD)</span>
-                        <span className="font-bold text-white text-xs">{safeLotSizes.forex} lots</span>
-                      </div>
-                      <div className="p-1.5 rounded bg-black/40 border border-grid/40">
-                        <span className="text-[10px] text-muted block">Gold (XAUUSD)</span>
-                        <span className="font-bold text-white text-xs">{safeLotSizes.gold} lots</span>
-                      </div>
-                      <div className="p-1.5 rounded bg-black/40 border border-grid/40">
-                        <span className="text-[10px] text-muted block">Crypto (BTC)</span>
-                        <span className="font-bold text-white text-xs">{safeLotSizes.btc} BTC</span>
-                      </div>
-                    </div>
                   </div>
 
                   <div className="p-3 rounded-lg bg-white/[0.02] border border-grid/60">
                     <span className="text-[10px] text-muted block uppercase">Profit Target</span>
-                    <span className="text-base font-bold text-sky-400 mt-0.5 block">
-                      {fmtUsd(profitTargetUsd)} ({profitTargetPct}%)
+                    <span className="text-base font-bold text-emerald-400 mt-0.5 block">
+                      {profitTargetPct}% ({fmtUsd(profitTargetUsd)})
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-white/[0.02] border border-grid/60">
+                    <span className="text-[10px] text-muted block uppercase">Max Total Loss Limit</span>
+                    <span className="text-base font-bold text-rose-400 mt-0.5 block">
+                      {maxTotalLossPct}% ({fmtUsd(maxTotalLossUsd)})
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="text-[11px] text-muted border-t border-grid/60 pt-3">
-                Protected by TradeXGuardian pre-trade enforcement layer. Prevents account liquidation.
-              </div>
+              <button
+                onClick={() => handleLaunch()}
+                className="w-full clay-btn py-2 text-center text-xs font-bold text-white hover:text-cyan-300 transition"
+              >
+                Launch Terminal with These Limits
+              </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* TradeXGuardian Core Architecture Pillars */}
-      <section id="guardian" className="px-6 py-16 max-w-6xl mx-auto w-full">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Core Architecture</span>
-          <h2 className="text-2xl sm:text-4xl font-extrabold text-white mt-2">
-            The 6 Layers of TradeXGuardian
-          </h2>
-          <p className="mt-3 text-xs sm:text-sm text-slate-400">
-            Engineered exclusively to enforce trading psychology, protect prop accounts, and stop fatal blowups.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {/* 1. Trade Blocker */}
-          <div className="clay-card p-5 space-y-2.5">
-            <div className="h-8 w-8 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center">
-              <svg className="h-4 w-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-bold text-white">1. Hard Trade Blocker</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Enforces your daily maximum trade count and maximum daily loss. Once reached, order placement is hard-blocked until the daily reset.
-            </p>
-          </div>
-
-          {/* 2. Time Blocker */}
-          <div className="clay-card p-5 space-y-2.5">
-            <div className="h-8 w-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center">
-              <svg className="h-4 w-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-bold text-white">2. Session & Time Blocker</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Trade only when your edge is proven. Restricts order placement strictly to permitted London, New York, or Asian killzone windows.
-            </p>
-          </div>
-
-          {/* 3. Risk Error Confirmation */}
-          <div className="clay-card p-5 space-y-2.5">
-            <div className="h-8 w-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
-              <svg className="h-4 w-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-bold text-white">3. Risk Error Confirmation</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Catches fat-finger typos, abnormally wide stop losses, missing stop losses, or negative risk-to-reward ratios before execution.
-            </p>
-          </div>
-
-          {/* 4. Prop Firm Rule Guardian */}
-          <div className="clay-card p-5 space-y-2.5">
-            <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-              <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-bold text-white">4. Prop Firm Rule Guardian</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Guards consistency target ratios, detects martingale lot escalation, weekend hold limits, and tracks maximum trailing drawdown.
-            </p>
-          </div>
-
-          {/* 5. Intelligent Pair Awareness */}
-          <div className="clay-card p-5 space-y-2.5">
-            <div className="h-8 w-8 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center">
-              <svg className="h-4 w-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-bold text-white">5. Intelligent Pair Awareness</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Calculates contract sizes, tick values, and pip values dynamically across Forex, XAUUSD, Indices, and Crypto instruments.
-            </p>
-          </div>
-
-          {/* 6. Emergency Lock & Discipline Score */}
-          <div className="clay-card p-5 space-y-2.5">
-            <div className="h-8 w-8 rounded-lg bg-teal-500/10 border border-teal-500/30 flex items-center justify-center">
-              <svg className="h-4 w-4 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-bold text-white">6. Emergency Lock & Score</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Provides one-click emergency kill-switches and tracks your discipline score (0-100%) to measure behavioral compliance over time.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Security & Client-Side Zero-Knowledge Encryption */}
+      {/* Security & Client-Side Encryption */}
       <section id="security" className="border-t border-grid bg-panel/60 px-6 py-16">
         <div className="max-w-5xl mx-auto w-full">
           <div className="clay-panel p-8 rounded-2xl border border-grid space-y-6">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-                <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              <div className="h-10 w-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+                <svg className="h-5 w-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">Client-Side Zero-Knowledge Key Vault</h3>
-                <span className="text-xs text-muted">AES-GCM 256-Bit Cryptographic Hardening</span>
+                <h3 className="text-base font-bold text-white font-heading">Security &amp; Encryption Standards</h3>
+                <span className="text-xs text-muted">Argon2id Hashing • JWT Session Security • AES-GCM 256 Vault</span>
               </div>
             </div>
 
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Your broker API credentials, private keys, and trade journals never leave your browser unencrypted.
-              All data is encrypted client-side using Web Crypto PBKDF2 (100,000 rounds) and AES-GCM 256-bit encryption.
-              Even if the server or database were compromised, your broker secrets cannot be decrypted without your local master password.
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans">
+              TerminalX protects your assets with defense-in-depth security. User passwords are encrypted using memory-hard Argon2id, while broker API credentials are encrypted client-side using Web Crypto PBKDF2 (100,000 rounds) and AES-GCM 256. Cloud layouts and workspace drawings are seamlessly synced to your dedicated PostgreSQL or SQLite instance.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <div className="p-3 rounded bg-white/[0.02] border border-grid/50">
-                <span className="font-bold text-white block">Zero Cloud Storage</span>
+                <span className="font-bold text-white block">Postgres &amp; SQLite Sync</span>
+                <span className="text-muted text-[11px] mt-0.5 block">Drawings and layouts backed up to cloud.</span>
+              </div>
+              <div className="p-3 rounded bg-white/[0.02] border border-grid/50">
+                <span className="font-bold text-white block">Token-Bucket Rate Limiter</span>
+                <span className="text-muted text-[11px] mt-0.5 block">Axum rate-limiter prevents brute-force.</span>
+              </div>
+              <div className="p-3 rounded bg-white/[0.02] border border-grid/50">
+                <span className="font-bold text-white block">Zero Cloud Broker Keys</span>
                 <span className="text-muted text-[11px] mt-0.5 block">Secrets remain in your encrypted local vault.</span>
               </div>
-              <div className="p-3 rounded bg-white/[0.02] border border-grid/50">
-                <span className="font-bold text-white block">Local AI Behavioral Coach</span>
-                <span className="text-muted text-[11px] mt-0.5 block">Runs offline via local Ollama instance.</span>
-              </div>
-              <div className="p-3 rounded bg-white/[0.02] border border-grid/50">
-                <span className="font-bold text-white block">Strict CSP & Sanitization</span>
-                <span className="text-muted text-[11px] mt-0.5 block">Prototype-pollution and XSS defense built-in.</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Download Native App for iOS & Android Section */}
-      <section id="download" className="border-t border-grid bg-white/[0.01] px-6 py-16">
-        <div className="max-w-5xl mx-auto w-full text-center space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-accent/30 bg-accent/10 text-accent text-xs font-semibold">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
-            <span>Cross-Platform Standalone Software</span>
-          </div>
-
-          <h2 className="text-2xl sm:text-4xl font-extrabold text-white font-heading">
-            Trade with Zero Latency on Any Device
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto font-sans leading-relaxed">
-            Install CRT Terminal directly on your iPhone, iPad, Android phone, tablet, or desktop.
-            Standalone full-screen execution with offline caching, local data persistence, and zero app store delays.
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 text-left">
-            {/* iOS */}
-            <div className="clay-panel p-5 rounded-2xl border border-white/10 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-white font-heading">Apple iOS &amp; iPadOS</span>
-                <span className="text-[10px] font-bold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">Safari PWA</span>
-              </div>
-              <p className="text-xs text-slate-300 font-sans leading-relaxed">
-                Add to your home screen with 1 tap. Runs in isolated full-screen standalone mode without URL bars.
-              </p>
-              <button
-                onClick={() => {
-                  audioHaptics.tick();
-                  setIsDownloadModalOpen(true);
-                }}
-                className="w-full clay-btn py-2 text-xs font-bold text-white hover:text-sky-300 transition"
-              >
-                View iOS Install Guide
-              </button>
-            </div>
-
-            {/* Android */}
-            <div className="clay-panel p-5 rounded-2xl border border-white/10 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-white font-heading">Google Android</span>
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Direct Install</span>
-              </div>
-              <p className="text-xs text-slate-300 font-sans leading-relaxed">
-                Install as a standalone Android app with offline shell support and high-performance WebGL chart acceleration.
-              </p>
-              <button
-                onClick={() => {
-                  audioHaptics.tick();
-                  setIsDownloadModalOpen(true);
-                }}
-                className="w-full clay-btn py-2 text-xs font-bold text-white hover:text-emerald-300 transition"
-              >
-                Install on Android
-              </button>
-            </div>
-
-            {/* Native Capacitor Project */}
-            <div className="clay-panel p-5 rounded-2xl border border-white/10 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-white font-heading">Native Capacitor Projects</span>
-                <span className="text-[10px] font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">Xcode / Gradle</span>
-              </div>
-              <p className="text-xs text-slate-300 font-sans leading-relaxed">
-                Full native Xcode and Android Studio projects included in the repository. Ready to compile into signed binaries.
-              </p>
-              <button
-                onClick={() => {
-                  audioHaptics.tick();
-                  setIsDownloadModalOpen(true);
-                }}
-                className="w-full clay-btn py-2 text-xs font-bold text-white hover:text-purple-300 transition"
-              >
-                Compile Native APK / IPA
-              </button>
             </div>
           </div>
         </div>
@@ -779,8 +661,8 @@ export default function LandingPage({
         <div className="max-w-6xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-6 text-xs text-muted">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-white font-heading">CRT TERMINAL &amp; TRADEXGUARDIAN</span>
-              <span className="px-1.5 py-0.2 rounded bg-white/10 text-white text-[10px] font-mono">PRODUCTION READY</span>
+              <span className="font-bold text-white font-heading">TERMINALX &amp; TRADEXGUARDIAN</span>
+              <span className="px-1.5 py-0.2 rounded bg-cyan-400 text-black text-[10px] font-mono font-bold">PRODUCTION READY</span>
             </div>
             <p className="mt-1 text-[11px] font-sans">Designed for professional traders, prop firm challengers, and institutional execution.</p>
           </div>
@@ -796,11 +678,8 @@ export default function LandingPage({
               Download App
             </button>
             <button
-              onClick={() => {
-                audioHaptics.tick();
-                onLaunchTerminal();
-              }}
-              className="clay-btn-active px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer font-heading"
+              onClick={() => handleLaunch()}
+              className="clay-btn-active px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer font-heading bg-cyan-400 hover:bg-cyan-300 text-black"
             >
               <span>Launch Terminal</span>
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
