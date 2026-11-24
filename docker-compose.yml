@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  crt-terminal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crt-terminal
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - PORT=5173
+      - DIST_PATH=/app/terminal/dist
+      - RUST_LOG=info,crt_server=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

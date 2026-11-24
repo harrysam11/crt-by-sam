@@ -1,6 +1,7 @@
 import React from 'react';
 import { usePsychologyStore } from '../store/usePsychologyStore';
 import { sanitizeMediaUrl } from '../utils/security';
+import { loadCustomWallpaper } from '../services/wallpaperStorage';
 
 export interface WallpaperPreset {
   name: string;
@@ -101,6 +102,23 @@ export default function ChartSkinsLayer() {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const safeMediaUrl = sanitizeMediaUrl(mediaUrl);
 
+  // Restore custom uploaded wallpaper (MP4, GIF, Image) from IndexedDB if browser revoked blob URL on refresh
+  React.useEffect(() => {
+    if (wallpaperType !== 'SOLID') {
+      if (!mediaUrl || mediaUrl.startsWith('blob:')) {
+        loadCustomWallpaper().then((stored) => {
+          if (stored && stored.blob) {
+            const freshBlobUrl = URL.createObjectURL(stored.blob);
+            usePsychologyStore.getState().setThemeConfig({
+              wallpaperType: stored.type,
+              mediaUrl: freshBlobUrl,
+            });
+          }
+        }).catch(() => {});
+      }
+    }
+  }, []);
+
   React.useEffect(() => {
     if (videoRef.current) {
       videoRef.current.muted = true;
@@ -134,7 +152,11 @@ export default function ChartSkinsLayer() {
   };
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden select-none">
+    <div
+      id="chart-skins-layer"
+      data-chart-skins-layer="true"
+      className="pointer-events-none absolute inset-0 z-0 overflow-hidden select-none"
+    >
       {/* Background Media Layer */}
       <div
         className="h-full w-full"

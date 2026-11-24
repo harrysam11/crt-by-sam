@@ -3,6 +3,7 @@ import { usePsychologyStore } from '../store/usePsychologyStore';
 import { WALLPAPER_PRESETS, type WallpaperPreset } from './ChartSkinsLayer';
 import { audioHaptics } from '../utils/notify';
 import { validateWallpaperFile, sanitizeMediaUrl } from '../utils/security';
+import { saveCustomWallpaper, clearCustomWallpaper } from '../services/wallpaperStorage';
 import type { WallpaperFitMode } from '../types/psychology';
 
 interface ChartSkinsModalProps {
@@ -62,6 +63,11 @@ export default function ChartSkinsModal({ isOpen, onClose }: ChartSkinsModalProp
 
     const determinedType: 'VIDEO' | 'GIF' | 'IMAGE' = isVideo ? 'VIDEO' : isGif ? 'GIF' : 'IMAGE';
 
+    // Persist blob to IndexedDB so it never disappears on page refresh
+    saveCustomWallpaper(file, file.name, determinedType).catch((err) => {
+      console.warn('Could not persist wallpaper in IndexedDB:', err);
+    });
+
     setThemeConfig({
       wallpaperType: determinedType,
       mediaUrl: objectUrl,
@@ -83,6 +89,7 @@ export default function ChartSkinsModal({ isOpen, onClose }: ChartSkinsModalProp
     setThemeConfig({
       wallpaperType: preset.type,
       mediaUrl: preset.url,
+      overlayOpacity: themeConfig.overlayOpacity > 0.65 ? 0.45 : themeConfig.overlayOpacity,
       fitMode: 'cover',
       scale: 1.0,
       offsetX: 0,
@@ -126,6 +133,7 @@ export default function ChartSkinsModal({ isOpen, onClose }: ChartSkinsModalProp
 
   const handleResetSolid = () => {
     audioHaptics.tick();
+    clearCustomWallpaper().catch(() => {});
     setThemeConfig({
       wallpaperType: 'SOLID',
       mediaUrl: null,

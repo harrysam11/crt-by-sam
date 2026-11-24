@@ -6,7 +6,10 @@ export default {
       colors: {
         bg: 'var(--color-bg, #08090d)',
         panel: 'var(--color-panel, #0e1017)',
+        surface: 'var(--color-surface, #141722)',
         grid: 'var(--color-grid, rgba(255, 255, 255, 0.08))',
+        primary: 'var(--color-text, #f8fafc)',
+        secondary: 'var(--color-secondary, #94a3b8)',
         up: 'var(--color-up, #22c55e)',
         down: 'var(--color-down, #ef4444)',
         accent: 'var(--color-accent, #38bdf8)',

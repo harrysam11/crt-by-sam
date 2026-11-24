@@ -65,11 +65,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let static_service = ServeDir::new(&dist_path)
         .not_found_service(ServeFile::new(format!("{}/index.html", dist_path)));
 
-    // 8. Assemble Main Axum Router
+    // 8. Assemble Main Axum Router with Security Headers & CORS
     let app = Router::new()
         .nest("/api", routes::router().with_state(app_state))
         .route("/ws", get(ws_handler).with_state(ws_state))
         .fallback_service(static_service)
+        .layer(axum::middleware::from_fn(security_headers_middleware))
         .layer(cors);
 
     // 9. Determine listening port and interface
@@ -92,4 +93,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+async fn security_headers_middleware(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let mut res = next.run(req).await;
+    let headers = res.headers_mut();
+    headers.insert(
+        axum::http::header::X_CONTENT_TYPE_OPTIONS,
+        axum::http::HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        axum::http::header::X_FRAME_OPTIONS,
+        axum::http::HeaderValue::from_static("SAMEORIGIN"),
+    );
+    headers.insert(
+        axum::http::header::REFERRER_POLICY,
+        axum::http::HeaderValue::from_static("strict-origin-when-cross-origin"),
+    );
+    headers.insert(
+        axum::http::header::X_XSS_PROTECTION,
+        axum::http::HeaderValue::from_static("1; mode=block"),
+    );
+    res
 }

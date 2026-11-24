@@ -47,6 +47,7 @@ export default function DrawingSettingsModal({
 
   // Form states initialized from drawing
   const [color, setColor] = useState('#38bdf8');
+  const [lineOpacity, setLineOpacity] = useState(1);
   const [lineWidth, setLineWidth] = useState(2);
   const [lineStyle, setLineStyle] = useState<'solid' | 'dashed' | 'dotted'>('solid');
   const [fillColor, setFillColor] = useState('#38bdf8');
@@ -129,6 +130,7 @@ export default function DrawingSettingsModal({
   useEffect(() => {
     if (!drawing) return;
     setColor(drawing.color || '#38bdf8');
+    setLineOpacity(drawing.lineOpacity !== undefined ? drawing.lineOpacity : 1);
     setLineWidth(drawing.lineWidth || 2);
     setLineStyle(drawing.lineStyle || 'solid');
     setFillColor(drawing.fillColor || drawing.color || '#38bdf8');
@@ -178,6 +180,7 @@ export default function DrawingSettingsModal({
     audioHaptics.tick();
     const patch: Partial<DrawingItem> = {
       color,
+      lineOpacity,
       lineWidth,
       lineStyle,
       fillColor: hasFill ? fillColor : undefined,
@@ -355,6 +358,25 @@ export default function DrawingSettingsModal({
                     <option value="dashed">Dashed</option>
                     <option value="dotted">Dotted</option>
                   </select>
+                </div>
+
+                {/* Line / Border Opacity Slider */}
+                <div className="flex items-center gap-3 bg-slate-900/60 p-2 rounded-lg border border-grid">
+                  <span className="text-[10px] text-slate-400 font-medium">Border Opacity:</span>
+                  <input
+                    type="range"
+                    min="0.05"
+                    max="1"
+                    step="0.05"
+                    value={lineOpacity}
+                    onChange={(e) => {
+                      const next = parseFloat(e.target.value);
+                      setLineOpacity(next);
+                      applyLiveChange({ lineOpacity: next });
+                    }}
+                    className="flex-1 accent-accent cursor-pointer"
+                  />
+                  <span className="text-slate-200 text-[10px] w-9 font-mono text-right">{Math.round(lineOpacity * 100)}%</span>
                 </div>
               </div>
 

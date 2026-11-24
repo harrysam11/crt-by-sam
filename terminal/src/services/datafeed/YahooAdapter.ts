@@ -95,12 +95,40 @@ function aggregateBars(cs: Candle[], sec: number): Candle[] {
   return out;
 }
 
+const SYMBOL_ALIASES: Record<string, string> = {
+  'XAUUSD': 'GC=F',
+  'XAUUSD=X': 'GC=F',
+  'GOLD': 'GC=F',
+  'XAGUSD': 'SI=F',
+  'XAGUSD=X': 'SI=F',
+  'SILVER': 'SI=F',
+  'US100': 'NQ=F',
+  'NAS100': 'NQ=F',
+  'USTEC': 'NQ=F',
+  'NASDAQ': 'NQ=F',
+  'US500': 'ES=F',
+  'SPX500': 'ES=F',
+  'US30': 'YM=F',
+  'DJ30': 'YM=F',
+  'EURUSD': 'EURUSD=X',
+  'GBPUSD': 'GBPUSD=X',
+  'USDJPY': 'USDJPY=X',
+  'AUDUSD': 'AUDUSD=X',
+  'USDCAD': 'USDCAD=X',
+  'USDINR': 'USDINR=X',
+};
+
+export function resolveYahooSymbol(symbol: string): string {
+  const upper = symbol.toUpperCase().trim();
+  return SYMBOL_ALIASES[upper] || symbol;
+}
+
 export class YahooAdapter implements IDatafeedAdapter {
   readonly name = 'Yahoo Finance / Global Markets';
   readonly providerId = 'yahoo';
 
   supportsSymbol(symbol: string): boolean {
-    const s = symbol.toUpperCase();
+    const s = resolveYahooSymbol(symbol).toUpperCase();
     return (
       s.includes('=X') ||
       s.includes('=F') ||
@@ -113,11 +141,16 @@ export class YahooAdapter implements IDatafeedAdapter {
 
   async searchSymbols(query: string, category?: AssetCategory, signal?: AbortSignal): Promise<Instrument[]> {
     const q = query.trim().toUpperCase();
+    const cleanQ = q.replace(/[^A-Z0-9]/g, '');
     const defaultMatches = DEFAULT_INSTRUMENTS.filter(
       (inst) =>
         inst.provider === 'yahoo' &&
         (!category || inst.category === category) &&
-        (!q || inst.id.includes(q) || inst.label.includes(q) || inst.name.toUpperCase().includes(q))
+        (!q ||
+          inst.id.includes(q) ||
+          inst.label.includes(q) ||
+          (cleanQ && inst.label.replace(/[^A-Z0-9]/g, '').includes(cleanQ)) ||
+          inst.name.toUpperCase().includes(q))
     );
 
     if (!q) return defaultMatches;
@@ -198,7 +231,8 @@ export class YahooAdapter implements IDatafeedAdapter {
     signal?: AbortSignal
   ): Promise<{ candles: Candle[]; quote: QuoteInfo }> {
     const cfg = getYahooConfig(timeframe);
-    const url = `${BASE}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${cfg.interval}&range=${cfg.range}&includePrePost=false`;
+    const targetSymbol = resolveYahooSymbol(symbol);
+    const url = `${BASE}/v8/finance/chart/${encodeURIComponent(targetSymbol)}?interval=${cfg.interval}&range=${cfg.range}&includePrePost=false`;
 
     const res = await fetch(url, { signal });
     if (!res.ok) {

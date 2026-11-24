@@ -63,14 +63,22 @@ export class BinanceAdapter implements IDatafeedAdapter {
   readonly providerId = 'binance';
 
   supportsSymbol(symbol: string): boolean {
-    return symbol.toUpperCase().endsWith('USDT') || symbol.toUpperCase().endsWith('BUSD');
+    const s = symbol.toUpperCase();
+    return s.endsWith('USDT') || s.endsWith('BUSD') || s === 'PAXGUSDT';
   }
 
   async searchSymbols(query: string, category?: AssetCategory, signal?: AbortSignal): Promise<Instrument[]> {
-    if (category && category !== 'CRYPTO') return [];
+    if (category && category !== 'CRYPTO' && category !== 'COMMODITY') return [];
     const q = query.trim().toUpperCase();
+    const cleanQ = q.replace(/[^A-Z0-9]/g, '');
     const matches = DEFAULT_INSTRUMENTS.filter(
-      (i) => i.provider === 'binance' && (!q || i.id.includes(q) || i.label.includes(q) || i.name.toUpperCase().includes(q))
+      (i) =>
+        i.provider === 'binance' &&
+        (!q ||
+          i.id.includes(q) ||
+          i.label.includes(q) ||
+          (cleanQ && i.label.replace(/[^A-Z0-9]/g, '').includes(cleanQ)) ||
+          i.name.toUpperCase().includes(q))
     );
     if (matches.length > 0 || !q) return matches;
 

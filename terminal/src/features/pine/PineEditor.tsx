@@ -42,14 +42,37 @@ export default function PineEditor({ onApplyPlots, onClearPlots }: PineEditorPro
 
     const result = await executePineScript(code, candles, symbol, timeframe);
 
-    if (result.ok && result.plots.length > 0) {
+    const hasOutputs =
+      result.ok &&
+      (result.plots.length > 0 ||
+        (result.drawings &&
+          (result.drawings.boxes.length > 0 ||
+            result.drawings.lines.length > 0 ||
+            result.drawings.labels.length > 0 ||
+            result.drawings.tables.length > 0)));
+
+    if (hasOutputs) {
       setStatus('ACTIVE');
       setErrorMessage(null);
       const totalPoints = result.plots.reduce((acc, p) => acc + p.data.length, 0);
+      const drawingsCount =
+        (result.drawings?.boxes.length || 0) +
+        (result.drawings?.lines.length || 0) +
+        (result.drawings?.labels.length || 0) +
+        (result.drawings?.tables.length || 0);
       setMetrics({
         runtimeMs: result.runtimeMs || 0,
-        plotCount: result.plots.length,
+        plotCount: result.plots.length + drawingsCount,
         pointsCount: totalPoints,
+      });
+
+      // Extract title from code if present: indicator("Title", ...), strategy("Title", ...), study("Title", ...)
+      const matchTitle = code.match(/(?:indicator|strategy|study)\s*\(\s*["']([^"']+)["']/i);
+      const scriptTitle = matchTitle?.[1]?.trim() || selectedPreset || 'Custom Pine Script';
+
+      useTerminalStore.getState().addPineScript({
+        name: scriptTitle,
+        code,
       });
 
       if (onApplyPlots) {
@@ -57,7 +80,7 @@ export default function PineEditor({ onApplyPlots, onClearPlots }: PineEditorPro
       }
     } else {
       setStatus('ERROR');
-      setErrorMessage(result.error || 'Compilation error: No plots generated');
+      setErrorMessage(result.error || 'Compilation error: No plots or drawings generated');
       audioHaptics.error();
     }
   };

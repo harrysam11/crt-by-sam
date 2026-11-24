@@ -1,4 +1,5 @@
 import { useJournalStore } from '../store/useJournalStore';
+import { usePsychologyStore } from '../store/usePsychologyStore';
 import type { JournalEntry, TradingSessionTag } from '../types/psychology';
 
 /**
@@ -7,22 +8,26 @@ import type { JournalEntry, TradingSessionTag } from '../types/psychology';
 function renderSvgToCanvas(
   ctx: CanvasRenderingContext2D,
   svgEl: SVGSVGElement,
-  width: number,
-  height: number
+  x: number,
+  y: number,
+  w: number,
+  h: number
 ): Promise<void> {
   return new Promise((resolve) => {
     try {
       const cloned = svgEl.cloneNode(true) as SVGSVGElement;
-      cloned.setAttribute('width', `${width}`);
-      cloned.setAttribute('height', `${height}`);
+      const origW = svgEl.clientWidth || w;
+      const origH = svgEl.clientHeight || h;
+      cloned.setAttribute('width', `${origW}`);
+      cloned.setAttribute('height', `${origH}`);
       if (!cloned.getAttribute('viewBox')) {
-        cloned.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        cloned.setAttribute('viewBox', `0 0 ${origW} ${origH}`);
       }
       const xml = new XMLSerializer().serializeToString(cloned);
       const img = new Image();
       img.onload = () => {
         try {
-          ctx.drawImage(img, 0, 0, width, height);
+          ctx.drawImage(img, x, y, w, h);
         } catch {}
         resolve();
       };
@@ -32,6 +37,40 @@ function renderSvgToCanvas(
       resolve();
     }
   });
+}
+
+/**
+ * Helper to draw active ChartSkins MP4 video loop, GIF, or image wallpaper
+ * onto the screenshot canvas with configured dark overlay tint before drawing series.
+ */
+function drawWallpaperBackground(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  container: HTMLElement | null
+) {
+  try {
+    const { themeConfig } = usePsychologyStore.getState();
+    if (themeConfig && themeConfig.wallpaperType !== 'SOLID' && themeConfig.mediaUrl) {
+      const skinsLayer = (container?.parentElement || document).querySelector(
+        '#chart-skins-layer, [data-chart-skins-layer="true"]'
+      );
+      const mediaEl = skinsLayer?.querySelector('video, img') as HTMLVideoElement | HTMLImageElement | null;
+      if (mediaEl) {
+        ctx.save();
+        ctx.drawImage(mediaEl, 0, 0, width, height);
+        ctx.fillStyle = '#0b0e14';
+        ctx.globalAlpha = themeConfig.overlayOpacity !== undefined ? Math.min(themeConfig.overlayOpacity, 0.6) : 0.5;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('Could not draw wallpaper background onto screenshot:', err);
+  }
+  ctx.fillStyle = '#0b0e14';
+  ctx.fillRect(0, 0, width, height);
 }
 
 /**
@@ -59,18 +98,25 @@ export async function captureChartScreenshot(
         const ctx = offscreen.getContext('2d');
         if (!ctx) return baseCanvas.toDataURL('image/png', 0.95);
 
+        // Draw active wallpaper (video, gif, image) or background color first
+        drawWallpaperBackground(ctx, width, height, container);
+
         // Draw base chart (series, scales, grid, indicators)
         ctx.drawImage(baseCanvas, 0, 0);
 
-        // Overlay SVG drawings if present
-        const parentEl = container?.parentElement || container;
-        if (parentEl && parentEl.querySelectorAll) {
-          const svgs = Array.from(parentEl.querySelectorAll('svg')) as SVGSVGElement[];
-          for (let i = 0; i < svgs.length; i++) {
-            const svg = svgs[i];
-            if (svg.querySelector('path, line, rect, circle, polygon, text')) {
-              await renderSvgToCanvas(ctx, svg, width, height);
-            }
+        // Overlay ONLY user drawings SVG if present (never toolbar or button SVGs)
+        if (container) {
+          const drawingSvg = container.querySelector('svg[data-drawing-svg="true"]') as SVGSVGElement | null;
+          if (drawingSvg && drawingSvg.querySelector('path, line, rect, circle, polygon, text')) {
+            const containerRect = container.getBoundingClientRect();
+            const svgRect = drawingSvg.getBoundingClientRect();
+            const scaleX = width / (containerRect.width || width);
+            const scaleY = height / (containerRect.height || height);
+            const drawX = (svgRect.left - containerRect.left) * scaleX;
+            const drawY = (svgRect.top - containerRect.top) * scaleY;
+            const drawW = svgRect.width * scaleX;
+            const drawH = svgRect.height * scaleY;
+            await renderSvgToCanvas(ctx, drawingSvg, drawX, drawY, drawW, drawH);
           }
         }
 
@@ -96,9 +142,8 @@ export async function captureChartScreenshot(
   const ctx = offscreen.getContext('2d');
   if (!ctx) return '';
 
-  // Draw background fill
-  ctx.fillStyle = '#0b0e14';
-  ctx.fillRect(0, 0, width, height);
+  // Draw active wallpaper (video, gif, image) or background color first
+  drawWallpaperBackground(ctx, width, height, container);
 
   const containerRect = container.getBoundingClientRect();
 
@@ -115,6 +160,17 @@ export async function captureChartScreenshot(
       // Ignore cross-origin canvas security errors if any
     }
   });
+
+  // Overlay user drawing SVG if present
+  const drawingSvg = container.querySelector('svg[data-drawing-svg="true"]') as SVGSVGElement | null;
+  if (drawingSvg && drawingSvg.querySelector('path, line, rect, circle, polygon, text')) {
+    const svgRect = drawingSvg.getBoundingClientRect();
+    const drawX = svgRect.left - containerRect.left;
+    const drawY = svgRect.top - containerRect.top;
+    const drawW = svgRect.width;
+    const drawH = svgRect.height;
+    await renderSvgToCanvas(ctx, drawingSvg, drawX, drawY, drawW, drawH);
+  }
 
   // Clean TradingView-style export (zero text watermark overlay)
   return offscreen.toDataURL('image/png', 0.95);

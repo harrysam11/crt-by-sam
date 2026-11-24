@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { positionPnlUsd, useTerminalStore } from '../../store/useTerminalStore';
 import { useExecutionEngineStore } from '../../store/useExecutionEngineStore';
 import { useGuardianStore } from '../../store/useGuardianStore';
@@ -42,6 +42,17 @@ export default function PositionsTable({
     }
   };
 
+  useEffect(() => {
+    const handleOpenPine = () => {
+      setTab('pine');
+      if (isCollapsed && onToggleCollapse) {
+        onToggleCollapse();
+      }
+    };
+    window.addEventListener('crt_open_pine_tab', handleOpenPine);
+    return () => window.removeEventListener('crt_open_pine_tab', handleOpenPine);
+  }, [isCollapsed, onToggleCollapse]);
+
   const positions = useTerminalStore((s) => s.positions);
   const prices = useTerminalStore((s) => s.prices);
   const orders = useTerminalStore((s) => s.orders);
@@ -59,6 +70,12 @@ export default function PositionsTable({
 
   // TradeXGuardian Emergency Lock state
   const guardianEmergencyLocked = useGuardianStore((s) => s.emergencyLocked);
+
+  // Ticket mode state & actions
+  const positionTickets = useTerminalStore((s) => s.positionTickets || []);
+  const positionViewMode = useTerminalStore((s) => s.positionViewMode || 'TICKETS');
+  const setPositionViewMode = useTerminalStore((s) => s.setPositionViewMode);
+  const closePositionTicket = useTerminalStore((s) => s.closePositionTicket);
 
   // Quantum Bulk Actions from Store
   const bulkClosePositions = useTerminalStore((s) => s.bulkClosePositions);
@@ -135,7 +152,7 @@ export default function PositionsTable({
       <div className="flex shrink-0 items-center justify-between border-b border-grid/50 px-3 py-1.5 bg-[#09090d]/80">
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none min-w-0 flex-1 py-0.5">
           <button className={tabCls(tab === 'positions')} onClick={() => handleTabClick('positions')}>
-            Positions ({open.length})
+            Positions ({positionViewMode === 'TICKETS' ? positionTickets.length : open.length})
           </button>
           <button className={tabCls(tab === 'orders')} onClick={() => handleTabClick('orders')}>
             Orders ({pending} open)
@@ -156,6 +173,39 @@ export default function PositionsTable({
 
         {/* Quick Toolbar */}
         <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          {tab === 'positions' && (positionTickets.length > 0 || open.length > 0) && (
+            <div className="flex items-center gap-0.5 bg-[#101018] p-0.5 rounded border border-grid text-[11px]">
+              <button
+                onClick={() => {
+                  audioHaptics.tick();
+                  setPositionViewMode('TICKETS');
+                }}
+                className={`px-2 py-0.5 rounded transition ${
+                  positionViewMode === 'TICKETS'
+                    ? 'bg-[#38bdf8] text-black font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Ticket Mode: Separate lots per order fill"
+              >
+                Tickets ({positionTickets.length})
+              </button>
+              <button
+                onClick={() => {
+                  audioHaptics.tick();
+                  setPositionViewMode('NETTED');
+                }}
+                className={`px-2 py-0.5 rounded transition ${
+                  positionViewMode === 'NETTED'
+                    ? 'bg-[#38bdf8] text-black font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Netted Mode: Single net position per symbol"
+              >
+                Netted ({open.length})
+              </button>
+            </div>
+          )}
+
           {tab === 'journal' && (
             <button
               onClick={copyTradesCsv}
@@ -221,6 +271,22 @@ export default function PositionsTable({
           )}
         </div>
       </div>
+
+      {/* TradeXGuardian Emergency Risk Alert Banner */}
+      {guardianEmergencyLocked && (
+        <div className="flex items-center justify-between px-3 py-1 bg-red-950/80 border-b border-red-500/50 text-red-200 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-red-400 uppercase">[TRADE-X-GUARDIAN LOCK ACTIVE]</span>
+            <span>Trading halted by capital protection rules. New orders are blocked.</span>
+          </div>
+          <button
+            onClick={() => useGuardianStore.getState().emergencyUnlock()}
+            className="px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/50 hover:bg-red-500 hover:text-white font-bold transition text-[10.5px]"
+          >
+            Emergency Unlock
+          </button>
+        </div>
+      )}
 
       {/* Quantum Bulk Actions Toolbar (Positions) */}
       {tab === 'positions' && open.length > 0 && (
@@ -403,132 +469,209 @@ export default function PositionsTable({
 
       {/* Tab Panels */}
       <div className="min-h-0 flex-1 overflow-auto">
-        {tab === 'positions' && (open.length === 0 ? (
-          <p className="p-3 text-xs text-muted">No open positions. Place an order to start.</p>
-        ) : (
-          <table className="num w-full text-xs">
-            <thead>
-              <tr>
-                <th className="px-3 py-1.5 w-8 text-center">
-                  <input
-                    type="checkbox"
-                    checked={selectedPositionSymbols.length === open.length && open.length > 0}
-                    onChange={toggleSelectAllPositions}
-                    className="rounded bg-[#1a1a26] border-grid cursor-pointer"
-                    title="Select / Deselect All Positions"
-                  />
-                </th>
-                <th className={th}>Symbol</th>
-                <th className={th}>Side</th>
-                <th className={th}>Size</th>
-                <th className={th}>Entry</th>
-                <th className={th}>Mark</th>
-                <th className={th}>Lev</th>
-                <th className={th}>PnL (USD)</th>
-                <th className={`${th} text-right`}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {open.map((p) => {
-                const mark = prices[p.symbol] ?? p.entryPrice;
-                const pnl = positionPnlUsd(p, mark);
-                const isSelected = selectedPositionSymbols.includes(p.symbol);
-                return (
-                  <tr
-                    key={p.symbol}
-                    className={`border-t border-grid transition ${
-                      isSelected ? 'bg-[#38bdf8]/10' : 'hover:bg-slate-900/30'
-                    }`}
-                  >
-                    <td className="px-3 py-2 w-8 text-center">
+        {tab === 'positions' && (
+          positionViewMode === 'TICKETS' ? (
+            positionTickets.length === 0 ? (
+              <p className="p-3 text-xs text-muted">No open position tickets. Place an order to start.</p>
+            ) : (
+              <table className="num w-full text-xs">
+                <thead>
+                  <tr>
+                    <th className={th}>Ticket #</th>
+                    <th className={th}>Symbol</th>
+                    <th className={th}>Side</th>
+                    <th className={th}>Size</th>
+                    <th className={th}>Entry</th>
+                    <th className={th}>Mark</th>
+                    <th className={th}>Lev</th>
+                    <th className={th}>PnL (USD)</th>
+                    <th className={`${th} text-right`}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {positionTickets.map((t) => {
+                    const mark = prices[t.symbol] ?? t.entryPrice;
+                    const dir = t.side === 'LONG' ? 1 : -1;
+                    const pnl = t.unrealizedPnl !== undefined && !isNaN(t.unrealizedPnl)
+                      ? t.unrealizedPnl
+                      : (mark - t.entryPrice) * t.size * dir;
+                    return (
+                      <tr key={t.id} className="border-t border-grid hover:bg-slate-900/30 transition">
+                        <td className="px-3 py-2 text-[#38bdf8] font-bold">
+                          {t.id}
+                        </td>
+                        <td className="px-3 py-2">
+                          <button className="text-white hover:underline font-semibold" onClick={() => setSymbol(t.symbol)}>
+                            {labelOf(t.symbol)}
+                          </button>
+                        </td>
+                        <td className={`px-3 ${t.side === 'LONG' ? 'text-up font-semibold' : 'text-down font-semibold'}`}>
+                          {t.side}
+                        </td>
+                        <td className="px-3">{fmtQty(t.size)}</td>
+                        <td className="px-3">{fmtPrice(t.entryPrice, t.symbol)}</td>
+                        <td className="px-3">{fmtPrice(mark, t.symbol)}</td>
+                        <td className="px-3 text-muted">{t.leverage}x</td>
+                        <td className={`px-3 font-semibold ${pnlClass(pnl)}`}>{fmtPnl(pnl)}</td>
+                        <td className="px-3 text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                audioHaptics.tick();
+                                snapBE(t.symbol);
+                              }}
+                              className="rounded border border-grid px-1.5 py-0.5 text-[11px] text-muted hover:border-cyan-400 hover:text-cyan-300 transition"
+                              title="Move Stop Loss to Entry Price (Break-Even)"
+                            >
+                              Snap BE
+                            </button>
+                            <button
+                              onClick={() => {
+                                audioHaptics.tick();
+                                closePositionTicket(t.id);
+                              }}
+                              className="rounded border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-400 hover:bg-red-500 hover:text-white transition"
+                              title="Close this individual ticket"
+                            >
+                              Close
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )
+          ) : (
+            open.length === 0 ? (
+              <p className="p-3 text-xs text-muted">No open netted positions. Place an order to start.</p>
+            ) : (
+              <table className="num w-full text-xs">
+                <thead>
+                  <tr>
+                    <th className="px-3 py-1.5 w-8 text-center">
                       <input
                         type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelectPosition(p.symbol)}
+                        checked={selectedPositionSymbols.length === open.length && open.length > 0}
+                        onChange={toggleSelectAllPositions}
                         className="rounded bg-[#1a1a26] border-grid cursor-pointer"
+                        title="Select / Deselect All Positions"
                       />
-                    </td>
-                    <td className="px-3 py-2">
-                      <button className="text-white hover:underline font-semibold" onClick={() => setSymbol(p.symbol)}>
-                        {labelOf(p.symbol)}
-                      </button>
-                    </td>
-                    <td className={`px-3 ${p.side === 'LONG' ? 'text-up font-semibold' : 'text-down font-semibold'}`}>
-                      {p.side}
-                    </td>
-                    <td className="px-3">{fmtQty(p.size)}</td>
-                    <td className="px-3">{fmtPrice(p.entryPrice, p.symbol)}</td>
-                    <td className="px-3">{fmtPrice(mark, p.symbol)}</td>
-                    <td className="px-3 text-muted">{p.leverage}x</td>
-                    <td className={`px-3 font-semibold ${pnlClass(pnl)}`}>{fmtPnl(pnl)}</td>
-                    <td className="px-3 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <button
-                          onClick={() => {
-                            audioHaptics.tick();
-                            snapBE(p.symbol);
-                          }}
-                          className="rounded border border-grid px-1.5 py-0.5 text-[11px] text-muted hover:border-cyan-400 hover:text-cyan-300 transition"
-                          title="Move Stop Loss to Entry Price (Break-Even)"
-                        >
-                          Snap BE
-                        </button>
-                        <button
-                          onClick={() => {
-                            audioHaptics.tick();
-                            const val = window.prompt(`Set Trailing Stop % for ${p.symbol}:`, '1.5');
-                            if (val) {
-                              const pct = parseFloat(val);
-                              if (pct > 0) setTrailingStop(p.symbol, pct);
-                            }
-                          }}
-                          className="rounded border border-grid px-1.5 py-0.5 text-[11px] text-muted hover:border-emerald-400 hover:text-emerald-300 transition"
-                          title="Attach Trailing Stop Loss order that ratchets with favorable price movement"
-                        >
-                          Trail
-                        </button>
-                        <button
-                          disabled={guardianEmergencyLocked}
-                          onClick={() => {
-                            if (guardianEmergencyLocked) {
-                              audioHaptics.error();
-                              return;
-                            }
-                            audioHaptics.tick();
-                            flip(p.symbol);
-                          }}
-                          className="rounded border border-grid px-1.5 py-0.5 text-[11px] text-muted hover:border-amber-400 hover:text-amber-300 transition disabled:opacity-40 disabled:cursor-not-allowed"
-                          title="Reverse Position Direction at Market"
-                        >
-                          Flip
-                        </button>
-                        <button
-                          onClick={() => {
-                            audioHaptics.tick();
-                            closePartial(p.symbol, 0.5);
-                          }}
-                          className="rounded border border-grid px-1.5 py-0.5 text-[11px] text-muted hover:border-accent hover:text-white transition"
-                          title="Close 50% of position size (Scale Out)"
-                        >
-                          50% Close
-                        </button>
-                        <button
-                          onClick={() => {
-                            audioHaptics.tick();
-                            close(p.symbol);
-                          }}
-                          className="rounded border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-400 hover:bg-red-500 hover:text-white transition"
-                        >
-                          Close
-                        </button>
-                      </div>
-                    </td>
+                    </th>
+                    <th className={th}>Symbol</th>
+                    <th className={th}>Side</th>
+                    <th className={th}>Size</th>
+                    <th className={th}>Entry</th>
+                    <th className={th}>Mark</th>
+                    <th className={th}>Lev</th>
+                    <th className={th}>PnL (USD)</th>
+                    <th className={`${th} text-right`}>Actions</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        ))}
+                </thead>
+                <tbody>
+                  {open.map((p) => {
+                    const mark = prices[p.symbol] ?? p.entryPrice;
+                    const pnl = positionPnlUsd(p, mark);
+                    const isSelected = selectedPositionSymbols.includes(p.symbol);
+                    return (
+                      <tr
+                        key={p.symbol}
+                        className={`border-t border-grid transition ${
+                          isSelected ? 'bg-[#38bdf8]/10' : 'hover:bg-slate-900/30'
+                        }`}
+                      >
+                        <td className="px-3 py-2 w-8 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectPosition(p.symbol)}
+                            className="rounded bg-[#1a1a26] border-grid cursor-pointer"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <button className="text-white hover:underline font-semibold" onClick={() => setSymbol(p.symbol)}>
+                            {labelOf(p.symbol)}
+                          </button>
+                        </td>
+                        <td className={`px-3 ${p.side === 'LONG' ? 'text-up font-semibold' : 'text-down font-semibold'}`}>
+                          {p.side}
+                        </td>
+                        <td className="px-3">{fmtQty(p.size)}</td>
+                        <td className="px-3">{fmtPrice(p.entryPrice, p.symbol)}</td>
+                        <td className="px-3">{fmtPrice(mark, p.symbol)}</td>
+                        <td className="px-3 text-muted">{p.leverage}x</td>
+                        <td className={`px-3 font-semibold ${pnlClass(pnl)}`}>{fmtPnl(pnl)}</td>
+                        <td className="px-3 text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                audioHaptics.tick();
+                                snapBE(p.symbol);
+                              }}
+                              className="rounded border border-grid px-1.5 py-0.5 text-[11px] text-muted hover:border-cyan-400 hover:text-cyan-300 transition"
+                              title="Move Stop Loss to Entry Price (Break-Even)"
+                            >
+                              Snap BE
+                            </button>
+                            <button
+                              onClick={() => {
+                                audioHaptics.tick();
+                                const val = window.prompt(`Set Trailing Stop % for ${p.symbol}:`, '1.5');
+                                if (val) {
+                                  const pct = parseFloat(val);
+                                  if (pct > 0) setTrailingStop(p.symbol, pct);
+                                }
+                              }}
+                              className="rounded border border-grid px-1.5 py-0.5 text-[11px] text-muted hover:border-emerald-400 hover:text-emerald-300 transition"
+                              title="Attach Trailing Stop Loss order that ratchets with favorable price movement"
+                            >
+                              Trail
+                            </button>
+                            <button
+                              disabled={guardianEmergencyLocked}
+                              onClick={() => {
+                                if (guardianEmergencyLocked) {
+                                  audioHaptics.error();
+                                  return;
+                                }
+                                audioHaptics.tick();
+                                flip(p.symbol);
+                              }}
+                              className="rounded border border-grid px-1.5 py-0.5 text-[11px] text-muted hover:border-amber-400 hover:text-amber-300 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                              title="Reverse Position Direction at Market"
+                            >
+                              Flip
+                            </button>
+                            <button
+                              onClick={() => {
+                                audioHaptics.tick();
+                                closePartial(p.symbol, 0.5);
+                              }}
+                              className="rounded border border-grid px-1.5 py-0.5 text-[11px] text-muted hover:border-accent hover:text-white transition"
+                              title="Close 50% of position size (Scale Out)"
+                            >
+                              50% Close
+                            </button>
+                            <button
+                              onClick={() => {
+                                audioHaptics.tick();
+                                close(p.symbol);
+                              }}
+                              className="rounded border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-400 hover:bg-red-500 hover:text-white transition"
+                            >
+                              Close
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )
+          )
+        )}
 
         {tab === 'orders' && (list.length === 0 ? (
           <p className="p-3 text-xs text-muted">No orders yet.</p>

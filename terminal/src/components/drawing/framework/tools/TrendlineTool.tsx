@@ -62,7 +62,7 @@ export class TrendlineTool extends BaseDrawingTool {
           stroke={this.color}
           strokeWidth={this.lineWidth}
           strokeDasharray={strokeDash}
-          opacity={isHovered ? 0.9 : 1}
+          opacity={isHovered ? 0.9 * (this.lineOpacity ?? 1) : (this.lineOpacity ?? 1)}
         />
       </g>
     );

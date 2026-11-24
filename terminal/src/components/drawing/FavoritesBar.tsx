@@ -217,6 +217,15 @@ const TOOL_METAS: Record<ToolType, ToolMeta> = {
       </svg>
     ),
   },
+  ANCHORED_VOLUME_PROFILE: {
+    type: 'ANCHORED_VOLUME_PROFILE',
+    label: 'Anchored Volume Profile',
+    icon: (
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h4v16H3V4zm7 6h4v10h-4V10zm7-4h4v14h-4V6z" />
+      </svg>
+    ),
+  },
 };
 
 export default function FavoritesBar() {

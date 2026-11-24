@@ -10,6 +10,7 @@ export abstract class BaseDrawingTool {
   public p3?: Point2D;
   public points?: Point2D[];
   public color: string;
+  public lineOpacity?: number;
   public fillColor?: string;
   public fillOpacity?: number;
   public lineWidth: number;
@@ -39,6 +40,7 @@ export abstract class BaseDrawingTool {
     this.p3 = item.p3 ? { ...item.p3 } : undefined;
     this.points = item.points ? item.points.map((p) => ({ ...p })) : undefined;
     this.color = item.color || '#38bdf8';
+    this.lineOpacity = item.lineOpacity !== undefined ? item.lineOpacity : 1;
     this.fillColor = item.fillColor;
     this.fillOpacity = item.fillOpacity !== undefined ? item.fillOpacity : 0.15;
     this.lineWidth = item.lineWidth || 2;
@@ -126,6 +128,7 @@ export abstract class BaseDrawingTool {
       p3: this.p3 ? { ...this.p3 } : undefined,
       points: this.points ? this.points.map((p) => ({ ...p })) : undefined,
       color: this.color,
+      lineOpacity: this.lineOpacity,
       fillColor: this.fillColor,
       fillOpacity: this.fillOpacity,
       lineWidth: this.lineWidth,

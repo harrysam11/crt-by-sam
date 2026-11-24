@@ -53,6 +53,9 @@ export default function MultiChartGrid() {
 
   const layoutMenuRef = useRef<HTMLDivElement>(null);
   const templateMenuRef = useRef<HTMLDivElement>(null);
+  const [isSyncBarCollapsed, setIsSyncBarCollapsed] = useState(() => {
+    return typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+  });
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -149,281 +152,312 @@ export default function MultiChartGrid() {
 
   return (
     <div className={`relative flex h-full w-full flex-col overflow-hidden bg-bg ${isChartMaximized ? 'fixed inset-0 z-50' : ''}`}>
-      {/* Top Floating Multi-Chart Layout & Sync Controller Toolbar */}
-      <div className="absolute right-3 top-2 z-30 flex items-center gap-1.5 font-mono text-xs select-none">
-        {/* Sync Toggles Cluster */}
-        <div className="flex items-center gap-1 clay-card px-2 py-0.5 bg-[#09090d]/80 backdrop-blur-md">
-          {/* Symbol Sync */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              toggleSync('syncSymbol');
-            }}
-            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold transition flex items-center gap-1 ${
-              syncSymbol ? 'clay-pill-active' : 'clay-pill text-muted hover:text-white'
-            }`}
-            title="Sync Symbol across all charts"
-          >
-            <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-            <span>Sym</span>
-          </button>
-
-          {/* Timeframe Sync */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              toggleSync('syncTimeframe');
-            }}
-            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold transition flex items-center gap-1 ${
-              syncTimeframe ? 'clay-pill-active' : 'clay-pill text-muted hover:text-white'
-            }`}
-            title="Sync Interval / Timeframe across all charts"
-          >
-            <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Int</span>
-          </button>
-
-          {/* Crosshair Sync */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              toggleSync('syncCrosshair');
-            }}
-            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold transition flex items-center gap-1 ${
-              syncCrosshair ? 'clay-pill-active' : 'clay-pill text-muted hover:text-white'
-            }`}
-            title="Sync Crosshair time cursor across all charts"
-          >
-            <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m-6-6h12" />
-            </svg>
-            <span>Cross</span>
-          </button>
-
-          {/* Range Sync (Pan/Zoom) */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              toggleSync('syncRange');
-            }}
-            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold transition flex items-center gap-1 ${
-              syncRange ? 'clay-pill-active' : 'clay-pill text-muted hover:text-white'
-            }`}
-            title="Sync Visible Range / Zoom across all charts"
-          >
-            <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-            <span>Range</span>
-          </button>
-        </div>
-
-        {/* Saved Layouts & Templates Dropdown */}
-        <div className="relative" ref={templateMenuRef}>
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              setIsTemplateMenuOpen((v) => !v);
-              setIsLayoutMenuOpen(false);
-            }}
-            className="flex items-center gap-1.5 clay-pill px-2.5 py-1 text-white hover:text-white transition text-[11px]"
-            title="Layout Templates"
-          >
-            <span className="truncate max-w-[110px] font-bold text-white">{currentTemplateName}</span>
-            <svg className="h-3 w-3 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          {isTemplateMenuOpen && (
-            <div className="clay-popover absolute right-0 top-8 z-50 flex flex-col gap-1 p-2 min-w-[240px] max-h-[380px] overflow-y-auto">
-              <div className="flex items-center justify-between px-2 py-1 border-b border-grid text-[10px] uppercase font-bold text-muted">
-                <span>Layout Templates</span>
+      {/* Top Center Multi-Chart Layout & Sync Controller (Only shown in multi-pane layouts to prevent covering underlying chart buttons) */}
+      {layout !== '1x1' && (
+        <div className="absolute left-1/2 -translate-x-1/2 top-1.5 z-30 flex items-center gap-1.5 font-mono text-xs select-none max-w-[95vw]">
+          {isSyncBarCollapsed ? (
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setIsSyncBarCollapsed(false);
+              }}
+              className="clay-card px-2.5 py-1 text-[10.5px] font-bold text-accent bg-[#09090d]/90 backdrop-blur-md flex items-center gap-1.5 hover:text-white transition shadow-xl border border-white/10 rounded-full"
+              title="Expand Multi-Chart Sync & Layout Toolbar"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+              <span>{layout} Sync</span>
+              <svg className="h-3 w-3 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 clay-card px-2 py-0.5 bg-[#09090d]/95 backdrop-blur-md shadow-2xl border border-white/10 rounded-xl">
+              {/* Sync Toggles Cluster */}
+              <div className="flex items-center gap-0.5 pr-1 border-r border-white/10">
+                {/* Symbol Sync */}
                 <button
-                  onClick={() => setIsSavingLayout(true)}
-                  className="clay-pill px-2 py-0.5 text-[9px] text-white hover:text-white"
-                >
-                  + Save New
-                </button>
-              </div>
-
-              {isSavingLayout && (
-                <form onSubmit={handleSaveLayoutSubmit} className="p-2 border-b border-grid flex flex-col gap-1.5">
-                  <input
-                    type="text"
-                    value={newLayoutName}
-                    onChange={(e) => setNewLayoutName(e.target.value)}
-                    placeholder="Enter layout name..."
-                    autoFocus
-                    className="clay-inset px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none w-full"
-                  />
-                  <div className="flex items-center justify-end gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setIsSavingLayout(false)}
-                      className="clay-btn px-2 py-0.5 text-[10px] text-muted hover:text-white"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="clay-pill-active px-2.5 py-0.5 text-[10px]"
-                    >
-                      Save
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              <div className="flex flex-col gap-0.5 mt-1">
-                {savedLayouts.map((tmpl) => (
-                  <div
-                    key={tmpl.id}
-                    className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition text-[11px] group ${
-                      activeLayoutId === tmpl.id
-                        ? 'clay-pill-active font-bold'
-                        : 'hover:bg-white/10 text-slate-300'
-                    }`}
-                  >
-                    <button
-                      onClick={() => {
-                        audioHaptics.tick();
-                        loadLayout(tmpl.id);
-                        setIsTemplateMenuOpen(false);
-                      }}
-                      className="flex-1 text-left truncate flex items-center gap-1.5"
-                    >
-                      <span className="font-semibold">{tmpl.name}</span>
-                      <span className="text-[9px] text-muted font-normal">({tmpl.layout})</span>
-                    </button>
-                    {!tmpl.id.startsWith('tmpl-') && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          audioHaptics.tick();
-                          deleteLayout(tmpl.id);
-                        }}
-                        className="hidden group-hover:block text-muted hover:text-white px-1 text-[11px]"
-                        title="Delete template"
-                      >
-                        x
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Layout Grid Selector Button */}
-        <div className="relative" ref={layoutMenuRef}>
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              setIsLayoutMenuOpen((v) => !v);
-              setIsTemplateMenuOpen(false);
-            }}
-            className="flex items-center gap-1.5 clay-pill px-2.5 py-1 text-white hover:text-white transition text-[11px]"
-            title="Select Chart Grid Layout"
-          >
-            {/* Grid Layout SVG Icon */}
-            <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              {layout === '1x1' && (
-                <rect x="3" y="3" width="18" height="18" rx="2" strokeWidth="2" />
-              )}
-              {layout === '1x2' && (
-                <>
-                  <rect x="3" y="3" width="8" height="18" rx="1.5" strokeWidth="2" />
-                  <rect x="13" y="3" width="8" height="18" rx="1.5" strokeWidth="2" />
-                </>
-              )}
-              {layout === '2x1' && (
-                <>
-                  <rect x="3" y="3" width="18" height="8" rx="1.5" strokeWidth="2" />
-                  <rect x="3" y="13" width="18" height="8" rx="1.5" strokeWidth="2" />
-                </>
-              )}
-              {layout === '2x2' && (
-                <>
-                  <rect x="3" y="3" width="8" height="8" rx="1" strokeWidth="2" />
-                  <rect x="13" y="3" width="8" height="8" rx="1" strokeWidth="2" />
-                  <rect x="3" y="13" width="8" height="8" rx="1" strokeWidth="2" />
-                  <rect x="13" y="13" width="8" height="8" rx="1" strokeWidth="2" />
-                </>
-              )}
-            </svg>
-            <span className="font-bold text-white">{layout}</span>
-          </button>
-
-          {/* Layout Popover */}
-          {isLayoutMenuOpen && (
-            <div className="clay-popover absolute right-0 top-8 z-50 flex flex-col gap-1 p-2 min-w-[160px]">
-              <span className="px-2 py-1 text-[10px] uppercase font-bold text-muted border-b border-grid">
-                Chart Grid Layout
-              </span>
-              {[
-                { id: '1x1', label: '1x1 Single', desc: 'Single Full Chart' },
-                { id: '1x2', label: '1x2 Vertical', desc: 'Side-by-side Dual' },
-                { id: '2x1', label: '2x1 Horizontal', desc: 'Top & Bottom Dual' },
-                { id: '2x2', label: '2x2 Quad', desc: '4 Independent Panes' },
-              ].map((item) => (
-                <button
-                  key={item.id}
                   onClick={() => {
                     audioHaptics.tick();
-                    setLayout(item.id as ChartGridLayout);
-                    setIsLayoutMenuOpen(false);
+                    toggleSync('syncSymbol');
                   }}
-                  className={`flex items-center justify-between px-3 py-1.5 text-left transition text-[11px] rounded-lg ${
-                    layout === item.id
-                      ? 'clay-pill-active font-bold'
-                      : 'hover:bg-white/10 text-muted hover:text-white'
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition flex items-center gap-1 ${
+                    syncSymbol ? 'clay-pill-active' : 'clay-pill text-muted hover:text-white'
                   }`}
+                  title="Sync Symbol across all charts"
                 >
-                  <span>{item.label}</span>
-                  {layout === item.id && <span className="text-[10px] font-bold">*</span>}
+                  <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                  <span>Sym</span>
                 </button>
-              ))}
-              <div className="border-t border-grid pt-1 mt-1">
+
+                {/* Timeframe Sync */}
                 <button
                   onClick={() => {
                     audioHaptics.tick();
-                    setIsLayoutMenuOpen(false);
-                    (window as any).__openLayoutCustomizer?.();
+                    toggleSync('syncTimeframe');
                   }}
-                  className="w-full flex items-center justify-between px-2.5 py-1.5 text-left transition text-[11px] rounded-lg bg-accent/20 hover:bg-accent/30 border border-accent/40 text-white font-bold"
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition flex items-center gap-1 ${
+                    syncTimeframe ? 'clay-pill-active' : 'clay-pill text-muted hover:text-white'
+                  }`}
+                  title="Sync Interval / Timeframe across all charts"
                 >
-                  <span>Customize Panes</span>
-                  <span className="text-[10px] text-accent font-mono">&gt;</span>
+                  <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Int</span>
+                </button>
+
+                {/* Crosshair Sync */}
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    toggleSync('syncCrosshair');
+                  }}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition flex items-center gap-1 ${
+                    syncCrosshair ? 'clay-pill-active' : 'clay-pill text-muted hover:text-white'
+                  }`}
+                  title="Sync Crosshair time cursor across all charts"
+                >
+                  <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m-6-6h12" />
+                  </svg>
+                  <span>Cross</span>
+                </button>
+
+                {/* Range Sync (Pan/Zoom) */}
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    toggleSync('syncRange');
+                  }}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition flex items-center gap-1 ${
+                    syncRange ? 'clay-pill-active' : 'clay-pill text-muted hover:text-white'
+                  }`}
+                  title="Sync Visible Range / Zoom across all charts"
+                >
+                  <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                  </svg>
+                  <span>Range</span>
                 </button>
               </div>
+
+              {/* Saved Layouts & Templates Dropdown */}
+              <div className="relative" ref={templateMenuRef}>
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    setIsTemplateMenuOpen((v) => !v);
+                    setIsLayoutMenuOpen(false);
+                  }}
+                  className="flex items-center gap-1 clay-pill px-2 py-0.5 text-white hover:text-white transition text-[10.5px]"
+                  title="Layout Templates"
+                >
+                  <span className="truncate max-w-[90px] font-bold text-white">{currentTemplateName}</span>
+                  <svg className="h-3 w-3 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {isTemplateMenuOpen && (
+                  <div className="clay-popover absolute left-0 top-8 z-50 flex flex-col gap-1 p-2 min-w-[240px] max-h-[380px] overflow-y-auto">
+                    <div className="flex items-center justify-between px-2 py-1 border-b border-grid text-[10px] uppercase font-bold text-muted">
+                      <span>Layout Templates</span>
+                      <button
+                        onClick={() => setIsSavingLayout(true)}
+                        className="clay-pill px-2 py-0.5 text-[9px] text-white hover:text-white"
+                      >
+                        + Save New
+                      </button>
+                    </div>
+
+                    {isSavingLayout && (
+                      <form onSubmit={handleSaveLayoutSubmit} className="p-2 border-b border-grid flex flex-col gap-1.5">
+                        <input
+                          type="text"
+                          value={newLayoutName}
+                          onChange={(e) => setNewLayoutName(e.target.value)}
+                          placeholder="Enter layout name..."
+                          autoFocus
+                          className="clay-inset px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none w-full"
+                        />
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setIsSavingLayout(false)}
+                            className="clay-btn px-2 py-0.5 text-[10px] text-muted hover:text-white"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            className="clay-pill-active px-2.5 py-0.5 text-[10px]"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    <div className="flex flex-col gap-0.5 mt-1">
+                      {savedLayouts.map((tmpl) => (
+                        <div
+                          key={tmpl.id}
+                          className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition text-[11px] group ${
+                            activeLayoutId === tmpl.id
+                              ? 'clay-pill-active font-bold'
+                              : 'hover:bg-white/10 text-slate-300'
+                          }`}
+                        >
+                          <button
+                            onClick={() => {
+                              audioHaptics.tick();
+                              loadLayout(tmpl.id);
+                              setIsTemplateMenuOpen(false);
+                            }}
+                            className="flex-1 text-left truncate flex items-center gap-1.5"
+                          >
+                            <span className="font-semibold">{tmpl.name}</span>
+                            <span className="text-[9px] text-muted font-normal">({tmpl.layout})</span>
+                          </button>
+                          {!tmpl.id.startsWith('tmpl-') && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                audioHaptics.tick();
+                                deleteLayout(tmpl.id);
+                              }}
+                              className="hidden group-hover:block text-muted hover:text-white px-1 text-[11px]"
+                              title="Delete template"
+                            >
+                              x
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Layout Grid Selector Button */}
+              <div className="relative" ref={layoutMenuRef}>
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    setIsLayoutMenuOpen((v) => !v);
+                    setIsTemplateMenuOpen(false);
+                  }}
+                  className="flex items-center gap-1 clay-pill px-2 py-0.5 text-white hover:text-white transition text-[10.5px]"
+                  title="Select Chart Grid Layout"
+                >
+                  <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    {(layout as string) === '1x1' && (
+                      <rect x="3" y="3" width="18" height="18" rx="2" strokeWidth="2" />
+                    )}
+                    {layout === '1x2' && (
+                      <>
+                        <rect x="3" y="3" width="8" height="18" rx="1.5" strokeWidth="2" />
+                        <rect x="13" y="3" width="8" height="18" rx="1.5" strokeWidth="2" />
+                      </>
+                    )}
+                    {layout === '2x1' && (
+                      <>
+                        <rect x="3" y="3" width="18" height="8" rx="1.5" strokeWidth="2" />
+                        <rect x="3" y="13" width="18" height="8" rx="1.5" strokeWidth="2" />
+                      </>
+                    )}
+                    {layout === '2x2' && (
+                      <>
+                        <rect x="3" y="3" width="8" height="8" rx="1" strokeWidth="2" />
+                        <rect x="13" y="3" width="8" height="8" rx="1" strokeWidth="2" />
+                        <rect x="3" y="13" width="8" height="8" rx="1" strokeWidth="2" />
+                        <rect x="13" y="13" width="8" height="8" rx="1" strokeWidth="2" />
+                      </>
+                    )}
+                  </svg>
+                  <span className="font-bold text-white">{layout}</span>
+                </button>
+
+                {isLayoutMenuOpen && (
+                  <div className="clay-popover absolute left-0 top-8 z-50 flex flex-col gap-1 p-2 min-w-[160px]">
+                    <span className="px-2 py-1 text-[10px] uppercase font-bold text-muted border-b border-grid">
+                      Chart Grid Layout
+                    </span>
+                    {[
+                      { id: '1x1', label: '1x1 Single', desc: 'Single Full Chart' },
+                      { id: '1x2', label: '1x2 Vertical', desc: 'Side-by-side Dual' },
+                      { id: '2x1', label: '2x1 Horizontal', desc: 'Top & Bottom Dual' },
+                      { id: '2x2', label: '2x2 Quad', desc: '4 Independent Panes' },
+                    ].map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          audioHaptics.tick();
+                          setLayout(item.id as ChartGridLayout);
+                          setIsLayoutMenuOpen(false);
+                        }}
+                        className={`flex items-center justify-between px-3 py-1.5 text-left transition text-[11px] rounded-lg ${
+                          layout === item.id
+                            ? 'clay-pill-active font-bold'
+                            : 'hover:bg-white/10 text-muted hover:text-white'
+                        }`}
+                      >
+                        <span>{item.label}</span>
+                        {layout === item.id && <span className="text-[10px] font-bold">*</span>}
+                      </button>
+                    ))}
+                    <div className="border-t border-grid pt-1 mt-1">
+                      <button
+                        onClick={() => {
+                          audioHaptics.tick();
+                          setIsLayoutMenuOpen(false);
+                          (window as any).__openLayoutCustomizer?.();
+                        }}
+                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-left transition text-[11px] rounded-lg bg-accent/20 hover:bg-accent/30 border border-accent/40 text-white font-bold"
+                      >
+                        <span>Customize Panes</span>
+                        <span className="text-[10px] text-accent font-mono">&gt;</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Chart-Only Maximize Viewport Button */}
+              <button
+                onClick={() => {
+                  audioHaptics.tick();
+                  toggleChartMaximized();
+                }}
+                className={`clay-pill p-1 transition ${isChartMaximized ? 'clay-pill-active' : 'text-slate-300 hover:text-white'}`}
+                title={isChartMaximized ? 'Exit Maximize Chart' : 'Maximize Chart View'}
+              >
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {isChartMaximized ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                  )}
+                </svg>
+              </button>
+
+              {/* Collapse Toolbar Button */}
+              <button
+                onClick={() => {
+                  audioHaptics.tick();
+                  setIsSyncBarCollapsed(true);
+                }}
+                className="clay-btn h-5 w-5 text-muted hover:text-white text-[10px] rounded flex items-center justify-center"
+                title="Collapse sync toolbar"
+              >
+                –
+              </button>
             </div>
           )}
         </div>
-
-        {/* Chart-Only Maximize Viewport Button */}
-        <button
-          onClick={() => {
-            audioHaptics.tick();
-            toggleChartMaximized();
-          }}
-          className={`clay-pill p-1.5 transition ${isChartMaximized ? 'clay-pill-active' : 'text-slate-300 hover:text-white'}`}
-          title={isChartMaximized ? 'Exit Maximize Chart' : 'Maximize Chart View'}
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            {isChartMaximized ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            )}
-          </svg>
-        </button>
-      </div>
+      )}
 
       {/* Grid Container with Active Pane Focus Rings & Resizable Splitters */}
       <div ref={gridContainerRef} className="flex-1 min-h-0 w-full h-full relative">

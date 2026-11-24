@@ -110,6 +110,7 @@ export class CircleTool extends BaseDrawingTool {
           fill={fillCol}
           fillOpacity={opacity}
           stroke={strokeColor}
+          strokeOpacity={this.lineOpacity !== undefined ? this.lineOpacity : 1}
           strokeWidth={this.lineWidth}
           strokeDasharray={
             this.lineStyle === 'dashed'

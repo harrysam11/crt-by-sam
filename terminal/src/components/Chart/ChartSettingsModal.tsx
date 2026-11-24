@@ -38,6 +38,7 @@ export interface ChartSettingsState {
   showExecutionsOnChart: boolean;
   showEventsOnChart: boolean;
   showQuickTradeButtons?: boolean;
+  showSubToolbar?: boolean;
 }
 
 export const DEFAULT_CHART_SETTINGS: ChartSettingsState = {
@@ -57,8 +58,8 @@ export const DEFAULT_CHART_SETTINGS: ChartSettingsState = {
   showVolumeMetric: false,
   priceScalePosition: 'right',
   showCountdownTimer: true,
-  topMarginPercent: 8,
-  bottomMarginPercent: 12,
+  topMarginPercent: 5,
+  bottomMarginPercent: 5,
   timezone: 'UTC',
   gridLines: 'both',
   gridOpacity: 0.08,
@@ -70,6 +71,7 @@ export const DEFAULT_CHART_SETTINGS: ChartSettingsState = {
   showExecutionsOnChart: true,
   showEventsOnChart: true,
   showQuickTradeButtons: true,
+  showSubToolbar: false,
 };
 
 interface ChartSettingsModalProps {
@@ -311,6 +313,15 @@ export default function ChartSettingsModal({
                   />
                   <span>Bar Volume Metric</span>
                 </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.showSubToolbar || false}
+                    onChange={(e) => onUpdateSettings({ showSubToolbar: e.target.checked })}
+                    className="rounded border-grid text-accent focus:ring-0"
+                  />
+                  <span>Show Secondary In-Chart Toolbar (Disabled for clean TradingView single topbar)</span>
+                </label>
               </div>
             )}
 
@@ -427,6 +438,25 @@ export default function ChartSettingsModal({
                   />
                   <span>Background Watermark</span>
                 </label>
+
+                <div className="pt-3 border-t border-grid/50 flex items-center justify-between">
+                  <div>
+                    <span className="font-semibold text-white block text-xs">Chart Skins & Wallpapers</span>
+                    <span className="text-[10px] text-slate-400 block">Custom video, GIF, image and themes</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      if ((window as any).__openChartSkinsModal) {
+                        (window as any).__openChartSkinsModal();
+                      }
+                    }}
+                    className="clay-btn px-3 py-1.5 text-xs text-white hover:border-white/40 transition"
+                  >
+                    Open Chart Skins
+                  </button>
+                </div>
               </div>
             )}
 

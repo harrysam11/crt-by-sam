@@ -50,6 +50,7 @@ export class HorizontalLineTool extends BaseDrawingTool {
           x2="100%"
           y2={y}
           stroke={this.color}
+          strokeOpacity={this.lineOpacity !== undefined ? this.lineOpacity : 1}
           strokeWidth={this.lineWidth}
           strokeDasharray={strokeDash}
         />

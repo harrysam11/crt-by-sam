@@ -24,8 +24,11 @@ import { CoordinateHelper } from './framework/CoordinateHelper';
 import { ToolFactory } from './framework/ToolFactory';
 import { drawingEvents } from './framework/DrawingEvents';
 import { useDrawingStore } from '../../store/useDrawingStore';
+import { useLayoutStore } from '../../store/useLayoutStore';
+import { fmtPrice } from '../../utils/formatters';
 
 interface DrawingOverlayProps {
+  paneId?: string;
   symbol: string;
   activeTool: ToolType;
   onSelectTool?: (tool: ToolType) => void;
@@ -41,6 +44,7 @@ interface DrawingOverlayProps {
 }
 
 export default function DrawingOverlay({
+  paneId = 'pane-1',
   symbol,
   activeTool,
   onSelectTool,
@@ -55,6 +59,8 @@ export default function DrawingOverlay({
   externalLineTrigger,
 }: DrawingOverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const activePaneId = useLayoutStore((s) => s.activePaneId);
+  const isThisPaneActive = !activePaneId || activePaneId === paneId;
 
   // Dynamic price scale offset so price scale and bottom time scale are never blocked by drawing overlay
   const [priceScaleWidth, setPriceScaleWidth] = useState(68);
@@ -99,6 +105,7 @@ export default function DrawingOverlay({
 
   const [activeDrawing, setActiveDrawing] = useState<DrawingItem | null>(null);
   const [creationStep, setCreationStep] = useState<number>(0);
+  const [cursorPos, setCursorPos] = useState<Point2D | null>(null);
 
   // Modifier Key States
   const [isCtrlHeld, setIsCtrlHeld] = useState(false);
@@ -118,7 +125,8 @@ export default function DrawingOverlay({
     currentX: number;
     currentY: number;
   } | null>(null);
-  const rightClickDragRef = useRef<{ startX: number; startY: number; didMove: boolean } | null>(null);
+  const marqueeDragRef = useRef<{ startX: number; startY: number; didMove: boolean } | null>(null);
+  const shiftMeasureDragRef = useRef<{ startPoint: Point2D; didMove: boolean } | null>(null);
 
   // Dragging state
   const [draggingHandle, setDraggingHandle] = useState<{
@@ -192,6 +200,7 @@ export default function DrawingOverlay({
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+      if (!isThisPaneActive) return;
 
       if (e.key === 'Control' || e.key === 'Meta') setIsCtrlHeld(true);
       if (e.key === 'Shift') setIsShiftHeld(true);
@@ -286,14 +295,19 @@ export default function DrawingOverlay({
     };
   }, [selectedDrawingIds, drawings, undo, redo, pushState, setSelectedDrawingIds, setActiveTool, onSelectTool, autoRevertToCrosshair]);
 
-  // Persist drawings per symbol to localStorage & sync with useDrawingStore
+  // Persist drawings per symbol to localStorage & sync with other panes & useDrawingStore
   useEffect(() => {
     try {
       localStorage.setItem(`crt_drawings_${symbol}`, JSON.stringify(drawings));
+      window.dispatchEvent(
+        new CustomEvent('crt_drawings_updated', {
+          detail: { symbol, drawings, sourcePane: paneId },
+        })
+      );
     } catch {}
     onDrawingsCountChange?.(drawings.length);
     useDrawingStore.getState().setActiveSymbolDrawings(drawings);
-  }, [drawings, symbol, onDrawingsCountChange]);
+  }, [drawings, symbol, paneId, onDrawingsCountChange]);
 
   // Synchronize with external drawing events (from Object Tree, Context Menu, etc.)
   useEffect(() => {
@@ -328,8 +342,8 @@ export default function DrawingOverlay({
     });
 
     const handleCustomEvent = (e: Event) => {
-      const custom = e as CustomEvent<{ symbol: string; drawings: DrawingItem[] }>;
-      if (custom.detail && custom.detail.symbol === symbol) {
+      const custom = e as CustomEvent<{ symbol: string; drawings: DrawingItem[]; sourcePane?: string }>;
+      if (custom.detail && custom.detail.symbol === symbol && custom.detail.sourcePane !== paneId) {
         setDrawings(custom.detail.drawings);
         pushState(custom.detail.drawings);
       }
@@ -344,7 +358,7 @@ export default function DrawingOverlay({
       unsubReload();
       window.removeEventListener('crt_drawings_updated', handleCustomEvent);
     };
-  }, [drawings, pushState, setSelectedDrawingIds, symbol]);
+  }, [symbol, paneId, pushState]);
 
   // Reload drawings when symbol switches
   useEffect(() => {
@@ -528,16 +542,42 @@ export default function DrawingOverlay({
   const coordHelperRef = useRef(coordHelper);
   coordHelperRef.current = coordHelper;
 
-  // Native chart container listener for right-click drag selection
+  // Native chart container listener for Shift+drag measurement and Ctrl+drag marquee selection
   useEffect(() => {
     const parent = containerRef.current?.parentElement;
     if (!parent) return;
 
     const onMouseDown = (e: MouseEvent) => {
-      // Marquee selector only activates when Ctrl (or Cmd) is held AND right mouse button is dragged
-      if ((e.ctrlKey || e.metaKey) && e.button === 2) {
+      // 1. Shift + Left Click: Instant Measurement Ruler
+      if (e.shiftKey && e.button === 0) {
         const rect = parent.getBoundingClientRect();
-        rightClickDragRef.current = {
+        const rawX = e.clientX - rect.left;
+        const rawY = e.clientY - rect.top;
+        const curHelper = coordHelperRef.current;
+        const pt = {
+          x: rawX,
+          y: rawY,
+          price: curHelper.yToPrice(rawY),
+          time: curHelper.xToTime(rawX),
+        };
+        shiftMeasureDragRef.current = { startPoint: pt, didMove: false };
+        const measureDrawing: DrawingItem = {
+          id: `measure_${Date.now()}`,
+          type: 'MEASURE_RULER',
+          p1: pt,
+          p2: pt,
+          color: '#22c55e',
+          lineWidth: 1.5,
+        };
+        setActiveDrawing(measureDrawing);
+        setCreationStep(1);
+        return;
+      }
+
+      // 2. Ctrl + Left Click (or Right Click): Marquee multi-selection box
+      if ((e.ctrlKey || e.metaKey) && (e.button === 0 || e.button === 2)) {
+        const rect = parent.getBoundingClientRect();
+        marqueeDragRef.current = {
           startX: e.clientX - rect.left,
           startY: e.clientY - rect.top,
           didMove: false,
@@ -546,33 +586,67 @@ export default function DrawingOverlay({
     };
 
     const onMouseMove = (e: MouseEvent) => {
-      if (!rightClickDragRef.current) return;
-      const rect = parent.getBoundingClientRect();
-      const currentX = e.clientX - rect.left;
-      const currentY = e.clientY - rect.top;
-      const dx = Math.abs(currentX - rightClickDragRef.current.startX);
-      const dy = Math.abs(currentY - rightClickDragRef.current.startY);
-
-      if (dx > 4 || dy > 4) {
-        rightClickDragRef.current.didMove = true;
-        setSelectionBox({
-          startX: rightClickDragRef.current.startX,
-          startY: rightClickDragRef.current.startY,
-          currentX,
-          currentY,
-        });
+      // Update Shift+drag measurement ruler
+      if (shiftMeasureDragRef.current) {
+        const rect = parent.getBoundingClientRect();
+        const rawX = e.clientX - rect.left;
+        const rawY = e.clientY - rect.top;
+        const curHelper = coordHelperRef.current;
+        const pt = {
+          x: rawX,
+          y: rawY,
+          price: curHelper.yToPrice(rawY),
+          time: curHelper.xToTime(rawX),
+        };
+        shiftMeasureDragRef.current.didMove = true;
+        setActiveDrawing((prev) =>
+          prev && prev.type === 'MEASURE_RULER' ? { ...prev, p2: pt } : prev
+        );
+        return;
       }
-    };
 
-    const onMouseUp = (e: MouseEvent) => {
-      if (rightClickDragRef.current && rightClickDragRef.current.didMove) {
+      // Update Ctrl+drag marquee selection box
+      if (marqueeDragRef.current) {
         const rect = parent.getBoundingClientRect();
         const currentX = e.clientX - rect.left;
         const currentY = e.clientY - rect.top;
-        const minX = Math.min(rightClickDragRef.current.startX, currentX);
-        const maxX = Math.max(rightClickDragRef.current.startX, currentX);
-        const minY = Math.min(rightClickDragRef.current.startY, currentY);
-        const maxY = Math.max(rightClickDragRef.current.startY, currentY);
+        const dx = Math.abs(currentX - marqueeDragRef.current.startX);
+        const dy = Math.abs(currentY - marqueeDragRef.current.startY);
+
+        if (dx > 4 || dy > 4) {
+          marqueeDragRef.current.didMove = true;
+          setSelectionBox({
+            startX: marqueeDragRef.current.startX,
+            startY: marqueeDragRef.current.startY,
+            currentX,
+            currentY,
+          });
+        }
+      }
+    };
+
+    const onMouseUp = () => {
+      // Finalize Shift+drag measurement ruler
+      if (shiftMeasureDragRef.current) {
+        if (shiftMeasureDragRef.current.didMove) {
+          setCreationStep(2); // lock measurement visible on screen
+        } else {
+          setActiveDrawing(null);
+          setCreationStep(0);
+        }
+        shiftMeasureDragRef.current = null;
+      }
+
+      // Finalize Ctrl+drag marquee selection box
+      if (marqueeDragRef.current && marqueeDragRef.current.didMove) {
+        const rect = parent.getBoundingClientRect();
+        const currentX = marqueeDragRef.current ? marqueeDragRef.current.startX : 0;
+        const curX = selectionBox ? selectionBox.currentX : currentX;
+        const curY = selectionBox ? selectionBox.currentY : 0;
+        const minX = Math.min(marqueeDragRef.current.startX, curX);
+        const maxX = Math.max(marqueeDragRef.current.startX, curX);
+        const minY = Math.min(marqueeDragRef.current.startY, curY);
+        const maxY = Math.max(marqueeDragRef.current.startY, curY);
 
         if (maxX - minX > 5 || maxY - minY > 5) {
           const matchedIds: string[] = [];
@@ -600,12 +674,12 @@ export default function DrawingOverlay({
         setSelectionBox(null);
       }
       setTimeout(() => {
-        rightClickDragRef.current = null;
+        marqueeDragRef.current = null;
       }, 50);
     };
 
     const onContextMenu = (e: MouseEvent) => {
-      if (rightClickDragRef.current?.didMove) {
+      if (marqueeDragRef.current?.didMove) {
         e.preventDefault();
         e.stopPropagation();
       }
@@ -622,7 +696,7 @@ export default function DrawingOverlay({
       window.removeEventListener('mouseup', onMouseUp);
       parent.removeEventListener('contextmenu', onContextMenu, true);
     };
-  }, [setSelectedDrawingIds]);
+  }, [setSelectedDrawingIds, selectionBox]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement | SVGElement | null;
@@ -639,13 +713,21 @@ export default function DrawingOverlay({
       return;
     }
     if (!containerRef.current) return;
+    useLayoutStore.getState().setActivePaneId(paneId);
     const rect = containerRef.current.getBoundingClientRect();
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
     const point = snapToCandle(rawX, rawY);
 
+    // If previous measurement ruler is on screen, normal click dismisses it
+    if (activeDrawing && activeDrawing.type === 'MEASURE_RULER') {
+      setActiveDrawing(null);
+      setCreationStep(0);
+      if (!e.shiftKey) return;
+    }
+
     // 1. Shift + Drag: Instant TradingView Measure Ruler (ONLY when in cursor mode)
-    if (e.shiftKey && e.button === 0 && !isDrawingTool && !activeDrawing) {
+    if (e.shiftKey && e.button === 0 && !isDrawingTool) {
       audioHaptics.tick();
       const measureDrawing: DrawingItem = {
         id: `measure_${Date.now()}`,
@@ -680,7 +762,7 @@ export default function DrawingOverlay({
     }
 
     // 4. Ctrl + drag Marquee selection (ONLY when in cursor mode and not drawing)
-    if (isCtrlHeld && e.button === 0 && !isDrawingTool && !activeDrawing && creationStep === 0) {
+    if ((e.ctrlKey || e.metaKey || isCtrlHeld) && e.button === 0 && !isDrawingTool && !activeDrawing && creationStep === 0) {
       setSelectionBox({
         startX: rawX,
         startY: rawY,
@@ -790,6 +872,7 @@ export default function DrawingOverlay({
     if (isDrawingTool) {
       if (creationStep === 0) {
         audioHaptics.tick();
+        const toolPrefs = useDrawingStore.getState().toolPreferences[activeTool] || {};
 
         // 1-point instant tools: Horizontal, Vertical, Price Tag Label
         if (activeTool === 'HORIZONTAL_LINE' || activeTool === 'VERTICAL_LINE' || activeTool === 'PRICE_LABEL') {
@@ -800,6 +883,7 @@ export default function DrawingOverlay({
             color: '#38bdf8',
             lineWidth: activeTool === 'PRICE_LABEL' ? 1.5 : 2,
             lineStyle: 'solid',
+            ...toolPrefs,
           };
           const next = [...drawings, newDrawing];
           setDrawings(next);
@@ -831,6 +915,7 @@ export default function DrawingOverlay({
             color: isLong ? '#22c55e' : '#ef4444',
             lineWidth: 1.5,
             lineStyle: 'solid',
+            ...toolPrefs,
           };
           const next = [...drawings, newDrawing];
           setDrawings(next);
@@ -850,6 +935,7 @@ export default function DrawingOverlay({
             fillColor: '#181820',
             lineWidth: 1,
             fontSize: 12,
+            ...toolPrefs,
           };
           const next = [...drawings, newDrawing];
           setDrawings(next);
@@ -867,6 +953,7 @@ export default function DrawingOverlay({
             points: [point],
             color: '#38bdf8',
             lineWidth: 2,
+            ...toolPrefs,
           };
           setActiveDrawing(newDrawing);
           setCreationStep(1);
@@ -882,6 +969,7 @@ export default function DrawingOverlay({
           color: '#38bdf8',
           lineWidth: 2,
           lineStyle: 'solid',
+          ...toolPrefs,
         };
         setActiveDrawing(newDrawing);
         setCreationStep(1);
@@ -928,6 +1016,8 @@ export default function DrawingOverlay({
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
     let point = snapToCandle(rawX, rawY);
+    setCursorPos(point);
+    useLayoutStore.getState().setActivePaneId(paneId);
 
     // Demonstration line update
     if (demonstrationDrawing) {
@@ -1138,16 +1228,43 @@ export default function DrawingOverlay({
       setCreationStep(0);
       autoRevertToCrosshair();
     }
+    if (activeDrawing && activeDrawing.type === 'MEASURE_RULER') {
+      setCreationStep(2);
+      return;
+    }
   };
 
   // Drawing modifiers
   const updateDrawing = (id: string, patch: Partial<DrawingItem>) => {
+    let targetType: string | undefined;
     setDrawings((prev) => {
-      const next = prev.map((d) => (d.id === id ? { ...d, ...patch } : d));
+      const next = prev.map((d) => {
+        if (d.id === id) {
+          targetType = d.type;
+          return { ...d, ...patch };
+        }
+        return d;
+      });
       pushState(next);
       return next;
     });
     setEditingDrawing((prev) => (prev && prev.id === id ? { ...prev, ...patch } : prev));
+
+    if (targetType) {
+      const styleKeys: (keyof DrawingItem)[] = [
+        'color', 'fillColor', 'lineWidth', 'lineStyle', 'fontSize',
+        'extendLeft', 'extendRight', 'showPrice'
+      ];
+      const stylePatch: Partial<DrawingItem> = {};
+      for (const k of styleKeys) {
+        if ((patch as any)[k] !== undefined) {
+          (stylePatch as any)[k] = (patch as any)[k];
+        }
+      }
+      if (Object.keys(stylePatch).length > 0) {
+        useDrawingStore.getState().setToolPreference(targetType, stylePatch);
+      }
+    }
   };
 
   const deleteDrawing = (id: string) => {
@@ -1214,6 +1331,8 @@ export default function DrawingOverlay({
 
   // Direct interaction on an SVG drawing item
   const handleDrawingPointerDown = (e: React.PointerEvent, item: DrawingItem) => {
+    useLayoutStore.getState().setActivePaneId(paneId);
+
     // Eraser mode deletes on click
     if (activeTool === 'CURSOR_ERASER') {
       audioHaptics.tick();
@@ -1433,6 +1552,7 @@ export default function DrawingOverlay({
   // Window-level listener to deselect drawings when clicking empty chart space
   useEffect(() => {
     const handleGlobalPointerDown = (e: PointerEvent) => {
+      if (!isThisPaneActive) return;
       if (isDrawingTool || activeDrawing || creationStep > 0 || isSettingsModalOpen) return;
       if (selectedDrawingIds.length === 0) return;
 
@@ -1459,7 +1579,7 @@ export default function DrawingOverlay({
 
     window.addEventListener('pointerdown', handleGlobalPointerDown);
     return () => window.removeEventListener('pointerdown', handleGlobalPointerDown);
-  }, [selectedDrawingIds, isDrawingTool, activeDrawing, creationStep, isSettingsModalOpen, setSelectedDrawingIds]);
+  }, [selectedDrawingIds, isDrawingTool, activeDrawing, creationStep, isSettingsModalOpen, setSelectedDrawingIds, isThisPaneActive]);
 
   const singleSelectedDrawing =
     selectedDrawingIds.length === 1 ? drawings.find((d) => d.id === selectedDrawingIds[0]) ?? null : null;
@@ -1476,9 +1596,10 @@ export default function DrawingOverlay({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerLeave={() => setCursorPos(null)}
       style={{ right: `${priceScaleWidth}px`, bottom: '26px' }}
       className={`absolute left-0 top-0 z-20 ${
-        isDrawingTool || activeDrawing || selectionBox || draggingHandle || draggingBody
+        isDrawingTool || activeDrawing || selectionBox || draggingHandle || draggingBody || isShiftHeld || isCtrlHeld
           ? `${activeTool === 'CURSOR_CROSSHAIR' ? 'cursor-crosshair' : activeTool === 'CURSOR_ARROW' ? 'cursor-default' : 'cursor-crosshair'} pointer-events-auto`
           : activeTool === 'CURSOR_ERASER'
           ? 'cursor-not-allowed pointer-events-auto'
@@ -1486,9 +1607,97 @@ export default function DrawingOverlay({
       }`}
     >
       <svg
+        data-drawing-svg="true"
         className="h-full w-full pointer-events-none"
         style={{ overflow: 'visible' }}
       >
+        {/* Precision Crosshair Laser Lines & Coordinate Badges while Drawing */}
+        {(isDrawingTool || activeDrawing) && cursorPos && (
+          <g className="pointer-events-none select-none font-mono">
+            {/* Horizontal Crosshair Laser Line */}
+            <line
+              x1={0}
+              y1={cursorPos.y}
+              x2={coordHelper.width}
+              y2={cursorPos.y}
+              stroke="#94a3b8"
+              strokeWidth={1}
+              strokeDasharray="3 3"
+              opacity={0.85}
+            />
+            {/* Vertical Crosshair Laser Line */}
+            <line
+              x1={cursorPos.x}
+              y1={0}
+              x2={cursorPos.x}
+              y2={coordHelper.height}
+              stroke="#94a3b8"
+              strokeWidth={1}
+              strokeDasharray="3 3"
+              opacity={0.85}
+            />
+            {/* Precision Reticle Target Ring */}
+            <circle
+              cx={cursorPos.x}
+              cy={cursorPos.y}
+              r={5.5}
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth={1.5}
+            />
+            <circle
+              cx={cursorPos.x}
+              cy={cursorPos.y}
+              r={1.5}
+              fill="#38bdf8"
+            />
+            {/* Floating Price Tag on Right Edge */}
+            <g transform={`translate(${Math.max(10, coordHelper.width - 76)}, ${cursorPos.y - 10})`}>
+              <rect
+                width={76}
+                height={20}
+                rx={3}
+                fill="#090a0f"
+                stroke="#38bdf8"
+                strokeWidth={1}
+              />
+              <text
+                x={38}
+                y={14}
+                fill="#ffffff"
+                fontSize={10.5}
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                {fmtPrice(cursorPos.price, symbol)}
+              </text>
+            </g>
+            {/* Floating Time Tag on Bottom Edge */}
+            {cursorPos.time && (
+              <g transform={`translate(${Math.max(10, Math.min(coordHelper.width - 90, cursorPos.x - 45))}, ${coordHelper.height - 22})`}>
+                <rect
+                  width={90}
+                  height={18}
+                  rx={3}
+                  fill="#090a0f"
+                  stroke="#38bdf8"
+                  strokeWidth={1}
+                />
+                <text
+                  x={45}
+                  y={13}
+                  fill="#38bdf8"
+                  fontSize={10}
+                  fontWeight="bold"
+                  textAnchor="middle"
+                >
+                  {new Date(cursorPos.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                </text>
+              </g>
+            )}
+          </g>
+        )}
+
         {/* Selection Marquee Box */}
         {selectionBox && (
           <rect
@@ -1641,6 +1850,7 @@ export default function DrawingOverlay({
                     onPointerDown={(e) => {
                       e.stopPropagation();
                       audioHaptics.tick();
+                      useLayoutStore.getState().setActivePaneId(paneId);
                       setDraggingHandle({ drawingId: item.id, handleId: h.id });
                     }}
                   />
@@ -1666,7 +1876,7 @@ export default function DrawingOverlay({
       )}
 
       {/* Multi-Selection Action Bar (when > 1 drawing selected) */}
-      {selectedDrawingIds.length > 1 && !isHiddenAll && (
+      {isThisPaneActive && selectedDrawingIds.length > 1 && !isHiddenAll && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-[#101015]/95 border border-[#272730] px-3 py-1.5 rounded-lg shadow-xl text-xs backdrop-blur font-mono pointer-events-auto">
           <span className="text-[#38bdf8] font-semibold">{selectedDrawingIds.length} drawings selected</span>
           <span className="text-[#3a3e52]">|</span>
@@ -1702,7 +1912,7 @@ export default function DrawingOverlay({
       )}
 
       {/* Floating style panel for single selected drawing */}
-      {singleSelectedDrawing && !isHiddenAll && (
+      {isThisPaneActive && singleSelectedDrawing && !isHiddenAll && (
         <DrawingContextBar
           selectedDrawing={singleSelectedDrawing}
           onUpdateDrawing={updateDrawing}

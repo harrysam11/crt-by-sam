@@ -14,6 +14,12 @@ import { useLayoutStore, type ChartGridLayout } from '../../store/useLayoutStore
 import { useDrawingStore } from '../../store/useDrawingStore';
 import { computeActiveSessions } from '../../services/marketSessions';
 import { wsManager } from '../../services/websocket';
+import MobileConnectModal from '../Network/MobileConnectModal';
+import SymbolSearchModal from '../Search/SymbolSearchModal';
+import { drawingEvents } from '../drawing/framework/DrawingEvents';
+import { useIndicatorsStore } from '../../store/useIndicatorsStore';
+import type { ChartStyle, Timeframe } from '../../types/terminal';
+import { TIMEFRAMES } from '../../services/instruments';
 
 const DOT = { open: 'bg-up', connecting: 'bg-yellow-400', reconnecting: 'bg-yellow-400', closed: 'bg-down' } as const;
 
@@ -81,6 +87,7 @@ export default function Header({
   const activeAccount = accounts.find((a) => a.id === activeAccountId) || accounts[0];
 
   const [isNewAccountModalOpen, setIsNewAccountModalOpen] = useState(false);
+  const [isMobileConnectOpen, setIsMobileConnectOpen] = useState(false);
   const [newAccName, setNewAccName] = useState('');
   const [newAccType, setNewAccType] = useState<'PAPER' | 'PROP_FIRM' | 'BINANCE_FUTURES' | 'BYBIT' | 'DEMO'>('PROP_FIRM');
   const [newAccBalance, setNewAccBalance] = useState('50000');
@@ -126,6 +133,83 @@ export default function Header({
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
   const overflowRef = useRef<HTMLDivElement>(null);
 
+  // TradingView / DMCharts Unified Chart Navigation State
+  const setSymbol = useTerminalStore((s) => s.setSymbol);
+  const timeframe = useTerminalStore((s) => s.timeframe);
+  const setTimeframe = useTerminalStore((s) => s.setTimeframe);
+  const activePaneId = useLayoutStore((s) => s.activePaneId);
+  const setPaneSymbol = useLayoutStore((s) => s.setPaneSymbol);
+  const setPaneTimeframe = useLayoutStore((s) => s.setPaneTimeframe);
+  const chartStyle = useLayoutStore((s) => s.chartStyle) || 'CANDLE';
+  const setChartStyle = useLayoutStore((s) => s.setChartStyle);
+  const activeIndicators = useIndicatorsStore((s) => s.activeInstances);
+
+  const [isSymbolSearchOpen, setIsSymbolSearchOpen] = useState(false);
+  const [isTfMenuOpen, setIsTfMenuOpen] = useState(false);
+  const [isStyleMenuOpen, setIsStyleMenuOpen] = useState(false);
+  const [isCandleColorOpen, setIsCandleColorOpen] = useState(false);
+  const [isLayersMenuOpen, setIsLayersMenuOpen] = useState(false);
+  const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
+  const tfMenuRef = useRef<HTMLDivElement>(null);
+  const styleMenuRef = useRef<HTMLDivElement>(null);
+  const candleColorRef = useRef<HTMLDivElement>(null);
+  const layersMenuRef = useRef<HTMLDivElement>(null);
+  const snapshotRef = useRef<HTMLDivElement>(null);
+
+  // Live Candle Color sync
+  const [candleSettings, setCandleSettings] = useState<{ candleUpColor: string; candleDownColor: string }>(() => {
+    try {
+      const s = localStorage.getItem('crt_chart_settings');
+      return s ? JSON.parse(s) : { candleUpColor: '#ffffff', candleDownColor: '#101015' };
+    } catch {
+      return { candleUpColor: '#ffffff', candleDownColor: '#101015' };
+    }
+  });
+
+  useEffect(() => {
+    const handleSync = (e: any) => {
+      if (e.detail) {
+        setCandleSettings({
+          candleUpColor: e.detail.candleUpColor || '#ffffff',
+          candleDownColor: e.detail.candleDownColor || '#101015',
+        });
+      }
+    };
+    window.addEventListener('crt-chart-settings-changed', handleSync);
+    return () => window.removeEventListener('crt-chart-settings-changed', handleSync);
+  }, []);
+
+  const applyCandlePreset = (up: string, down: string) => {
+    setCandleSettings({ candleUpColor: up, candleDownColor: down });
+    try {
+      const raw = localStorage.getItem('crt_chart_settings');
+      const prev = raw ? JSON.parse(raw) : {};
+      const next = { ...prev, candleUpColor: up, candleDownColor: down };
+      localStorage.setItem('crt_chart_settings', JSON.stringify(next));
+      window.dispatchEvent(new CustomEvent('crt-chart-settings-changed', { detail: next }));
+    } catch {}
+    if ((window as any).__updateChartSettings) {
+      (window as any).__updateChartSettings({ candleUpColor: up, candleDownColor: down });
+    }
+  };
+
+  const updateCustomCandleColor = (key: 'candleUpColor' | 'candleDownColor', value: string) => {
+    setCandleSettings((prev) => {
+      const next = { ...prev, [key]: value };
+      try {
+        const raw = localStorage.getItem('crt_chart_settings');
+        const prevFull = raw ? JSON.parse(raw) : {};
+        const nextFull = { ...prevFull, [key]: value };
+        localStorage.setItem('crt_chart_settings', JSON.stringify(nextFull));
+        window.dispatchEvent(new CustomEvent('crt-chart-settings-changed', { detail: nextFull }));
+      } catch {}
+      if ((window as any).__updateChartSettings) {
+        (window as any).__updateChartSettings({ [key]: value });
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -141,6 +225,21 @@ export default function Header({
       if (overflowRef.current && !overflowRef.current.contains(target)) {
         setIsOverflowOpen(false);
       }
+      if (tfMenuRef.current && !tfMenuRef.current.contains(target)) {
+        setIsTfMenuOpen(false);
+      }
+      if (styleMenuRef.current && !styleMenuRef.current.contains(target)) {
+        setIsStyleMenuOpen(false);
+      }
+      if (candleColorRef.current && !candleColorRef.current.contains(target)) {
+        setIsCandleColorOpen(false);
+      }
+      if (layersMenuRef.current && !layersMenuRef.current.contains(target)) {
+        setIsLayersMenuOpen(false);
+      }
+      if (snapshotRef.current && !snapshotRef.current.contains(target)) {
+        setIsSnapshotOpen(false);
+      }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -148,9 +247,14 @@ export default function Header({
         setIsLayoutOpen(false);
         setIsAccountOpen(false);
         setIsOverflowOpen(false);
+        setIsTfMenuOpen(false);
+        setIsStyleMenuOpen(false);
+        setIsCandleColorOpen(false);
+        setIsLayersMenuOpen(false);
+        setIsSnapshotOpen(false);
       }
     };
-    if (isInstToolsOpen || isLayoutOpen || isAccountOpen || isOverflowOpen) {
+    if (isInstToolsOpen || isLayoutOpen || isAccountOpen || isOverflowOpen || isTfMenuOpen || isStyleMenuOpen || isCandleColorOpen || isLayersMenuOpen || isSnapshotOpen) {
       window.addEventListener('mousedown', handleClickOutside);
       window.addEventListener('keydown', handleKeyDown);
     }
@@ -158,7 +262,7 @@ export default function Header({
       window.removeEventListener('mousedown', handleClickOutside);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isInstToolsOpen, isLayoutOpen, isAccountOpen, isOverflowOpen]);
+  }, [isInstToolsOpen, isLayoutOpen, isAccountOpen, isOverflowOpen, isTfMenuOpen, isStyleMenuOpen, isCandleColorOpen, isLayersMenuOpen, isSnapshotOpen]);
 
   // Colour the price by tick direction
   const prev = useRef(price);
@@ -294,7 +398,7 @@ export default function Header({
   const displayPnl = hideDollar ? (open >= 0 ? '+Target Track' : '-Risk Zone') : fmtPnl(open);
 
   return (
-    <header className="relative flex h-11 shrink-0 items-center justify-between gap-2 border-b border-grid bg-panel px-2.5 sm:px-3 select-none font-mono text-xs z-30">
+    <header className="relative flex h-[38px] shrink-0 items-center justify-between gap-1.5 border-b border-grid bg-panel px-2 sm:px-2.5 select-none font-mono text-xs z-30">
       {/* Daily Drawdown Progress Bar along top border */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-grid/30 overflow-hidden">
         <div
@@ -306,21 +410,484 @@ export default function Header({
         />
       </div>
 
-      {/* Left Symbol & Price Cluster */}
-      <div className="flex items-center gap-1 sm:gap-2 whitespace-nowrap min-w-0 shrink truncate mr-1 sm:mr-4">
-        <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate max-w-[75px] xs:max-w-none">{labelOf(symbol)}</span>
-        <span className={`num text-xs sm:text-base font-bold transition-colors shrink-0 ${dir === 'up' ? 'text-up' : dir === 'down' ? 'text-down' : 'text-slate-100'}`}>
-          {fmtPrice(price, symbol)}
-        </span>
-        <span className="text-xs text-muted font-medium hidden sm:inline">{inst?.currency}</span>
-        <span className={`hidden sm:inline-block num text-[10px] sm:text-xs font-semibold px-1 sm:px-1.5 py-0.5 rounded-[4px] border ${
-          change >= 0
-            ? 'text-up bg-emerald-500/10 border-emerald-500/25'
-            : 'text-down bg-rose-500/10 border-rose-500/25'
-        }`}>
-          {fmtPct(change)}
-        </span>
-        {marketOpen === false && <span className="clay-badge px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs text-zinc-400 hidden xs:inline">Closed</span>}
+      {/* Left Section: Symbol, Timeframes, Candle Style, Indicators, Replay, Undo/Redo */}
+      <div className="flex items-center gap-1 sm:gap-1.5 overflow-visible min-w-0 shrink py-0.5">
+        {/* Brand Pill */}
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="font-heading font-black tracking-tighter text-white text-[11px] px-1.5 py-0.5 rounded bg-white/10 border border-white/15">
+            CRT
+          </span>
+        </div>
+
+        <span className="h-4 w-px bg-grid shrink-0" />
+
+        {/* Symbol Search Trigger Button */}
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            setIsSymbolSearchOpen(true);
+          }}
+          className="flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-white/10 text-white font-bold text-xs transition shrink-0 group border border-white/5 hover:border-white/20"
+          title="Search symbols (/ or Ctrl+K)"
+        >
+          <span className="text-xs sm:text-sm font-bold text-white tracking-tight">{labelOf(symbol)}</span>
+          <span className={`num text-xs font-bold transition-colors ${dir === 'up' ? 'text-up' : dir === 'down' ? 'text-down' : 'text-primary'}`}>
+            {fmtPrice(price, symbol)}
+          </span>
+          <span className={`hidden sm:inline-block num text-[10px] font-semibold px-1 py-0.2 rounded border ${
+            change >= 0
+              ? 'text-up bg-emerald-500/10 border-emerald-500/25'
+              : 'text-down bg-rose-500/10 border-rose-500/25'
+          }`}>
+            {fmtPct(change)}
+          </span>
+          <svg className="h-3 w-3 text-slate-400 group-hover:text-white transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        <span className="h-4 w-px bg-grid shrink-0" />
+
+        {/* Timeframe Chips & Dropdown */}
+        <div className="relative flex items-center shrink-0" ref={tfMenuRef}>
+          <div className="flex items-center gap-0.5">
+            {(['1m', '5m', '15m', '1h', '4h', '1d'] as Timeframe[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => {
+                  audioHaptics.tick();
+                  setTimeframe(t);
+                  setPaneTimeframe(activePaneId, t);
+                }}
+                className={`px-1.5 py-0.5 text-xs rounded transition ${
+                  t === timeframe
+                    ? 'bg-white/20 text-white font-bold shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+            {!['1m', '5m', '15m', '1h', '4h', '1d'].includes(timeframe) && (
+              <button
+                onClick={() => setIsTfMenuOpen((v) => !v)}
+                className="px-1.5 py-0.5 text-xs bg-white/20 text-white font-bold rounded"
+              >
+                {timeframe}
+              </button>
+            )}
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setIsTfMenuOpen((v) => !v);
+              }}
+              className="p-1 rounded text-slate-400 hover:text-white transition"
+              title="All Timeframes"
+            >
+              <svg className={`h-3 w-3 transition-transform ${isTfMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+
+          {isTfMenuOpen && (
+            <div className="absolute left-0 top-full mt-1.5 z-50 w-44 clay-popover p-2 shadow-2xl font-mono text-xs max-h-72 overflow-y-auto">
+              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1">
+                Timeframes
+              </div>
+              <div className="grid grid-cols-2 gap-0.5">
+                {['1s', '5s', '15s', '1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w'].map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      audioHaptics.tick();
+                      setTimeframe(t as Timeframe);
+                      setPaneTimeframe(activePaneId, t as Timeframe);
+                      setIsTfMenuOpen(false);
+                    }}
+                    className={`flex items-center justify-between px-2 py-1 rounded transition text-left ${
+                      t === timeframe ? 'bg-white/20 text-white font-bold' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <span>{t}</span>
+                    {t === timeframe && (
+                      <svg className="h-3 w-3 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <span className="h-4 w-px bg-grid shrink-0" />
+
+        {/* Candle Style Dropdown */}
+        <div className="relative shrink-0" ref={styleMenuRef}>
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setIsStyleMenuOpen((v) => !v);
+            }}
+            className="flex items-center gap-1 p-1 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+            title="Chart Style"
+          >
+            <svg className="h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <line x1="9" y1="2" x2="9" y2="6" strokeLinecap="round" />
+              <rect x="6" y="6" width="6" height="10" rx="1" fill="currentColor" fillOpacity={0.2} />
+              <line x1="9" y1="16" x2="9" y2="22" strokeLinecap="round" />
+              <line x1="17" y1="4" x2="17" y2="8" strokeLinecap="round" />
+              <rect x="14" y="8" width="6" height="8" rx="1" fill="currentColor" fillOpacity={0.2} />
+              <line x1="17" y1="16" x2="17" y2="20" strokeLinecap="round" />
+            </svg>
+            <svg className={`h-3 w-3 text-slate-400 transition-transform ${isStyleMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {isStyleMenuOpen && (
+            <div className="absolute left-0 top-full mt-1.5 z-50 w-52 clay-popover p-1.5 shadow-2xl font-mono text-xs">
+              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1">
+                Chart Style
+              </div>
+              {[
+                { id: 'CANDLE', label: 'Candlestick' },
+                { id: 'BAR', label: 'Bar Chart' },
+                { id: 'HOLLOW_CANDLE', label: 'Hollow Candles' },
+                { id: 'HEIKIN_ASHI', label: 'Heikin-Ashi' },
+                { id: 'LINE', label: 'Line Chart' },
+                { id: 'AREA', label: 'Area Chart' },
+                { id: 'BASELINE', label: 'Baseline Chart' },
+                { id: 'FOOTPRINT', label: 'Footprint Clusters' },
+              ].map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    audioHaptics.tick();
+                    setChartStyle(s.id as ChartStyle);
+                    setIsStyleMenuOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between px-2.5 py-1.5 rounded text-left transition ${
+                    chartStyle === s.id ? 'bg-white/20 text-white font-bold' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <span>{s.label}</span>
+                  {chartStyle === s.id && (
+                    <svg className="h-3.5 w-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Candle Colors & Palette Popover */}
+        <div className="relative shrink-0" ref={candleColorRef}>
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setIsCandleColorOpen((v) => !v);
+            }}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition cursor-pointer"
+            title="Candle Colors & Themes"
+          >
+            <span className="flex items-center gap-0.5">
+              <span
+                className="w-2.5 h-2.5 rounded-full border border-black/40 shadow-xs"
+                style={{ backgroundColor: candleSettings.candleUpColor || '#ffffff' }}
+              />
+              <span
+                className="w-2.5 h-2.5 rounded-full border border-white/40 shadow-xs"
+                style={{ backgroundColor: candleSettings.candleDownColor || '#101015' }}
+              />
+            </span>
+            <svg className={`h-2.5 w-2.5 text-slate-400 transition-transform ${isCandleColorOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {isCandleColorOpen && (
+            <div className="absolute left-0 top-full mt-1.5 z-50 w-64 clay-popover p-3 shadow-2xl font-mono text-xs select-none max-h-[80vh] overflow-y-auto">
+              <div className="px-1 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-2 flex items-center justify-between">
+                <span>Candle Palette</span>
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    applyCandlePreset('#ffffff', '#101015');
+                  }}
+                  className="text-[10px] text-slate-400 hover:text-white transition"
+                >
+                  Reset
+                </button>
+              </div>
+
+              <div className="text-[10px] text-slate-400 font-semibold mb-1.5 uppercase">Presets</div>
+              <div className="grid grid-cols-1 gap-1 mb-3">
+                {[
+                  { name: 'Claymorph B&W', up: '#ffffff', down: '#101015' },
+                  { name: 'TradingView Classic', up: '#089981', down: '#f23645' },
+                  { name: 'Cyberpunk Neon', up: '#00ffcc', down: '#ff0055' },
+                  { name: 'Solar Amber', up: '#f59e0b', down: '#64748b' },
+                  { name: 'Emerald Matrix', up: '#22c55e', down: '#18181b' },
+                ].map((preset) => {
+                  const isSelected =
+                    (candleSettings.candleUpColor || '#ffffff').toLowerCase() === preset.up.toLowerCase() &&
+                    (candleSettings.candleDownColor || '#101015').toLowerCase() === preset.down.toLowerCase();
+                  return (
+                    <button
+                      key={preset.name}
+                      onClick={() => {
+                        audioHaptics.tick();
+                        applyCandlePreset(preset.up, preset.down);
+                      }}
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition ${
+                        isSelected ? 'clay-btn-active font-bold text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1">
+                          <span className="w-2.5 h-2.5 rounded-full border border-black/40" style={{ backgroundColor: preset.up }} />
+                          <span className="w-2.5 h-2.5 rounded-full border border-white/40" style={{ backgroundColor: preset.down }} />
+                        </span>
+                        <span>{preset.name}</span>
+                      </div>
+                      {isSelected && (
+                        <svg className="h-3.5 w-3.5 text-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="border-t border-grid/60 pt-2 mb-1">
+                <div className="text-[10px] text-slate-400 font-semibold mb-2 uppercase">Custom Colors</div>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between bg-black/40 px-2.5 py-1.5 rounded-lg border border-white/5">
+                    <span className="text-slate-300 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: candleSettings.candleUpColor || '#ffffff' }} />
+                      Bull / Up Candle
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase">{candleSettings.candleUpColor || '#ffffff'}</span>
+                      <input
+                        type="color"
+                        value={candleSettings.candleUpColor || '#ffffff'}
+                        onChange={(e) => updateCustomCandleColor('candleUpColor', e.target.value)}
+                        className="h-6 w-7 rounded cursor-pointer border-0 bg-transparent p-0"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between bg-black/40 px-2.5 py-1.5 rounded-lg border border-white/5">
+                    <span className="text-slate-300 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: candleSettings.candleDownColor || '#101015' }} />
+                      Bear / Down Candle
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase">{candleSettings.candleDownColor || '#101015'}</span>
+                      <input
+                        type="color"
+                        value={candleSettings.candleDownColor || '#101015'}
+                        onChange={(e) => updateCustomCandleColor('candleDownColor', e.target.value)}
+                        className="h-6 w-7 rounded cursor-pointer border-0 bg-transparent p-0"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <span className="h-4 w-px bg-grid shrink-0" />
+
+        {/* fx Indicators Button */}
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            if ((window as any).__openIndicatorsModal) {
+              (window as any).__openIndicatorsModal();
+            }
+          }}
+          className="relative flex items-center gap-1 px-2 py-0.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition shrink-0"
+          title="Indicators, Metrics & Strategies (fx)"
+        >
+          <span className="font-bold text-xs tracking-tight text-accent">fx</span>
+          <span className="text-xs font-semibold hidden md:inline">Indicators</span>
+          {activeIndicators.length > 0 && (
+            <span className="px-1 py-0.1 min-w-[14px] text-center rounded-full bg-accent text-black text-[9px] font-bold">
+              {activeIndicators.length}
+            </span>
+          )}
+        </button>
+
+        {/* Institutional Layers & Overlays Menu */}
+        <div className="relative shrink-0" ref={layersMenuRef}>
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              setIsLayersMenuOpen((v) => !v);
+            }}
+            className="flex items-center gap-1 px-2 py-0.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition shrink-0"
+            title="Chart Layers, Overlays & Indicators"
+          >
+            <svg className="h-3.5 w-3.5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            <span className="text-xs font-semibold hidden md:inline">Layers</span>
+            <svg className={`h-2.5 w-2.5 text-slate-400 transition-transform ${isLayersMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {isLayersMenuOpen && (
+            <div className="absolute left-0 top-full mt-1.5 z-50 w-72 clay-popover p-2.5 shadow-2xl font-mono text-xs select-none max-h-[80vh] overflow-y-auto">
+              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1.5 flex items-center justify-between">
+                <span>Chart Overlays & Layers</span>
+                <span className="text-[9px] text-[#38bdf8]">Dynamic</span>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    (window as any).__toggleVolumeProfile?.();
+                    setIsLayersMenuOpen(false);
+                  }}
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-white/10 text-left text-slate-300 hover:text-white transition"
+                >
+                  <div>
+                    <div className="font-semibold text-xs text-white">Volume Profile (VPVR)</div>
+                    <div className="text-[10px] text-slate-400">Dynamic POC, VAH, VAL levels</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    (window as any).__toggleGhost?.();
+                    setIsLayersMenuOpen(false);
+                  }}
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-white/10 text-left text-slate-300 hover:text-white transition"
+                >
+                  <div>
+                    <div className="font-semibold text-xs text-white">Ghost HTF Candles</div>
+                    <div className="text-[10px] text-slate-400">Higher timeframe candle silhouettes</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    (window as any).__toggleSessionOHL?.();
+                    setIsLayersMenuOpen(false);
+                  }}
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-white/10 text-left text-slate-300 hover:text-white transition"
+                >
+                  <div>
+                    <div className="font-semibold text-xs text-white">Session OHL Laser Lines</div>
+                    <div className="text-[10px] text-slate-400">Daily Open, High, Low projections</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    useTerminalStore.getState().togglePeriodSeparators();
+                    setIsLayersMenuOpen(false);
+                  }}
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-white/10 text-left text-slate-300 hover:text-white transition"
+                >
+                  <div>
+                    <div className="font-semibold text-xs text-white">Period / Session Separators</div>
+                    <div className="text-[10px] text-slate-400">Vertical day / session partition lines</div>
+                  </div>
+                </button>
+
+                <div className="border-t border-grid/60 my-1" />
+
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    (window as any).__openObjectTree?.();
+                    setIsLayersMenuOpen(false);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-left text-[#38bdf8] transition"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                  <span className="font-semibold">Object Tree & Drawings...</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    audioHaptics.tick();
+                    (window as any).__openChartSkinsModal?.();
+                    setIsLayersMenuOpen(false);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-left text-slate-300 hover:text-white transition"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="font-semibold">Chart Skins & Wallpapers...</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Bar Replay Button */}
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            if ((window as any).__toggleBarReplay) {
+              (window as any).__toggleBarReplay();
+            }
+          }}
+          className="flex items-center gap-1 p-1 rounded hover:bg-white/10 text-slate-300 hover:text-white transition shrink-0"
+          title="Bar Replay Historical Time Machine"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
+          </svg>
+          <span className="text-xs hidden 2xl:inline">Replay</span>
+        </button>
+
+        {/* Undo / Redo */}
+        <div className="hidden sm:flex items-center gap-0.5 border-l border-grid pl-1 shrink-0">
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              drawingEvents.undo();
+            }}
+            className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition shrink-0"
+            title="Undo Drawing (Ctrl+Z)"
+          >
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 10h10a5 5 0 015 5v2m-15-7l4-4m-4 4l4 4" />
+            </svg>
+          </button>
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              drawingEvents.redo();
+            }}
+            className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition shrink-0"
+            title="Redo Drawing (Ctrl+Y)"
+          >
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 10H11a5 5 0 00-5 5v2m15-7l-4-4m4 4l-4 4" />
+            </svg>
+          </button>
+        </div>
 
         {/* Kill-Switch alert badge */}
         {killSwitch.isLocked && (
@@ -328,54 +895,16 @@ export default function Header({
             [Locked]
           </span>
         )}
-
-        {/* Live Market Sessions & Killzones Pill (Responsive 2xl display to avoid collision) */}
-        <button
-          onClick={() => {
-            audioHaptics.tick();
-            onOpenSessions?.();
-          }}
-          className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold border transition hidden 2xl:inline-flex items-center gap-1.5 cursor-pointer ${
-            sessionData.isLondonNyOverlap
-              ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
-              : sessionData.activeKillzones.filter(k => k.isActive).length > 0
-              ? 'border-amber-500/50 bg-amber-500/15 text-amber-300'
-              : sessionData.activeCount > 0
-              ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300'
-              : 'clay-badge text-zinc-400'
-          }`}
-          title={
-            `Sessions: ${sessionData.sessions.filter(s => s.isActive).map(s => s.name).join(', ') || 'Inter-Session'}` +
-            (sessionData.activeKillzones.filter(k => k.isActive).length > 0 ? ` | KZ: ${sessionData.activeKillzones.filter(k => k.isActive).map(k => k.name).join(', ')}` : '') +
-            ` | UTC: ${sessionData.currentUtcTimeString} | Click to open Sessions`
-          }
-        >
-          <span className={`h-1.5 w-1.5 rounded-full ${
-            sessionData.isLondonNyOverlap ? 'bg-emerald-400 animate-pulse' :
-            sessionData.activeKillzones.filter(k => k.isActive).length > 0 ? 'bg-amber-400 animate-pulse' :
-            sessionData.activeCount > 0 ? 'bg-cyan-400' : 'bg-zinc-500'
-          }`} />
-          <span className="truncate max-w-[150px]">
-            {sessionData.isLondonNyOverlap
-              ? 'LON / NY [OVERLAP]'
-              : sessionData.activeKillzones.filter(k => k.isActive).length > 0
-              ? `${sessionData.activeKillzones.filter(k => k.isActive)[0].name.toUpperCase()}${
-                  sessionData.sessions.filter(s => s.isActive).length > 0
-                    ? ` | ${sessionData.sessions.filter(s => s.isActive).map(s => s.name.split(' ')[0].toUpperCase()).join('+')}`
-                    : ''
-                }`
-              : sessionData.sessions.filter(s => s.isActive).length > 0
-              ? sessionData.sessions.filter(s => s.isActive).map(s => s.name.split(' ')[0].toUpperCase()).join(' + ')
-              : `Next: ${sessionInfo.name} in ${sessionInfo.remaining}`}
-          </span>
-        </button>
       </div>
+
+      {/* Flexible Spacer */}
+      <div className="flex-1 min-w-2" />
 
       {/* Breathing Guide Halo in Zen Mode */}
       <BreathingHalo />
 
       {/* Right Controls & Tools Cluster */}
-      <div className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap min-w-0 justify-end">
+      <div className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap min-w-0 justify-end ml-auto">
         {/* Compact Account Capsule Pill & Detailed Popover */}
         <div className="relative shrink-0" ref={accountRef}>
           <button
@@ -397,7 +926,7 @@ export default function Header({
             <span className="text-[10px] text-muted font-medium hidden sm:inline">Eq</span>
             <span className="font-bold text-[11px] sm:text-xs">{displayEquity}</span>
             <span
-              className={`hidden sm:inline-block text-[10px] font-semibold px-1 py-0.5 rounded ${
+              className={`hidden 2xl:inline-block text-[10px] font-semibold px-1 py-0.5 rounded ${
                 hideDollar
                   ? 'text-zinc-400 bg-white/5'
                   : open >= 0
@@ -602,46 +1131,12 @@ export default function Header({
               if (onOpenQuantAI) onOpenQuantAI();
               else if (window.__openQuantAI) window.__openQuantAI();
             }}
-            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-xs font-semibold rounded-lg border border-accent/40 bg-accent/15 hover:bg-accent/25 text-accent transition"
+            className="flex items-center justify-center p-1.5 text-xs rounded-lg border border-accent/40 bg-accent/15 hover:bg-accent/25 text-accent transition"
             title="Open Quant & AI Assistant (Ollama Local / Cloud)"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            <span className="hidden sm:inline">Quant AI</span>
-          </button>
-
-          {/* Zen Mode Button */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              toggleZenMode();
-            }}
-            className={`hidden sm:flex items-center gap-1 px-2 sm:px-2.5 py-1 text-xs font-semibold transition ${
-              zenMode.active
-                ? 'clay-pill-active'
-                : 'clay-pill'
-            }`}
-            title="Toggle Zen Mode (Alt+Z)"
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${zenMode.active ? 'bg-black' : 'bg-zinc-500'}`} />
-            <span>Zen</span>
-          </button>
-
-          {/* Quick Search & Command Palette Pill (Ctrl+K) */}
-          <button
-            onClick={() => {
-              audioHaptics.tick();
-              onOpenCommandPalette?.();
-            }}
-            className="hidden sm:flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 text-xs rounded-lg bg-black/40 hover:bg-black/70 border border-white/10 text-slate-300 hover:text-white transition shadow-sm font-sans"
-            title="Search all features, tools, pairs, and layouts (Ctrl+K)"
-          >
-            <svg className="h-3.5 w-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <span className="hidden 2xl:inline text-[11px] text-slate-400">Search tools...</span>
-            <kbd className="hidden sm:inline-block rounded border border-white/10 bg-white/5 px-1 py-0.2 text-[9px] font-mono text-muted">Ctrl+K</kbd>
           </button>
 
           {/* Institutional Suite Dropdown */}
@@ -651,19 +1146,13 @@ export default function Header({
                 audioHaptics.tick();
                 setIsInstToolsOpen((v) => !v);
               }}
-              className={`flex items-center gap-1 p-1 sm:px-2.5 sm:py-1 text-xs font-semibold transition ${
-                isInstToolsOpen
-                  ? 'clay-pill-active'
-                  : 'clay-pill'
+              className={`flex items-center justify-center p-1.5 text-xs rounded-lg transition ${
+                isInstToolsOpen ? 'clay-pill-active' : 'clay-pill text-secondary hover:text-primary'
               }`}
               title="Institutional Analytics & Tools Suite"
             >
-              <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              <span className="hidden sm:inline">Tools</span>
-              <svg className={`h-3 w-3 text-slate-400 transition-transform hidden sm:inline ${isInstToolsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
 
@@ -1126,23 +1615,6 @@ export default function Header({
             )}
           </div>
 
-          {/* Portfolio Tracker & Trade Journal Pill */}
-          {onOpenPortfolio && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenPortfolio();
-              }}
-              className="clay-btn px-2 py-1 text-xs font-semibold rounded-[6px] transition hidden xl:flex items-center gap-1.5 text-white hover:text-white"
-              title="Portfolio Tracker, Analytics, PnL Calendar & AI Journal (Alt+J)"
-            >
-              <svg className="h-3.5 w-3.5 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              <span>Portfolio</span>
-            </button>
-          )}
-
           {/* TradeXGuardian Capital Protection Pill */}
           {onOpenGuardian && (
             <button
@@ -1150,53 +1622,19 @@ export default function Header({
                 audioHaptics.tick();
                 onOpenGuardian();
               }}
-              className={`px-2 py-1 text-xs font-semibold rounded-[6px] border transition hidden sm:flex items-center gap-1.5 ${
+              className={`px-1.5 py-1 text-xs font-semibold rounded-lg border transition flex items-center gap-1 ${
                 guardianEmergencyLocked
                   ? 'border-red-500/60 bg-red-500/20 text-red-400 animate-pulse'
-                  : 'clay-btn text-white'
+                  : 'clay-btn text-primary'
               }`}
               title={`TradeXGuardian Protection System | Discipline Score: ${guardianDisciplineScore}%`}
             >
-              <span className={`h-1.5 w-1.5 rounded-full ${guardianEmergencyLocked ? 'bg-red-400 animate-pulse' : guardianEnabled ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
-              <span className="hidden xl:inline">Guardian</span>
+              <svg className="h-3.5 w-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
               <span className={`text-[10px] font-bold ${guardianDisciplineScore >= 80 ? 'text-emerald-400' : guardianDisciplineScore >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
                 {guardianDisciplineScore}%
               </span>
-            </button>
-          )}
-
-          {/* Overview Landing Page Toggle */}
-          {onOpenLanding && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenLanding();
-              }}
-              className="clay-btn px-2 sm:px-2.5 py-1 text-xs font-semibold transition hidden 2xl:flex items-center gap-1 text-slate-300 hover:text-white"
-              title="Institutional Showcase & Platform Overview"
-            >
-              <svg className="h-3.5 w-3.5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-              <span>Home</span>
-            </button>
-          )}
-
-          {/* Settings & Account Center */}
-          {onOpenSettings && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenSettings();
-              }}
-              className="clay-btn px-2 sm:px-2.5 py-1 text-xs font-semibold transition hidden xl:flex items-center gap-1.5"
-              title="Settings, Themes, Language & Notifications"
-            >
-              <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span className="hidden md:inline">Settings</span>
             </button>
           )}
 
@@ -1210,15 +1648,15 @@ export default function Header({
               }
               toggleTradingMode();
             }}
-            className={`relative px-2.5 py-1 text-xs font-bold rounded-[6px] border transition hidden sm:flex items-center gap-1.5 ${
+            className={`relative px-2 py-0.5 text-[10.5px] font-bold rounded-lg border transition flex items-center gap-1.5 ${
               tradingMode === 'LIVE'
                 ? 'border-red-500/60 bg-red-500/15 text-red-400 hover:bg-red-500/25 animate-pulse'
-                : 'border-zinc-600/40 bg-zinc-800/40 text-zinc-400 hover:text-white hover:border-zinc-500/60'
+                : 'border-grid bg-surface text-secondary hover:text-primary'
             }`}
             title={tradingMode === 'PAPER' ? 'Paper Trading (simulated) — click to switch to LIVE' : 'LIVE mode — orders route to broker API — click to return to Paper'}
           >
-            <span className={`h-1.5 w-1.5 rounded-full ${tradingMode === 'LIVE' ? 'bg-red-400' : 'bg-zinc-500'}`} />
-            {tradingMode === 'LIVE' ? 'LIVE' : 'PAPER'}
+            <span className={`h-1.5 w-1.5 rounded-full ${tradingMode === 'LIVE' ? 'bg-red-400' : 'bg-amber-400'}`} />
+            <span>{tradingMode}</span>
             {showLiveWarning && (
               <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-900/90 text-red-300 text-[9px] px-2 py-0.5 rounded border border-red-500/40 z-50">
                 LIVE mode — no real broker connected
@@ -1226,81 +1664,122 @@ export default function Header({
             )}
           </button>
 
-          {/* Sound Mute / Unmute Toggle Button */}
+          {/* Create Alert Dialog Trigger Button */}
           <button
             onClick={() => {
-              const next = audioHaptics.toggleMute();
-              setIsMuted(next);
+              audioHaptics.tick();
+              if ((window as any).__openCreateAlert) {
+                (window as any).__openCreateAlert();
+              }
             }}
-            className={`px-2 py-1 text-xs font-semibold rounded-[6px] border transition hidden 2xl:flex items-center gap-1 ${
-              isMuted
-                ? 'border-rose-500/40 bg-rose-500/10 text-rose-400 hover:border-rose-500/60'
-                : 'clay-btn text-white'
-            }`}
-            title={isMuted ? 'Sound Muted (Alt+U to unmute)' : 'Sound Enabled (Alt+U to mute)'}
+            className="flex items-center justify-center p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition shrink-0"
+            title="Create Alert (Alt+A)"
           >
-            {isMuted ? (
-              <svg className="h-3.5 w-3.5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-              </svg>
-            ) : (
-              <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-              </svg>
-            )}
-            <span>{isMuted ? 'Muted' : 'Audio'}</span>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
           </button>
 
-          {/* Mini Popout Window */}
-          {onTogglePopout && (
+          {/* Chart Snapshot Dropdown Popover (TradingView-Style) */}
+          <div className="relative shrink-0" ref={snapshotRef}>
             <button
               onClick={() => {
                 audioHaptics.tick();
-                onTogglePopout();
+                setIsSnapshotOpen((v) => !v);
               }}
-              className={`px-2 py-1 text-xs font-semibold transition hidden 2xl:flex items-center gap-1 ${
-                isPopoutActive ? 'clay-btn-active' : 'clay-btn'
-              }`}
-              title="Open Compact Pop-out Window (Picture-in-Picture)"
+              className="flex items-center justify-center p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition shrink-0"
+              title="Take Chart Snapshot (Download PNG / Copy Image)"
             >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </button>
-          )}
 
-          {/* Keyboard Hotkeys Cheatsheet */}
-          {onOpenHotkeys && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenHotkeys();
-              }}
-              className="clay-btn px-2 py-0.5 font-bold text-muted hover:text-white hidden 2xl:inline-block"
-              title="Keyboard Shortcuts Cheatsheet (?)"
-            >
-              [?]
-            </button>
-          )}
+            {isSnapshotOpen && (
+              <div className="absolute right-0 top-full mt-1.5 z-50 w-52 clay-popover p-1.5 rounded-xl shadow-2xl select-none font-mono text-xs border border-white/10 backdrop-blur-md">
+                <button
+                  onClick={() => {
+                    setIsSnapshotOpen(false);
+                    audioHaptics.tick();
+                    (window as any).__takeChartSnapshot?.('download');
+                  }}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 text-slate-200 hover:text-white transition text-left"
+                >
+                  <svg className="h-4 w-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span>Download Image (PNG)</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsSnapshotOpen(false);
+                    audioHaptics.tick();
+                    (window as any).__takeChartSnapshot?.('copy');
+                  }}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 text-slate-200 hover:text-white transition text-left"
+                >
+                  <svg className="h-4 w-4 text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                  </svg>
+                  <span>Copy Image</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsSnapshotOpen(false);
+                    audioHaptics.tick();
+                    (window as any).__takeChartSnapshot?.('link');
+                  }}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 text-slate-200 hover:text-white transition text-left"
+                >
+                  <svg className="h-4 w-4 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  <span>Copy Chart Link</span>
+                </button>
+              </div>
+            )}
+          </div>
 
-          {/* Institutional User Profile Avatar Pill */}
-          {onOpenSettings && (
-            <button
-              onClick={() => {
-                audioHaptics.tick();
-                onOpenSettings('PROFILE');
-              }}
-              className="clay-pill-active px-2.5 py-0.5 text-xs font-bold transition hidden xl:flex items-center gap-1.5"
-              title="Open Trader Profile & Subscription Details"
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-black" />
-              <span>PA [PRO+]</span>
-            </button>
-          )}
+          {/* Chart Settings Gear Icon */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              if ((window as any).__openChartSettings) {
+                (window as any).__openChartSettings();
+              } else if (onOpenSettings) {
+                onOpenSettings();
+              }
+            }}
+            className="flex items-center justify-center p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition shrink-0"
+            title="Chart Settings (Alt+S)"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
 
-          {/* Responsive Mobile / Tablet Overflow Menu */}
-          <div className="relative 2xl:hidden" ref={overflowRef}>
+          {/* Fullscreen Toggle */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen?.();
+              } else {
+                document.exitFullscreen?.();
+              }
+            }}
+            className="flex items-center justify-center p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition shrink-0 hidden sm:inline-flex"
+            title="Toggle Fullscreen"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+          </button>
+
+          {/* Responsive Overflow Quick Menu */}
+          <div className="relative shrink-0" ref={overflowRef}>
             <button
               onClick={() => {
                 audioHaptics.tick();
@@ -1317,10 +1796,10 @@ export default function Header({
             </button>
 
             {isOverflowOpen && (
-              <div className="absolute right-0 top-full mt-2 z-50 w-72 clay-popover p-3 shadow-2xl select-none font-mono text-xs space-y-2.5">
+              <div className="absolute right-0 top-full mt-2 z-50 w-72 clay-popover p-3 shadow-2xl select-none font-mono text-xs space-y-2.5 max-h-[calc(100vh-50px)] overflow-y-auto scrollbar-thin">
                 <div className="flex items-center justify-between border-b border-grid/60 pb-2">
-                  <span className="text-[10px] uppercase font-bold text-muted">Terminal Quick Menu</span>
-                  <span className="text-[10px] text-zinc-400">Mobile / Tablet</span>
+                  <span className="text-[10px] uppercase font-bold text-muted">Terminal Menu</span>
+                  <span className="text-[10px] text-zinc-400">Quick Access</span>
                 </div>
 
                 {/* Profile Pill in Overflow */}
@@ -1334,13 +1813,13 @@ export default function Header({
                     className="w-full flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition text-left"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                      <span className="h-2 w-2 rounded-full bg-slate-400" />
                       <div>
                         <span className="font-bold text-white block">Trader Profile</span>
                         <span className="text-[9px] text-muted">Institutional PA [PRO+]</span>
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold text-white bg-white/10 px-1.5 py-0.5 rounded">PRO+</span>
+                    <span className="text-[10px] font-bold text-slate-300 bg-white/10 px-1.5 py-0.5 rounded border border-white/10">PRO+</span>
                   </button>
                 )}
 
@@ -1355,7 +1834,7 @@ export default function Header({
                     className="w-full flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition text-left"
                   >
                     <div className="flex items-center gap-2">
-                      <svg className="h-4 w-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                       </svg>
                       <div>
@@ -1363,7 +1842,7 @@ export default function Header({
                         <span className="text-[9px] text-muted">Platform Overview & Showcase</span>
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded">VIEW</span>
+                    <span className="text-[10px] font-bold text-slate-300 bg-white/10 px-1.5 py-0.5 rounded border border-white/10">VIEW</span>
                   </button>
                 )}
 
@@ -1378,15 +1857,62 @@ export default function Header({
                     <span className={`font-bold ${tradingMode === 'LIVE' ? 'text-red-400' : 'text-zinc-400'}`}>[{tradingMode}]</span>
                   </div>
                   {loadTelegramConfig().enabled && (
-                    <div className="col-span-2 text-emerald-400 text-[10px] flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    <div className="col-span-2 text-slate-300 text-[10px] flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                       <span>Telegram Alerts Connected</span>
                     </div>
                   )}
                 </div>
 
                 {/* Quick Navigation Items */}
-                <div className="space-y-1">
+                <div className="space-y-0.5">
+                  {/* Object Tree & Layers */}
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      useDrawingStore.getState().setActiveRightDrawer((prev) => (prev === 'OBJECT_TREE' ? null : 'OBJECT_TREE'));
+                      setIsOverflowOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <span>Object Tree & Layers</span>
+                  </button>
+
+                  {/* Chart Skins & Background Themes */}
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      if ((window as any).__openChartSkinsModal) {
+                        (window as any).__openChartSkinsModal();
+                      }
+                      setIsOverflowOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>Chart Skins & Themes</span>
+                  </button>
+
+                  {/* Mobile & WiFi Connect */}
+                  <button
+                    onClick={() => {
+                      audioHaptics.tick();
+                      setIsMobileConnectOpen(true);
+                      setIsOverflowOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                  >
+                    <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span>Mobile & WiFi Sync</span>
+                  </button>
+
                   {onOpenCommandPalette && (
                     <button
                       onClick={() => {
@@ -1396,7 +1922,7 @@ export default function Header({
                       }}
                       className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                     >
-                      <svg className="h-4 w-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
                       <span>Search Tools & Commands</span>
@@ -1411,7 +1937,7 @@ export default function Header({
                     }}
                     className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                   >
-                    <svg className="h-4 w-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                     </svg>
                     <span>Watchlist & Markets</span>
@@ -1426,7 +1952,7 @@ export default function Header({
                       }}
                       className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                     >
-                      <svg className="h-4 w-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
                       <span>Customize Layout & Multi-Chart</span>
@@ -1441,7 +1967,7 @@ export default function Header({
                     }}
                     className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                   >
-                    <span className={`h-2 w-2 rounded-full ${zenMode.active ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
+                    <span className={`h-2 w-2 rounded-full ${zenMode.active ? 'bg-slate-300' : 'bg-zinc-500'}`} />
                     <span>Zen Mode: {zenMode.active ? 'ON' : 'OFF'}</span>
                   </button>
 
@@ -1453,11 +1979,12 @@ export default function Header({
                     }}
                     className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                   >
-                    <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                     <span>Depth of Market (DOM) Ladder</span>
                   </button>
+
                   <button
                     onClick={() => {
                       audioHaptics.tick();
@@ -1466,111 +1993,120 @@ export default function Header({
                     }}
                     className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                   >
-                    <svg className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
                     </svg>
                     <span>Seasonal Tendencies Matrix</span>
                   </button>
+
                   {onOpenScreener && (
                     <button
                       onClick={() => { audioHaptics.tick(); onOpenScreener(); setIsOverflowOpen(false); }}
                       className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                     >
-                      <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                       <span>Multi-Market Screener</span>
                     </button>
                   )}
+
                   {onOpenCalendar && (
                     <button
                       onClick={() => { audioHaptics.tick(); onOpenCalendar(); setIsOverflowOpen(false); }}
                       className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                     >
-                      <svg className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                       <span>Economic Calendar Matrix</span>
                     </button>
                   )}
+
                   {onOpenSettings && (
                     <button
                       onClick={() => { audioHaptics.tick(); onOpenSettings(); setIsOverflowOpen(false); }}
                       className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                     >
-                      <svg className="h-4 w-4 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
                       <span>Settings & Preferences</span>
                     </button>
                   )}
+
                   {onOpenHotkeys && (
                     <button
                       onClick={() => { audioHaptics.tick(); onOpenHotkeys(); setIsOverflowOpen(false); }}
                       className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                     >
-                      <svg className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                       </svg>
                       <span>Keyboard Shortcuts (?)</span>
                     </button>
                   )}
+
                   {onTogglePopout && (
                     <button
                       onClick={() => { audioHaptics.tick(); onTogglePopout(); setIsOverflowOpen(false); }}
                       className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                     >
-                      <svg className="h-4 w-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
                       <span>Mini Pop-out Window</span>
                     </button>
                   )}
+
                   {onOpenVault && (
                     <button
                       onClick={() => { audioHaptics.tick(); onOpenVault(); setIsOverflowOpen(false); }}
                       className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                     >
-                      <svg className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
                       <span>Broker API Vault (MT5 / Crypto / India)</span>
                     </button>
                   )}
+
                   {onOpenSessions && (
                     <button
                       onClick={() => { audioHaptics.tick(); onOpenSessions(); setIsOverflowOpen(false); }}
                       className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                     >
-                      <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7C5 4 4 5 4 7zm0 4h16M8 4v3m8-3v3" />
                       </svg>
                       <span>Trading Sessions & DB Backup</span>
                     </button>
                   )}
+
                   {onOpenGuardian && (
                     <button
                       onClick={() => { audioHaptics.tick(); onOpenGuardian(); setIsOverflowOpen(false); }}
                       className="flex w-full items-center justify-between px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                     >
                       <div className="flex items-center gap-2">
-                        <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                         </svg>
                         <span>TradeXGuardian Protection</span>
                       </div>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${guardianDisciplineScore >= 80 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-slate-200 border border-white/10">
                         {guardianDisciplineScore}%
                       </span>
                     </button>
                   )}
+
                   {onOpenPortfolio && (
                     <button
                       onClick={() => { audioHaptics.tick(); onOpenPortfolio(); setIsOverflowOpen(false); }}
                       className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                     >
-                      <svg className="h-4 w-4 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                       <span>Portfolio Tracker & PnL Calendar</span>
@@ -1585,24 +2121,17 @@ export default function Header({
                     className="flex w-full items-center justify-between px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
                   >
                     <div className="flex items-center gap-2">
-                      {isMuted ? (
-                        <svg className="h-4 w-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                        </svg>
-                      ) : (
-                        <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                        </svg>
-                      )}
+                      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                      </svg>
                       <span>Audio Haptics</span>
                     </div>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isMuted ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-slate-200 border border-white/10">
                       {isMuted ? 'MUTED' : 'ENABLED'}
                     </span>
                   </button>
 
-                  {/* Paper / Live Mode for Mobile */}
+                  {/* Paper / Live Mode */}
                   <button
                     onClick={() => {
                       audioHaptics.tick();
@@ -1788,6 +2317,23 @@ export default function Header({
           </div>
         </div>
       )}
+
+      {/* Symbol Search Modal Triggered from Header */}
+      <SymbolSearchModal
+        isOpen={isSymbolSearchOpen}
+        onClose={() => setIsSymbolSearchOpen(false)}
+        onSelect={(selectedInst) => {
+          setSymbol(selectedInst.id);
+          setPaneSymbol(activePaneId, selectedInst.id);
+          setIsSymbolSearchOpen(false);
+        }}
+      />
+
+      {/* Mobile & WiFi Connect Modal */}
+      <MobileConnectModal
+        isOpen={isMobileConnectOpen}
+        onClose={() => setIsMobileConnectOpen(false)}
+      />
     </header>
   );
 }

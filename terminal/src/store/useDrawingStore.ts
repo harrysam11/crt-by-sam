@@ -134,6 +134,9 @@ interface DrawingState {
   templates: Record<string, Partial<DrawingItem>>;
   saveTemplate: (name: string, template: Partial<DrawingItem>) => void;
   deleteTemplate: (name: string) => void;
+
+  toolPreferences: Record<string, Partial<DrawingItem>>;
+  setToolPreference: (tool: string, prefs: Partial<DrawingItem>) => void;
 }
 
 const DEFAULT_FAVORITES: ToolType[] = [
@@ -186,7 +189,7 @@ export const useDrawingStore = create<DrawingState>()(
       },
       isFavorite: (tool) => get().favorites.includes(tool),
 
-      isFavoritesBarVisible: true,
+      isFavoritesBarVisible: false,
       toggleFavoritesBar: () => set((s) => ({ isFavoritesBarVisible: !s.isFavoritesBarVisible })),
       setFavoritesBarVisible: (visible) => set({ isFavoritesBarVisible: visible }),
 
@@ -249,6 +252,15 @@ export const useDrawingStore = create<DrawingState>()(
           delete next[name];
           return { templates: next };
         }),
+
+      toolPreferences: {},
+      setToolPreference: (tool, prefs) =>
+        set((s) => ({
+          toolPreferences: {
+            ...s.toolPreferences,
+            [tool]: { ...s.toolPreferences[tool], ...prefs },
+          },
+        })),
     }),
     {
       name: 'crt_drawing_settings',
@@ -260,6 +272,7 @@ export const useDrawingStore = create<DrawingState>()(
         stayInDrawingMode: state.stayInDrawingMode,
         magnetConfig: state.magnetConfig,
         templates: state.templates,
+        toolPreferences: state.toolPreferences,
         isLegendHudVisible: state.isLegendHudVisible,
         activeRightDrawer: state.activeRightDrawer,
       }),

@@ -244,16 +244,16 @@ ${candleSummary || 'Data loading...'}`;
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-5 font-mono select-none">
-      <div className="flex flex-col h-[90vh] max-h-[820px] w-full max-w-3xl clay-popover shadow-2xl border border-white/15 overflow-hidden animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-5 font-mono select-none">
+      <div className="flex flex-col h-[90vh] max-h-[820px] w-full max-w-3xl rounded-xl bg-panel text-primary shadow-2xl border border-grid overflow-hidden animate-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-grid/60 bg-[#0c0c14]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-grid bg-surface/80">
           <div className="flex items-center gap-2.5">
             <span className="h-2.5 w-2.5 rounded-full bg-accent animate-pulse" />
-            <span className="font-bold text-white text-xs uppercase tracking-wider">
+            <span className="font-bold text-primary text-xs uppercase tracking-wider">
               Quant & AI Assistant ({provider === 'OLLAMA' ? 'Local Ollama' : 'Cloud API'})
             </span>
-            <span className="text-[10px] text-slate-400 border border-white/10 px-1.5 py-0.5 rounded">
+            <span className="text-[10px] text-muted border border-grid px-1.5 py-0.5 rounded">
               {symbol} · {timeframe}
             </span>
             {provider === 'OLLAMA' && ollamaConnected !== null && (
@@ -273,7 +273,7 @@ ${candleSummary || 'Data loading...'}`;
                 audioHaptics.tick();
                 setShowConfig((v) => !v);
               }}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/5 transition"
+              className="p-1 rounded text-muted hover:text-primary hover:bg-surface transition"
               title="Configure AI Provider & Model"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -283,7 +283,7 @@ ${candleSummary || 'Data loading...'}`;
             </button>
             <button
               onClick={onClose}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/5 transition"
+              className="p-1 rounded text-muted hover:text-primary hover:bg-surface transition"
               title="Close"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -295,14 +295,14 @@ ${candleSummary || 'Data loading...'}`;
 
         {/* Configuration Panel Dropdown */}
         {showConfig && (
-          <div className="bg-[#10101c] p-4 border-b border-grid/80 space-y-3 text-xs animate-in slide-in-from-top-2 duration-150">
-            <div className="flex items-center justify-between pb-1 border-b border-white/5">
-              <span className="font-bold text-white text-[11px] uppercase">AI Engine Settings</span>
-              <div className="flex items-center gap-1 bg-black/40 p-0.5 rounded border border-white/10">
+          <div className="bg-surface/50 p-4 border-b border-grid space-y-3 text-xs animate-in slide-in-from-top-2 duration-150">
+            <div className="flex items-center justify-between pb-1 border-b border-grid">
+              <span className="font-bold text-primary text-[11px] uppercase">AI Engine Settings</span>
+              <div className="flex items-center gap-1 bg-surface p-0.5 rounded border border-grid">
                 <button
                   onClick={() => setProvider('OLLAMA')}
                   className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    provider === 'OLLAMA' ? 'bg-accent text-black' : 'text-slate-400 hover:text-white'
+                    provider === 'OLLAMA' ? 'bg-accent text-black' : 'text-muted hover:text-primary'
                   }`}
                 >
                   Local Ollama
@@ -310,7 +310,7 @@ ${candleSummary || 'Data loading...'}`;
                 <button
                   onClick={() => setProvider('CLOUD_API')}
                   className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    provider === 'CLOUD_API' ? 'bg-accent text-black' : 'text-slate-400 hover:text-white'
+                    provider === 'CLOUD_API' ? 'bg-accent text-black' : 'text-muted hover:text-primary'
                   }`}
                 >
                   Cloud API
@@ -327,7 +327,7 @@ ${candleSummary || 'Data loading...'}`;
                     value={ollamaEndpoint}
                     onChange={(e) => setOllamaEndpoint(e.target.value)}
                     placeholder="http://localhost:11434/api/generate"
-                    className="w-full bg-slate-900 border border-grid rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-accent"
+                    className="w-full bg-surface border border-grid rounded px-2 py-1 text-primary text-xs focus:outline-none focus:border-accent"
                   />
                 </div>
                 <div>
@@ -335,7 +335,7 @@ ${candleSummary || 'Data loading...'}`;
                   <select
                     value={ollamaModel}
                     onChange={(e) => setOllamaModel(e.target.value)}
-                    className="w-full bg-slate-900 border border-grid rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-accent"
+                    className="w-full bg-surface border border-grid rounded px-2 py-1 text-primary text-xs focus:outline-none focus:border-accent"
                   >
                     <option value="deepseek-r1:latest">DeepSeek-R1 (Institutional Reasoning)</option>
                     <option value="llama3:latest">Llama 3 (Meta)</option>
@@ -354,7 +354,7 @@ ${candleSummary || 'Data loading...'}`;
                       value={cloudEndpoint}
                       onChange={(e) => setCloudEndpoint(e.target.value)}
                       placeholder="https://api.openai.com/v1/chat/completions"
-                      className="w-full bg-slate-900 border border-grid rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-accent"
+                      className="w-full bg-surface border border-grid rounded px-2 py-1 text-primary text-xs focus:outline-none focus:border-accent"
                     />
                   </div>
                   <div>
@@ -364,7 +364,7 @@ ${candleSummary || 'Data loading...'}`;
                       value={cloudModel}
                       onChange={(e) => setCloudModel(e.target.value)}
                       placeholder="e.g. deepseek-chat, gpt-4o-mini, claude-3-5-sonnet"
-                      className="w-full bg-slate-900 border border-grid rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-accent"
+                      className="w-full bg-surface border border-grid rounded px-2 py-1 text-primary text-xs focus:outline-none focus:border-accent"
                     />
                   </div>
                 </div>
@@ -375,7 +375,7 @@ ${candleSummary || 'Data loading...'}`;
                     value={cloudApiKey}
                     onChange={(e) => setCloudApiKey(e.target.value)}
                     placeholder="sk-..."
-                    className="w-full bg-slate-900 border border-grid rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-accent"
+                    className="w-full bg-surface border border-grid rounded px-2 py-1 text-primary text-xs focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>
@@ -393,43 +393,43 @@ ${candleSummary || 'Data loading...'}`;
         )}
 
         {/* Quick Prompt Pills Bar */}
-        <div className="flex items-center gap-1.5 px-3 py-2 bg-black/40 border-b border-grid/40 overflow-x-auto text-[10.5px]">
+        <div className="flex items-center gap-1.5 px-3 py-2 bg-surface/40 border-b border-grid overflow-x-auto text-[10.5px]">
           <span className="text-muted text-[10px] uppercase shrink-0">Prompts:</span>
           <button
             onClick={() => handleSend(`Perform an institutional Price Action & Liquidity Audit for ${symbol} on the ${timeframe} chart. Identify market structure, key order blocks, liquidity sweep levels, and high-probability invalidation zones.`)}
-            className="shrink-0 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition"
+            className="shrink-0 px-2.5 py-1 rounded-full bg-surface hover:bg-surface/80 text-secondary hover:text-primary border border-grid transition"
           >
             Chart TA & Liquidity Audit
           </button>
           <button
             onClick={() => handleSend(`Provide a macroeconomic and fundamentals debrief. How are recent CPI, rates, and yields impacting ${symbol}? Give directional orderflow bias.`)}
-            className="shrink-0 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition"
+            className="shrink-0 px-2.5 py-1 rounded-full bg-surface hover:bg-surface/80 text-secondary hover:text-primary border border-grid transition"
           >
             Macro & News Impact
           </button>
           <button
             onClick={() => handleSend(`Write a PineScript v5 indicator or strategy for Candle Range Theory (CRT) and Turtle Soup liquidity sweeps with clean visual plots and alerts.`)}
-            className="shrink-0 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition"
+            className="shrink-0 px-2.5 py-1 rounded-full bg-surface hover:bg-surface/80 text-secondary hover:text-primary border border-grid transition"
           >
             PineScript Strategy Builder
           </button>
           <button
             onClick={() => handleSend(`Explain how to use the Footprint DOM ladder, order flow delta, and the multi-account switcher in this trading terminal.`)}
-            className="shrink-0 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition"
+            className="shrink-0 px-2.5 py-1 rounded-full bg-surface hover:bg-surface/80 text-secondary hover:text-primary border border-grid transition"
           >
             Software & Terminal Help
           </button>
         </div>
 
         {/* Messages List Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3.5 text-xs bg-[#09090f]">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3.5 text-xs bg-bg/50">
           {messages.map((m) => (
             <div
               key={m.id}
               className={`flex flex-col ${m.sender === 'USER' ? 'items-end' : 'items-start'}`}
             >
-              <div className="flex items-center gap-2 mb-1 text-[10px] text-slate-400">
-                <span className="font-bold text-white uppercase">
+              <div className="flex items-center gap-2 mb-1 text-[10px] text-muted">
+                <span className="font-bold text-primary uppercase">
                   {m.sender === 'USER' ? 'You' : 'Quant AI'}
                 </span>
                 <span>{new Date(m.timestamp).toLocaleTimeString()}</span>
@@ -437,8 +437,8 @@ ${candleSummary || 'Data loading...'}`;
               <div
                 className={`max-w-[88%] rounded-xl p-3 leading-relaxed select-text whitespace-pre-wrap ${
                   m.sender === 'USER'
-                    ? 'bg-accent/15 text-white border border-accent/30'
-                    : 'bg-white/[0.03] text-slate-200 border border-white/10'
+                    ? 'bg-accent/15 text-primary border border-accent/30'
+                    : 'bg-surface text-primary border border-grid'
                 }`}
               >
                 {m.text}
@@ -452,7 +452,7 @@ ${candleSummary || 'Data loading...'}`;
                 <span className="h-2 w-2 rounded-full bg-accent animate-ping" />
                 <span>Quant AI Thinking & Analyzing Order Flow...</span>
               </div>
-              <div className="max-w-[88%] rounded-xl p-3 bg-white/[0.03] border border-white/10 text-slate-400">
+              <div className="max-w-[88%] rounded-xl p-3 bg-surface border border-grid text-muted">
                 Evaluating price levels, technical market structure, and macro confluence...
               </div>
             </div>
@@ -461,7 +461,7 @@ ${candleSummary || 'Data loading...'}`;
         </div>
 
         {/* Chat Input Bar */}
-        <div className="p-3 bg-[#0c0c14] border-t border-grid/60">
+        <div className="p-3 bg-surface/80 border-t border-grid">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -475,7 +475,7 @@ ${candleSummary || 'Data loading...'}`;
               onChange={(e) => setInputVal(e.target.value)}
               placeholder={`Ask Quant AI about ${symbol}, technicals, macro, or terminal features...`}
               disabled={isLoading}
-              className="flex-1 bg-slate-900 border border-grid rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-accent disabled:opacity-50"
+              className="flex-1 bg-surface border border-grid rounded-lg px-3 py-2 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent disabled:opacity-50"
             />
             <button
               type="submit"

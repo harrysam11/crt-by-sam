@@ -73,7 +73,55 @@ export default function PortfolioDashboardModal({
   const deleteEntry = useJournalStore((s) => s.deleteEntry);
   const updateEntry = useJournalStore((s) => s.updateEntry);
   const balance = useTerminalStore((s) => s.balance);
+  const trades = useTerminalStore((s) => s.trades);
+  const activeAccount = useTerminalStore((s) => (s.accounts || []).find((a) => a.id === s.activeAccountId) || s.accounts?.[0]);
+  const initialBalance = activeAccount?.balance || balance || 100000;
   const guardianProp = useGuardianStore((s) => s.propFirm);
+
+  // Unify logged journal entries with actual live terminal executions
+  const allEntries = useMemo(() => {
+    const journalTradeIds = new Set(entries.map((e) => e.tradeId || e.id));
+    const convertedTrades: JournalEntry[] = (trades || [])
+      .filter((t) => !journalTradeIds.has(t.id))
+      .map((t) => {
+        const d = new Date(t.time || Date.now());
+        const h = d.getUTCHours();
+        const session: JournalEntry['session'] =
+          h >= 0 && h < 7 ? 'ASIA' : h >= 7 && h < 12 ? 'LONDON' : h >= 12 && h < 16 ? 'OVERLAP' : 'NY';
+        const rawSide = String(t.side).toUpperCase();
+        const side: JournalEntry['side'] = rawSide === 'BUY' || rawSide === 'LONG' ? 'LONG' : 'SHORT';
+        const commission = 2.5;
+        const netPnl = t.pnl - commission;
+        const holdingTimeMs = t.entryTime ? Math.max(1000, t.time - t.entryTime) : 300000;
+        return {
+          id: t.id,
+          tradeId: t.id,
+          timestamp: t.time || Date.now(),
+          symbol: t.symbol,
+          side,
+          entryPrice: t.entry,
+          exitPrice: t.exit,
+          qty: t.qty,
+          pnl: t.pnl,
+          commission,
+          netPnl,
+          holdingTimeMs,
+          chartDataUrl: '',
+          session,
+          setup: 'Live Terminal Order',
+          emotionTag: 'PLANNED',
+          checklist: {
+            followedPlan: true,
+            validRR: true,
+            confluenceChecked: true,
+            noNewsConflict: true,
+            riskCalculated: true,
+          },
+          notes: `Live execution: ${t.side} ${t.qty} ${labelOf(t.symbol)} entry ${fmtPrice(t.entry, t.symbol)}, exit ${fmtPrice(t.exit, t.symbol)}`,
+        };
+      });
+    return [...entries, ...convertedTrades];
+  }, [entries, trades]);
 
   const [activeTab, setActiveTab] = useState<TabType>('DASHBOARD');
 
@@ -96,29 +144,29 @@ export default function PortfolioDashboardModal({
   // Macro News Filter
   const [newsFilterImpact, setNewsFilterImpact] = useState<'ALL' | 'HIGH'>('ALL');
 
-  // Calculations
-  const coreMetrics = useMemo(() => computeCoreMetrics(entries, balance || 10000), [entries, balance]);
-  const pnlCalendarMap = useMemo(() => computeDailyPnLCalendar(entries), [entries]);
-  const equityCurve = useMemo(() => computeCumulativeEquityCurve(entries, balance || 10000), [entries, balance]);
-  const pairStats = useMemo(() => computePairAnalytics(entries), [entries]);
-  const dayStats = useMemo(() => computeDayOfWeekAnalytics(entries), [entries]);
-  const sessionStats = useMemo(() => computeSessionAnalytics(entries), [entries]);
-  const setupStats = useMemo(() => computeSetupAnalytics(entries), [entries]);
-  const edgeFinder = useMemo(() => computeEdgeFinder(entries), [entries]);
+  // Pure calculations deriving strictly from live executed trades and journal entries
+  const coreMetrics = useMemo(() => computeCoreMetrics(allEntries, initialBalance), [allEntries, initialBalance]);
+  const pnlCalendarMap = useMemo(() => computeDailyPnLCalendar(allEntries), [allEntries]);
+  const equityCurve = useMemo(() => computeCumulativeEquityCurve(allEntries, initialBalance), [allEntries, initialBalance]);
+  const pairStats = useMemo(() => computePairAnalytics(allEntries), [allEntries]);
+  const dayStats = useMemo(() => computeDayOfWeekAnalytics(allEntries), [allEntries]);
+  const sessionStats = useMemo(() => computeSessionAnalytics(allEntries), [allEntries]);
+  const setupStats = useMemo(() => computeSetupAnalytics(allEntries), [allEntries]);
+  const edgeFinder = useMemo(() => computeEdgeFinder(allEntries), [allEntries]);
 
   const propCompliance = useMemo(() => {
     return computePropFirmCompliance(
-      entries,
-      guardianProp.accountSize || 100000,
+      allEntries,
+      guardianProp.accountSize || initialBalance,
       guardianProp.dailyDrawdownPct || 5.0,
       guardianProp.maxDrawdownPct || 10.0,
       guardianProp.profitTargetPct || 10.0,
       guardianProp.consistencyPct || 40.0,
       guardianProp.minTradingDays || 5
     );
-  }, [entries, guardianProp]);
+  }, [allEntries, guardianProp, initialBalance]);
 
-  const behavioralAudit = useMemo(() => performBehavioralAudit(entries), [entries]);
+  const behavioralAudit = useMemo(() => performBehavioralAudit(allEntries), [allEntries]);
 
   if (!isOpen) return null;
 
@@ -152,7 +200,7 @@ export default function PortfolioDashboardModal({
     return days;
   })();
 
-  const selectedJournalEntry = entries.find((e) => e.id === selectedJournalId) || entries[0];
+  const selectedJournalEntry = allEntries.find((e) => e.id === selectedJournalId) || allEntries[0];
 
   const handlePrevMonth = () => {
     audioHaptics.tick();
@@ -272,7 +320,7 @@ export default function PortfolioDashboardModal({
             { id: 'EDGE_FINDER' as TabType, label: 'Edge Finder & Setups' },
             { id: 'PROP_FIRM' as TabType, label: 'Prop Firm Rules Guardian' },
             { id: 'BEHAVIOR_AI' as TabType, label: 'AI Psychology Coach' },
-            { id: 'JOURNAL' as TabType, label: `Trade Logs & Canvas (${entries.length})` },
+            { id: 'JOURNAL' as TabType, label: `Trade Logs & Canvas (${allEntries.length})` },
             { id: 'MACRO_NEWS' as TabType, label: 'Macro Calendar & J7 Tracker' },
           ].map((t) => (
             <button
@@ -754,11 +802,11 @@ export default function PortfolioDashboardModal({
             <div className="flex flex-col lg:flex-row gap-4 min-h-[550px]">
               {/* Entries List */}
               <div className="w-full lg:w-80 shrink-0 border border-grid/50 rounded-xl p-2 overflow-y-auto max-h-[550px] bg-[#090b12] space-y-1">
-                {entries.length === 0 ? (
+                {allEntries.length === 0 ? (
                   <p className="text-center text-xs text-muted py-8">No journal entries logged yet.</p>
                 ) : (
-                  entries.map((e) => {
-                    const isSelected = (selectedJournalId || entries[0]?.id) === e.id;
+                  allEntries.map((e) => {
+                    const isSelected = (selectedJournalId || allEntries[0]?.id) === e.id;
                     return (
                       <div
                         key={e.id}

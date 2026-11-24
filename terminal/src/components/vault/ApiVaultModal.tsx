@@ -30,10 +30,124 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
   const [totpSecret, setTotpSecret] = useState('');
   const [propFirmShieldEnabled, setPropFirmShieldEnabled] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<'CONNECT' | 'STATUS' | 'GUIDE'>('CONNECT');
+  const [activeTab, setActiveTab] = useState<'CONNECT' | 'STATUS' | 'IDENTITY' | 'GUIDE'>('CONNECT');
   const [unlockPassword, setUnlockPassword] = useState('');
   const [unlockedCreds, setUnlockedCreds] = useState<ApiCredentials | null>(null);
   const [statusMsg, setStatusMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  // User Identity & Local Encryption Safe State
+  const [userId, setUserId] = useState<string>(() => {
+    let id = localStorage.getItem('crt_user_id');
+    if (!id) {
+      const rand = Array.from(window.crypto.getRandomValues(new Uint8Array(6)))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('')
+        .toUpperCase();
+      id = `UID-CRT-${rand.slice(0, 4)}-${rand.slice(4, 8)}-${rand.slice(8, 12)}`;
+      localStorage.setItem('crt_user_id', id);
+    }
+    return id;
+  });
+  const [copiedUid, setCopiedUid] = useState(false);
+  const [safePassphrase, setSafePassphrase] = useState('');
+  const [importPassphrase, setImportPassphrase] = useState('');
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isProcessingSafe, setIsProcessingSafe] = useState(false);
+
+  const handleRegenerateId = () => {
+    if (!window.confirm('Regenerate User ID? Your existing drawings and configuration will remain safe.')) return;
+    const rand = Array.from(window.crypto.getRandomValues(new Uint8Array(6)))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase();
+    const nextId = `UID-CRT-${rand.slice(0, 4)}-${rand.slice(4, 8)}-${rand.slice(8, 12)}`;
+    localStorage.setItem('crt_user_id', nextId);
+    setUserId(nextId);
+    setStatusMsg({ text: `New Cryptographic Identity Generated: ${nextId}`, ok: true });
+  };
+
+  const handleCopyUid = () => {
+    navigator.clipboard.writeText(userId);
+    setCopiedUid(true);
+    setTimeout(() => setCopiedUid(false), 2000);
+  };
+
+  const handleExportEncryptedSafe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!safePassphrase.trim()) {
+      setStatusMsg({ text: 'Please enter a Master Passphrase to encrypt the .crtsafe backup.', ok: false });
+      return;
+    }
+    try {
+      setIsProcessingSafe(true);
+      const snapshot = {
+        userId,
+        createdAt: new Date().toISOString(),
+        version: 1,
+        terminal: localStorage.getItem('terminal-v3'),
+        chartSettings: localStorage.getItem('crt_chart_settings'),
+        drawingSettings: localStorage.getItem('crt_drawing_settings'),
+        themeMode: localStorage.getItem('crt_theme_mode'),
+        psychology: localStorage.getItem('psychology-store'),
+        vault: localStorage.getItem('crt_secure_vault_v1'),
+      };
+      const encrypted = await encryptSecret(JSON.stringify(snapshot), safePassphrase.trim());
+      const blob = new Blob([encrypted], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `crt-vault-${userId}-${new Date().toISOString().slice(0, 10)}.crtsafe`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setSafePassphrase('');
+      setStatusMsg({ text: 'AES-256-GCM encrypted backup (.crtsafe) successfully generated and downloaded.', ok: true });
+    } catch (err) {
+      setStatusMsg({ text: 'Safe export failed: ' + String(err), ok: false });
+    } finally {
+      setIsProcessingSafe(false);
+    }
+  };
+
+  const handleImportEncryptedSafe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importFile) {
+      setStatusMsg({ text: 'Please select an encrypted .crtsafe backup file.', ok: false });
+      return;
+    }
+    if (!importPassphrase.trim()) {
+      setStatusMsg({ text: 'Please enter the decryption passphrase for this backup.', ok: false });
+      return;
+    }
+    try {
+      setIsProcessingSafe(true);
+      const fileData = await importFile.text();
+      const decrypted = await decryptSecret(fileData, importPassphrase.trim());
+      const snapshot = JSON.parse(decrypted);
+      if (!snapshot || typeof snapshot !== 'object') {
+        throw new Error('Invalid safe file structure.');
+      }
+      if (snapshot.terminal) localStorage.setItem('terminal-v3', snapshot.terminal);
+      if (snapshot.chartSettings) localStorage.setItem('crt_chart_settings', snapshot.chartSettings);
+      if (snapshot.drawingSettings) localStorage.setItem('crt_drawing_settings', snapshot.drawingSettings);
+      if (snapshot.themeMode) localStorage.setItem('crt_theme_mode', snapshot.themeMode);
+      if (snapshot.psychology) localStorage.setItem('psychology-store', snapshot.psychology);
+      if (snapshot.vault) localStorage.setItem('crt_secure_vault_v1', snapshot.vault);
+      if (snapshot.userId) {
+        localStorage.setItem('crt_user_id', snapshot.userId);
+        setUserId(snapshot.userId);
+      }
+      setImportPassphrase('');
+      setImportFile(null);
+      setStatusMsg({ text: 'Restoration successful! Refreshing terminal to apply restored state...', ok: true });
+      setTimeout(() => {
+        window.location.reload();
+      }, 1200);
+    } catch {
+      setStatusMsg({ text: 'Decryption failed: Incorrect passphrase or corrupted .crtsafe file.', ok: false });
+    } finally {
+      setIsProcessingSafe(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -131,7 +245,7 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
 
         {/* Tab navigation */}
         <div className="flex border-b border-grid bg-bg/30 px-6">
-          {(['CONNECT', 'STATUS', 'GUIDE'] as const).map((tab) => (
+          {(['CONNECT', 'STATUS', 'IDENTITY', 'GUIDE'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => {
@@ -148,6 +262,8 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
                 ? 'Broker Setup'
                 : tab === 'STATUS'
                 ? 'Vault Status'
+                : tab === 'IDENTITY'
+                ? 'User ID & Encryption'
                 : 'Bridge Architecture'}
             </button>
           ))}
@@ -204,6 +320,9 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
                         className="w-full rounded border border-grid bg-bg px-2.5 py-1.5 text-white focus:outline-none"
                       >
                         <option value="METATRADER_5">MetaTrader 5 (MT5 Bridge Gateway)</option>
+                        <option value="METAQUOTES">MetaQuotes / MQL5 Web API</option>
+                        <option value="PEPPERSTONE">Pepperstone (cTrader / FIX / MT5)</option>
+                        <option value="OANDA">OANDA v20 Forex & CFDs</option>
                         <option value="TRADOVATE">Tradovate (CME Futures Direct)</option>
                         <option value="INTERACTIVE_BROKERS">Interactive Brokers (IBKR TWS)</option>
                         <option value="ZERODHA_KITE">Zerodha Kite (NSE/BSE Equities & F&O)</option>
@@ -212,7 +331,6 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
                         <option value="DELTA_EXCHANGE">Delta Exchange (Options & Futures)</option>
                         <option value="BINANCE">Binance Futures (Perp USDT)</option>
                         <option value="BYBIT">Bybit Perpetuals</option>
-                        <option value="OANDA">OANDA v20 Forex</option>
                         <option value="CUSTOM">Custom WebSocket / REST Bridge</option>
                       </select>
                     </div>
@@ -511,7 +629,7 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
                     </div>
                   )}
 
-                  {['DELTA_EXCHANGE', 'BINANCE', 'BYBIT', 'OANDA', 'CUSTOM'].includes(broker) && (
+                  {['DELTA_EXCHANGE', 'BINANCE', 'BYBIT', 'OANDA', 'PEPPERSTONE', 'METAQUOTES', 'CUSTOM'].includes(broker) && (
                     <div className="space-y-3 border-t border-grid/50 pt-3">
                       <div>
                         <label className="text-[10px] uppercase font-bold text-muted block mb-1">
@@ -663,6 +781,149 @@ export default function ApiVaultModal({ isOpen, onClose }: ApiVaultModalProps) {
                 >
                   Export JSON Backup
                 </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'IDENTITY' && (
+            <div className="space-y-4">
+              {/* User Cryptographic Identity Card */}
+              <div className="rounded-xl border border-grid bg-bg/40 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                      Cryptographic User Identity
+                    </h3>
+                  </div>
+                  <span className="rounded bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 text-[10px] text-cyan-300 font-mono">
+                    Client-Side Zero-Knowledge
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-muted leading-relaxed">
+                  Your terminal identity is generated cryptographically on this device. No central account registration or tracking cookies are required.
+                </p>
+
+                <div className="flex items-center gap-2 rounded-lg border border-grid bg-black/40 p-2.5">
+                  <div className="flex-1 font-mono text-sm font-bold text-white tracking-wider">
+                    {userId}
+                  </div>
+                  <button
+                    onClick={handleCopyUid}
+                    className="clay-btn px-3 py-1 font-semibold text-xs text-slate-200 hover:text-white"
+                  >
+                    {copiedUid ? 'Copied' : 'Copy UID'}
+                  </button>
+                  <button
+                    onClick={handleRegenerateId}
+                    className="clay-btn px-2.5 py-1 text-xs text-rose-300 hover:text-rose-200"
+                    title="Generate a fresh cryptographic User ID"
+                  >
+                    Regenerate
+                  </button>
+                </div>
+              </div>
+
+              {/* Master Passphrase Encryption Details */}
+              <div className="rounded-xl border border-grid bg-bg/40 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                    Local Vault Encryption Protocol
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-[10px] font-mono">
+                  <div className="p-2 rounded bg-black/30 border border-grid">
+                    <span className="text-muted block">Cipher</span>
+                    <span className="text-emerald-400 font-bold">AES-GCM 256</span>
+                  </div>
+                  <div className="p-2 rounded bg-black/30 border border-grid">
+                    <span className="text-muted block">Derivation</span>
+                    <span className="text-white font-bold">PBKDF2 (100k rounds)</span>
+                  </div>
+                  <div className="p-2 rounded bg-black/30 border border-grid">
+                    <span className="text-muted block">Entropy Salt</span>
+                    <span className="text-white font-bold">128-bit CSPRNG</span>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  All broker API keys, private passwords, and customized layouts are protected by your master passphrase. The plaintext keys never touch local storage unencrypted.
+                </p>
+              </div>
+
+              {/* Encrypted Safe Backup (.crtsafe) */}
+              <div className="rounded-xl border border-grid bg-bg/40 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-accent" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                    Export Encrypted Safe Backup (.crtsafe)
+                  </h3>
+                </div>
+                <p className="text-[11px] text-muted">
+                  Package all drawings, templates, indicators, accounts, risk limits, and broker credentials into a single password-encrypted .crtsafe file.
+                </p>
+
+                <form onSubmit={handleExportEncryptedSafe} className="flex gap-2">
+                  <input
+                    type="password"
+                    placeholder="Enter Master Passphrase to Encrypt Backup"
+                    value={safePassphrase}
+                    onChange={(e) => setSafePassphrase(e.target.value)}
+                    required
+                    className="flex-1 rounded border border-grid bg-bg px-3 py-1.5 text-white text-xs"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isProcessingSafe}
+                    className="clay-pill-active px-4 py-1.5 font-bold text-xs shrink-0"
+                  >
+                    {isProcessingSafe ? 'Encrypting...' : 'Export .crtsafe'}
+                  </button>
+                </form>
+              </div>
+
+              {/* Restore Encrypted Safe Backup (.crtsafe) */}
+              <div className="rounded-xl border border-grid bg-bg/40 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-amber-400" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                    Restore From Encrypted Safe (.crtsafe)
+                  </h3>
+                </div>
+                <p className="text-[11px] text-muted">
+                  Restore your entire terminal configuration across devices or after clearing browser cache.
+                </p>
+
+                <form onSubmit={handleImportEncryptedSafe} className="space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept=".crtsafe,.json"
+                      onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                      className="text-xs text-muted file:mr-2 file:py-1 file:px-2.5 file:rounded file:border file:border-grid file:bg-panel file:text-xs file:font-semibold file:text-white cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      placeholder="Enter Decryption Passphrase"
+                      value={importPassphrase}
+                      onChange={(e) => setImportPassphrase(e.target.value)}
+                      required
+                      className="flex-1 rounded border border-grid bg-bg px-3 py-1.5 text-white text-xs"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isProcessingSafe || !importFile}
+                      className="clay-btn px-4 py-1.5 font-bold text-xs shrink-0 text-white disabled:opacity-40"
+                    >
+                      {isProcessingSafe ? 'Decrypting...' : 'Decrypt & Restore'}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}

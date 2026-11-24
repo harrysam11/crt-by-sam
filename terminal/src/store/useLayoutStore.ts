@@ -8,7 +8,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Timeframe } from '../types/terminal';
+import type { ChartStyle, Timeframe } from '../types/terminal';
 
 export type ChartGridLayout = '1x1' | '1x2' | '2x1' | '2x2';
 export type ThemeMode = 'DARK' | 'LIGHT';
@@ -108,6 +108,7 @@ interface LayoutState {
   syncTimeframe: boolean;
   syncCrosshair: boolean;
   syncRange: boolean;
+  chartStyle: ChartStyle;
   isChartMaximized: boolean;
   themeMode: ThemeMode;
   savedLayouts: SavedLayoutItem[];
@@ -115,6 +116,7 @@ interface LayoutState {
 
   setLayout: (layout: ChartGridLayout) => void;
   setActivePaneId: (paneId: string) => void;
+  setChartStyle: (style: ChartStyle) => void;
   setPaneConfig: (paneId: string, patch: Partial<PaneConfig>) => void;
   setPaneSymbol: (paneId: string, symbol: string) => void;
   setPaneTimeframe: (paneId: string, timeframe: Timeframe) => void;
@@ -143,6 +145,7 @@ export const useLayoutStore = create<LayoutState>()(
       syncTimeframe: false,
       syncCrosshair: true,
       syncRange: false,
+      chartStyle: 'CANDLE' as ChartStyle,
       isChartMaximized: false,
       themeMode: (localStorage.getItem('crt_theme_mode') as ThemeMode) || 'DARK',
       savedLayouts: DEFAULT_TEMPLATES,
@@ -157,6 +160,8 @@ export const useLayoutStore = create<LayoutState>()(
       setLayout: (layout) => set({ layout }),
 
       setActivePaneId: (activePaneId) => set({ activePaneId }),
+
+      setChartStyle: (chartStyle) => set({ chartStyle }),
 
       setPaneConfig: (paneId, patch) =>
         set((state) => {

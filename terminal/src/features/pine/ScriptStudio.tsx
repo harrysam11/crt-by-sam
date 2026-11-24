@@ -111,10 +111,17 @@ export default function ScriptStudio({ onApplyPlots, onClearPlots }: ScriptStudi
           plotCount: result.plots.length + drawingsCount,
           pointsCount: totalPoints,
         });
+        // Extract title from code if present: indicator("Title", ...), strategy("Title", ...), study("Title", ...)
+        const matchTitle = pineCode.match(/(?:indicator|strategy|study)\s*\(\s*["']([^"']+)["']/i);
+        const scriptTitle = matchTitle?.[1]?.trim() || selectedPinePreset || 'Custom Pine Script';
+
+        useTerminalStore.getState().addPineScript({
+          name: scriptTitle,
+          code: pineCode,
+        });
         if (onApplyPlots) {
           onApplyPlots(result.plots);
         }
-        useTerminalStore.getState().setPineDrawings(result.drawings || null);
       } else {
         setStatus('ERROR');
         setErrorMessage(result.error || 'Pine compilation error: No plots or drawings generated.');
@@ -128,10 +135,15 @@ export default function ScriptStudio({ onApplyPlots, onClearPlots }: ScriptStudi
     setStatus('IDLE');
     setErrorMessage(null);
     setMetrics(null);
+    const matchTitle = pineCode.match(/(?:indicator|strategy|study)\s*\(\s*["']([^"']+)["']/i);
+    const scriptName = matchTitle?.[1]?.trim() || selectedPinePreset || 'Custom Pine Script';
+    const found = useTerminalStore.getState().activePineScripts.find(p => p.name === scriptName);
+    if (found) {
+      useTerminalStore.getState().removePineScript(found.id);
+    }
     if (onClearPlots) {
       onClearPlots();
     }
-    useTerminalStore.getState().setPineDrawings(null);
   };
 
   const lineCount = activeCode.split('\n').length;

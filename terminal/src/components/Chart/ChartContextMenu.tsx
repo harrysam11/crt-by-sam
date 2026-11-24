@@ -9,6 +9,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { fmtPrice } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
 import type { ChartStyle, ChartTimezone, PriceScaleType } from '../../types/terminal';
+import { useTerminalStore } from '../../store/useTerminalStore';
 
 export interface ChartContextMenuPos {
   x: number;
@@ -64,6 +65,8 @@ export default function ChartContextMenu({
 }: ChartContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<'STYLE' | 'SCALE' | 'TZ' | null>(null);
+  const showPeriodSeparators = useTerminalStore((s) => s.showPeriodSeparators);
+  const togglePeriodSeparators = useTerminalStore((s) => s.togglePeriodSeparators);
 
   // Close on click outside or Escape
   useEffect(() => {
@@ -104,7 +107,7 @@ export default function ChartContextMenu({
     <div
       ref={menuRef}
       style={{ left: clampedX, top: clampedY }}
-      className="fixed z-50 w-64 rounded-[8px] border border-white/[0.08] bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl select-none font-mono text-[11px] text-slate-200"
+      className="fixed z-50 w-64 rounded-[8px] border border-grid bg-panel/95 py-1.5 shadow-2xl backdrop-blur-xl select-none font-mono text-[11px] text-white"
     >
       {/* Price Header */}
       <div className="border-b border-grid/60 px-3 py-1.5 flex items-center justify-between text-muted text-[10px]">
@@ -285,7 +288,7 @@ export default function ChartContextMenu({
         {activeSubmenu === 'TZ' && (
           <div
             onMouseLeave={() => setActiveSubmenu(null)}
-            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 rounded-[8px] border border-white/[0.08] bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl`}
+            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 rounded-[8px] border border-grid bg-panel py-1.5 shadow-2xl backdrop-blur-xl`}
           >
             {(
               [
@@ -319,6 +322,28 @@ export default function ChartContextMenu({
           </div>
         )}
       </div>
+
+      {/* Period Separators Toggle */}
+      <button
+        onClick={() => {
+          audioHaptics.tick();
+          togglePeriodSeparators();
+          onClose();
+        }}
+        className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+      >
+        <div className="flex items-center gap-2">
+          <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span>Period separators</span>
+        </div>
+        {showPeriodSeparators && (
+          <svg className="h-3.5 w-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        )}
+      </button>
 
       <div className="my-1 border-t border-grid/60" />
 
@@ -433,6 +458,22 @@ export default function ChartContextMenu({
             <span>Object tree & drawings...</span>
           </button>
         )}
+
+        <button
+          onClick={() => {
+            audioHaptics.tick();
+            if ((window as any).__openChartSkinsModal) {
+              (window as any).__openChartSkinsModal();
+            }
+            onClose();
+          }}
+          className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+        >
+          <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span>Chart skins & wallpapers...</span>
+        </button>
 
         <button
           onClick={() => {

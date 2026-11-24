@@ -1,0 +1,47 @@
+//@version=5
+indicator("ICT Silver Bullets (Sessions & Killzones)", overlay=true, max_boxes_count=500, max_labels_count=500)
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TIMEZONE & SESSION SETTINGS
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+gmtSelect = input.string("GMT-4", "Time Zone", options=["GMT-5", "GMT-4", "GMT-3", "GMT", "GMT+1", "GMT+2", "GMT+3", "GMT+5:30", "UTC"], group="Timezone")
+
+betweenTime1 = input.session("2100-2200", "Asia Silver Bullet", group="Silver Bullet Windows")
+betweenTime2 = input.session("0300-0400", "London Silver Bullet", group="Silver Bullet Windows")
+betweenTime3 = input.session("1000-1100", "NY AM Silver Bullet", group="Silver Bullet Windows")
+showLabels = input.bool(true, "Show Session Labels", group="Display Options")
+
+// Check if current bar is in session
+inAsia = not na(time(timeframe.period, betweenTime1 + ":1234567", gmtSelect))
+inLondon = not na(time(timeframe.period, betweenTime2 + ":1234567", gmtSelect))
+inNy = not na(time(timeframe.period, betweenTime3 + ":1234567", gmtSelect))
+
+// Draw Institutional Session Geometry Boxes
+var box bAsia = na
+var box bLondon = na
+var box bNy = na
+
+// Asia Silver Bullet Session (Lilac)
+if inAsia and not inAsia[1]
+    bAsia := box.new(left=bar_index, top=high, right=bar_index + 1, bottom=low, bgcolor=color.new(color.rgb(168, 85, 247), 92), border_color=color.new(color.rgb(168, 85, 247), 50), border_style=line.style_dashed, text=showLabels ? "Asia (21:00-22:00)" : "", text_color=color.rgb(216, 180, 254), text_size=size.tiny)
+else if inAsia and not na(bAsia)
+    box.set_right(bAsia, bar_index + 1)
+    box.set_top(bAsia, math.max(box.get_top(bAsia), high))
+    box.set_bottom(bAsia, math.min(box.get_bottom(bAsia), low))
+
+// London Silver Bullet Session (Cyan)
+if inLondon and not inLondon[1]
+    bLondon := box.new(left=bar_index, top=high, right=bar_index + 1, bottom=low, bgcolor=color.new(color.rgb(56, 189, 248), 92), border_color=color.new(color.rgb(56, 189, 248), 50), border_style=line.style_dashed, text=showLabels ? "London (03:00-04:00)" : "", text_color=color.rgb(186, 230, 253), text_size=size.tiny)
+else if inLondon and not na(bLondon)
+    box.set_right(bLondon, bar_index + 1)
+    box.set_top(bLondon, math.max(box.get_top(bLondon), high))
+    box.set_bottom(bLondon, math.min(box.get_bottom(bLondon), low))
+
+// NY AM Silver Bullet Session (Gold)
+if inNy and not inNy[1]
+    bNy := box.new(left=bar_index, top=high, right=bar_index + 1, bottom=low, bgcolor=color.new(color.rgb(234, 179, 8), 92), border_color=color.new(color.rgb(234, 179, 8), 50), border_style=line.style_dashed, text=showLabels ? "NY AM (10:00-11:00)" : "", text_color=color.rgb(254, 240, 138), text_size=size.tiny)
+else if inNy and not na(bNy)
+    box.set_right(bNy, bar_index + 1)
+    box.set_top(bNy, math.max(box.get_top(bNy), high))
+    box.set_bottom(bNy, math.min(box.get_bottom(bNy), low))

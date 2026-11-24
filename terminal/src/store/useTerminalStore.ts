@@ -10,7 +10,46 @@ import type {
 } from '../types/terminal';
 import { useExecutionEngineStore } from './useExecutionEngineStore';
 import { useLayoutStore } from './useLayoutStore';
-import type { PineDrawingOutput } from '../services/pineRunner';
+import crtModelPine from '../features/pine/presets/crtModel.pine?raw';
+import { executePineScript, type PineDrawingOutput, type PinePlotOutput } from '../services/pineRunner';
+import { useGuardianStore } from './useGuardianStore';
+
+export interface PositionTicket {
+  id: string;
+  orderId: string;
+  symbol: string;
+  side: 'LONG' | 'SHORT';
+  size: number;
+  entryPrice: number;
+  entryTime: number;
+  leverage: number;
+  unrealizedPnl: number;
+  stopLoss?: number;
+  takeProfit?: number;
+}
+
+export interface ActivePineScript {
+  id: string;
+  name: string;
+  code: string;
+  visible: boolean;
+}
+
+export const DEFAULT_PINE_SCRIPTS: ActivePineScript[] = [
+  {
+    id: 'pine-crt-model-pro',
+    name: 'CRT Model Pro - Sam',
+    code: crtModelPine,
+    visible: true,
+  },
+];
+
+interface CachedPineOutput {
+  cacheKey: string;
+  plots: PinePlotOutput[];
+  drawings?: PineDrawingOutput;
+}
+const pineScriptCache: Record<string, CachedPineOutput> = {};
 
 export const START_BALANCE = 10000; // USD
 export const LEVERAGES = [1, 2, 5, 10, 20, 50, 100];
@@ -123,6 +162,7 @@ interface TerminalState {
   isLoadingCandles: boolean;
   pinePlots: Array<{ title: string; color: string; data: Array<{ time: number; value: number }> }>;
   pineDrawings: PineDrawingOutput | null;
+  activePineScripts: ActivePineScript[];
 
   accounts: TradingAccount[];
   activeAccountId: string;
@@ -134,6 +174,16 @@ interface TerminalState {
   setIsLoadingCandles: (l: boolean) => void;
   setPinePlots: (plots: Array<{ title: string; color: string; data: Array<{ time: number; value: number }> }>) => void;
   setPineDrawings: (drawings: PineDrawingOutput | null) => void;
+  addPineScript: (script: { name: string; code: string }) => void;
+  updatePineScript: (id: string, patch: Partial<ActivePineScript>) => void;
+  removePineScript: (id: string) => void;
+  togglePineScript: (id: string) => void;
+  showPeriodSeparators: boolean;
+  togglePeriodSeparators: () => void;
+  setShowPeriodSeparators: (val: boolean) => void;
+  periodSeparatorInterval: 'AUTO' | '1h' | '4h' | '1D' | '1W';
+  setPeriodSeparatorInterval: (interval: 'AUTO' | '1h' | '4h' | '1D' | '1W') => void;
+  recalculatePineScripts: () => Promise<void>;
   setSymbol: (s: string) => void;
   setTimeframe: (t: Timeframe) => void;
   setCandles: (c: Candle[]) => void;
@@ -173,6 +223,10 @@ interface TerminalState {
   bulkCancelOrders: (orderIds: string[]) => void;
   bulkShiftOrderPrices: (orderIds: string[], offsetPct: number) => void;
   setTrailingStop: (symbol: string, trailPct: number) => void;
+  positionTickets: PositionTicket[];
+  positionViewMode: 'TICKETS' | 'NETTED';
+  setPositionViewMode: (mode: 'TICKETS' | 'NETTED') => void;
+  closePositionTicket: (ticketId: string) => void;
   resetAccount: () => void;
 }
 
@@ -185,6 +239,8 @@ export const positionPnlUsd = (p: Position, mark: number) =>
 const marginUsd = (p: Position) => (p.size * p.entryPrice * toUsd(p.symbol)) / p.leverage;
 export const freeMargin = (s: Pick<Book, 'positions' | 'balance'>) =>
   Object.values(s.positions).reduce((f, p) => f + p.unrealizedPnl - marginUsd(p), s.balance);
+export const totalEquity = (s: Pick<Book, 'positions' | 'balance'>) =>
+  Object.values(s.positions).reduce((acc, p) => acc + p.unrealizedPnl, s.balance);
 
 /** Net a fill into the book: scale-in averages entry, opposite fills realize PnL, overshoot flips. */
 function applyFill(positions: Record<string, Position>, balance: number, symbol: string, side: OrderSide, qty: number, price: number, leverage: number) {
@@ -222,6 +278,7 @@ function runEngine(book: Book, symbol: string, price: number): Partial<Book> | n
   let { positions, balance, trades } = book;
   let orders = book.orders;
   let touched = false as boolean;
+  const newTickets: PositionTicket[] = [];
 
   if (hasPending) {
     orders = orders.map((o) => {
@@ -268,6 +325,19 @@ function runEngine(book: Book, symbol: string, price: number): Partial<Book> | n
       positions = r.positions;
       balance = r.balance;
       if (r.trade) trades = [...trades, r.trade];
+      if (o.type === 'LIMIT' && !o.reduceOnly) {
+        newTickets.push({
+          id: `TKT-${Math.floor(100000 + Math.random() * 900000)}`,
+          orderId: o.id,
+          symbol,
+          side: o.side === 'BUY' ? 'LONG' : 'SHORT',
+          size: qty,
+          entryPrice: fillPrice,
+          entryTime: Date.now(),
+          leverage: o.leverage ?? 1,
+          unrealizedPnl: 0,
+        });
+      }
       touched = true;
       return { ...o, qty, price: fillPrice, status: 'FILLED' as const, timestamp: Date.now() };
     });
@@ -279,7 +349,7 @@ function runEngine(book: Book, symbol: string, price: number): Partial<Book> | n
 
   const pos = positions[symbol];
   if (pos) positions = { ...positions, [symbol]: { ...pos, unrealizedPnl: positionPnlUsd(pos, price) } };
-  return { positions, orders: trimOrders(orders), balance, trades: trimTrades(trades) };
+  return { positions, orders: trimOrders(orders), balance, trades: trimTrades(trades), ...(newTickets.length > 0 ? { newTickets } as any : {}) };
 }
 
 // ---- Store ---------------------------------------------------------------------------------------
@@ -343,6 +413,9 @@ export const useTerminalStore = create<TerminalState>()(
         quotes: {},
         instruments: DEFAULT_INSTRUMENTS,
         positions: {},
+        positionTickets: [],
+        positionViewMode: 'TICKETS',
+        setPositionViewMode: (mode) => set({ positionViewMode: mode }),
         orders: [],
         trades: [],
         alerts: [],
@@ -354,10 +427,159 @@ export const useTerminalStore = create<TerminalState>()(
         isLoadingCandles: false,
         pinePlots: [],
         pineDrawings: null,
+        activePineScripts: DEFAULT_PINE_SCRIPTS,
 
         setIsLoadingCandles: (isLoadingCandles) => set({ isLoadingCandles }),
         setPinePlots: (pinePlots) => set({ pinePlots }),
         setPineDrawings: (pineDrawings) => set({ pineDrawings }),
+
+        addPineScript: (script) => {
+          const current = get().activePineScripts;
+          const existing = current.find((p) => p.name === script.name);
+          if (existing) {
+            set({
+              activePineScripts: current.map((p) =>
+                p.id === existing.id ? { ...p, code: script.code, visible: true } : p
+              ),
+            });
+          } else {
+            const newScript: ActivePineScript = {
+              id: `pine-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              name: script.name,
+              code: script.code,
+              visible: true,
+            };
+            set({ activePineScripts: [...current, newScript] });
+          }
+          get().recalculatePineScripts();
+        },
+
+        updatePineScript: (id, patch) => {
+          set((s) => ({
+            activePineScripts: s.activePineScripts.map((p) =>
+              p.id === id ? { ...p, ...patch } : p
+            ),
+          }));
+          get().recalculatePineScripts();
+        },
+
+        removePineScript: (id) => {
+          set((s) => ({
+            activePineScripts: s.activePineScripts.filter((p) => p.id !== id),
+          }));
+          get().recalculatePineScripts();
+        },
+
+        togglePineScript: (id) => {
+          set((s) => ({
+            activePineScripts: s.activePineScripts.map((p) =>
+              p.id === id ? { ...p, visible: !p.visible } : p
+            ),
+          }));
+          get().recalculatePineScripts();
+        },
+
+        showPeriodSeparators: true,
+        periodSeparatorInterval: 'AUTO',
+        togglePeriodSeparators: () => set((s) => ({ showPeriodSeparators: !s.showPeriodSeparators })),
+        setShowPeriodSeparators: (val: boolean) => set({ showPeriodSeparators: val }),
+        setPeriodSeparatorInterval: (val: 'AUTO' | '1h' | '4h' | '1D' | '1W') => set({ periodSeparatorInterval: val }),
+
+        recalculatePineScripts: async () => {
+          const state = get();
+          const candles = state.candles;
+          const symbol = state.symbol;
+          const timeframe = state.timeframe;
+          if (!candles || candles.length < 5) return;
+
+          const active = state.activePineScripts.filter((p) => p.visible);
+          if (active.length === 0) {
+            set({ pinePlots: [], pineDrawings: null });
+            return;
+          }
+
+          // Clean up cache for any removed scripts
+          const activeIds = new Set(active.map((p) => p.id));
+          for (const key of Object.keys(pineScriptCache)) {
+            if (!activeIds.has(key)) {
+              delete pineScriptCache[key];
+            }
+          }
+
+          const syncOutputsToStore = () => {
+            const allPlots: PinePlotOutput[] = [];
+            const mergedDrawings: PineDrawingOutput = {
+              boxes: [],
+              lines: [],
+              labels: [],
+              tables: [],
+              barOffset: 0,
+            };
+
+            for (const script of active) {
+              const cached = pineScriptCache[script.id];
+              if (!cached) continue;
+              if (cached.plots && cached.plots.length > 0) {
+                allPlots.push(...cached.plots);
+              }
+              if (cached.drawings) {
+                if (cached.drawings.boxes) mergedDrawings.boxes.push(...cached.drawings.boxes);
+                if (cached.drawings.lines) mergedDrawings.lines.push(...cached.drawings.lines);
+                if (cached.drawings.labels) mergedDrawings.labels.push(...cached.drawings.labels);
+                if (cached.drawings.tables) mergedDrawings.tables.push(...cached.drawings.tables);
+                if (cached.drawings.barOffset !== undefined) mergedDrawings.barOffset = cached.drawings.barOffset;
+              }
+            }
+
+            set({
+              pinePlots: allPlots,
+              pineDrawings:
+                mergedDrawings.boxes.length > 0 ||
+                mergedDrawings.lines.length > 0 ||
+                mergedDrawings.labels.length > 0 ||
+                mergedDrawings.tables.length > 0
+                  ? mergedDrawings
+                  : null,
+            });
+          };
+
+          // Synchronize immediately from existing cache so already-calculated indicators show with 0ms delay
+          syncOutputsToStore();
+
+          // Sort so lightweight scripts (e.g. Dual EMA, Bollinger Bands) execute first (< 15ms)
+          const sorted = [...active].sort((a, b) => a.code.length - b.code.length);
+
+          const lastCandleTime = candles[candles.length - 1]?.time || 0;
+
+          for (const script of sorted) {
+            let codeHash = 0;
+            for (let chIdx = 0; chIdx < script.code.length; chIdx++) {
+              codeHash = (codeHash * 31 + script.code.charCodeAt(chIdx)) | 0;
+            }
+            const cacheKey = `${script.id}_${symbol}_${timeframe}_${lastCandleTime}_${codeHash}`;
+            if (pineScriptCache[script.id]?.cacheKey === cacheKey) {
+              continue;
+            }
+
+            // Slicing: heavy scripts (>20k chars like CRT Model Pro) use 100 bars; light scripts use 200 bars
+            const sliceCount = script.code.length > 20000 ? 100 : 200;
+            const calcCandles = candles.length > sliceCount ? candles.slice(-sliceCount) : candles;
+
+            try {
+              const res = await executePineScript(script.code, calcCandles, symbol, timeframe, candles.length);
+              if (res && res.ok) {
+                pineScriptCache[script.id] = {
+                  cacheKey,
+                  plots: res.plots || [],
+                  drawings: res.drawings,
+                };
+                syncOutputsToStore();
+              }
+            } catch (err) {
+              console.warn(`Failed to execute pine script ${script.name}:`, err);
+            }
+          }
+        },
         setSymbol: (symbol) => {
           const safe = sanitizeSymbol(symbol);
           set((s) => ({ symbol: safe, candles: [], error: null, currentPrice: s.prices[safe] ?? 0 }));
@@ -374,7 +596,12 @@ export const useTerminalStore = create<TerminalState>()(
             layoutState.setPaneTimeframe(layoutState.activePaneId || 'pane-1', safe);
           } catch {}
         },
-        setCandles: (candles) => set({ candles }),
+        setCandles: (candles) => {
+          set({ candles });
+          if (get().activePineScripts.some((p) => p.visible)) {
+            get().recalculatePineScripts();
+          }
+        },
         setStatus: (status) => set({ status }),
         setError: (error) => set({ error }),
 
@@ -409,7 +636,21 @@ export const useTerminalStore = create<TerminalState>()(
         updatePriceTick: (symbol, price) => {
           set((s) => {
             const r = runEngine(s, symbol, price);
-            return { prices: { ...s.prices, [symbol]: price }, currentPrice: symbol === s.symbol ? price : s.currentPrice, ...(r ?? {}) };
+            const currentPrices = { ...s.prices, [symbol]: price };
+            const positionTickets = (s.positionTickets || []).map((t) => {
+              const m = currentPrices[t.symbol] ?? t.entryPrice;
+              const dir = t.side === 'LONG' ? 1 : -1;
+              const pnl = (m - t.entryPrice) * t.size * dir * toUsd(t.symbol);
+              return { ...t, unrealizedPnl: pnl };
+            });
+            const incomingTickets: PositionTicket[] = (r as any)?.newTickets || [];
+            const mergedTickets = incomingTickets.length > 0 ? [...positionTickets, ...incomingTickets] : positionTickets;
+            return {
+              prices: currentPrices,
+              currentPrice: symbol === s.symbol ? price : s.currentPrice,
+              positionTickets: mergedTickets,
+              ...(r ?? {}),
+            };
           });
           fireAlerts(symbol, price);
           try {
@@ -438,6 +679,58 @@ export const useTerminalStore = create<TerminalState>()(
           const ref = req.type === 'LIMIT' ? req.price ?? 0 : mark;
           if (!(req.qty > 0)) return { ok: false, error: 'Enter a quantity above zero.' };
           if (!(ref > 0)) return { ok: false, error: req.type === 'LIMIT' ? 'Enter a limit price.' : 'Waiting for a live price.' };
+
+          // TradeXGuardian Pre-Trade Enforcement
+          try {
+            const guardianState = useGuardianStore.getState();
+            if (guardianState.emergencyLocked) {
+              const msg = `[GUARDIAN LOCKED] Emergency risk lock active: ${guardianState.emergencyLockReason || 'Trading halted.'}`;
+              notifyAlert('TradeXGuardian Locked', msg);
+              return { ok: false, error: msg };
+            }
+            if (guardianState.enabled) {
+              const openCount = (s.positionTickets && s.positionTickets.length > 0) ? s.positionTickets.length : Object.keys(s.positions).length;
+              const todayTrades = s.trades.filter((t) => t.time >= new Date().setHours(0, 0, 0, 0)).length;
+              const dailyLoss = s.trades
+                .filter((t) => t.time >= new Date().setHours(0, 0, 0, 0) && t.pnl < 0)
+                .reduce((sum, t) => sum + Math.abs(t.pnl), 0);
+
+              let consecutiveLosses = 0;
+              for (let i = s.trades.length - 1; i >= 0; i--) {
+                if (s.trades[i].pnl < 0) consecutiveLosses++;
+                else break;
+              }
+
+              const checkRes = guardianState.checkTrade({
+                symbol: req.symbol,
+                side: req.side,
+                qty: req.qty,
+                entryPrice: ref,
+                stopLoss: req.stopLoss,
+                takeProfit: req.takeProfit,
+                leverage: req.leverage,
+                accountEquity: totalEquity(s),
+                currentBalance: s.balance,
+                openPositionsCount: openCount,
+                tradesTodayCount: todayTrades,
+                dailyRealizedLoss: dailyLoss,
+                consecutiveLosses,
+                lastTradeTimestamp: s.trades[s.trades.length - 1]?.time,
+              });
+
+              if (checkRes.blocked) {
+                const reason = checkRes.violations.join('; ') || 'Rule violation.';
+                guardianState.logViolation('Risk Rule', 'BLOCK', reason);
+                notifyAlert('TradeXGuardian Blocked', reason);
+                return { ok: false, error: `[GUARDIAN BLOCKED] ${reason}` };
+              }
+              if (checkRes.warnings.length > 0) {
+                notifyAlert('TradeXGuardian Warning', checkRes.warnings[0]);
+              }
+            }
+          } catch (err) {
+            console.warn('Guardian check error:', err);
+          }
 
           const pos = s.positions[req.symbol];
           const reducing = !!pos && (req.side === 'SELL') === (pos.side === 'LONG');
@@ -474,6 +767,7 @@ export const useTerminalStore = create<TerminalState>()(
           }
 
           let { positions, balance, trades } = s;
+          let positionTickets = s.positionTickets || [];
           if (req.type === 'MARKET') {
             const r = applyFill(positions, balance, req.symbol, req.side, req.qty, ref, req.leverage);
             positions = r.positions;
@@ -481,9 +775,25 @@ export const useTerminalStore = create<TerminalState>()(
             if (r.trade) trades = trimTrades([...trades, r.trade]);
             const p = positions[req.symbol];
             if (p) positions = { ...positions, [req.symbol]: { ...p, unrealizedPnl: positionPnlUsd(p, mark) } };
+
+            const newTicket: PositionTicket = {
+              id: `TKT-${Math.floor(100000 + Math.random() * 900000)}`,
+              orderId: main.id,
+              symbol: req.symbol,
+              side: buy ? 'LONG' : 'SHORT',
+              size: req.qty,
+              entryPrice: ref,
+              entryTime: now,
+              leverage: req.leverage,
+              unrealizedPnl: 0,
+              stopLoss: req.stopLoss,
+              takeProfit: req.takeProfit,
+            };
+            positionTickets = [...positionTickets, newTicket];
+
             dispatchOrderFillTelegram(req.symbol, req.side, req.qty, ref);
           }
-          set({ positions, balance, trades, orders: trimOrders([...s.orders, main, ...exits]) });
+          set({ positions, balance, trades, positionTickets, orders: trimOrders([...s.orders, main, ...exits]) });
           const closed = s.quotes[req.symbol]?.open === false && req.type === 'MARKET';
           return { ok: true, warning: closed ? 'Market is closed; filled at the last price.' : undefined };
         },
@@ -500,12 +810,61 @@ export const useTerminalStore = create<TerminalState>()(
           const r = applyFill(s.positions, s.balance, symbol, side, pos.size, mark, pos.leverage);
           const closeOrder: Order = { id: uid(), symbol, side, type: 'MARKET', price: mark, qty: pos.size, status: 'FILLED', timestamp: Date.now() };
           const orders = s.orders.map((o) => (o.status === 'PENDING' && o.symbol === symbol && o.reduceOnly ? { ...o, status: 'CANCELLED' as const } : o));
+          const remainingTickets = (s.positionTickets || []).filter((t) => t.symbol !== symbol);
           set({
             positions: r.positions, balance: r.balance,
+            positionTickets: remainingTickets,
             trades: r.trade ? trimTrades([...s.trades, r.trade]) : s.trades,
             orders: trimOrders([...orders, closeOrder]),
           });
           notifyAlert('Position Closed', `${labelOf(symbol)} position closed at ${fmtPrice(mark, symbol)}.`);
+        },
+
+        closePositionTicket: (ticketId: string) => {
+          const s = get();
+          const ticket = (s.positionTickets || []).find((t) => t.id === ticketId);
+          if (!ticket) return;
+          const mark = s.prices[ticket.symbol] ?? ticket.entryPrice;
+          const dir = ticket.side === 'LONG' ? 1 : -1;
+          const pnl = (mark - ticket.entryPrice) * ticket.size * dir * toUsd(ticket.symbol);
+          const newBalance = s.balance + pnl;
+          const trade: Trade = {
+            id: uid(),
+            symbol: ticket.symbol,
+            side: ticket.side,
+            qty: ticket.size,
+            entry: ticket.entryPrice,
+            exit: mark,
+            pnl,
+            time: Date.now(),
+            entryTime: ticket.entryTime,
+          };
+
+          // Adjust netted positions
+          const pos = s.positions[ticket.symbol];
+          const nextPositions = { ...s.positions };
+          if (pos) {
+            const remainingSize = +(pos.size - ticket.size).toFixed(4);
+            if (remainingSize <= 0) {
+              delete nextPositions[ticket.symbol];
+            } else {
+              nextPositions[ticket.symbol] = {
+                ...pos,
+                size: remainingSize,
+                realizedPnl: pos.realizedPnl + pnl,
+                unrealizedPnl: positionPnlUsd({ ...pos, size: remainingSize }, mark),
+              };
+            }
+          }
+
+          const remainingTickets = (s.positionTickets || []).filter((t) => t.id !== ticketId);
+          set({
+            balance: newBalance,
+            positions: nextPositions,
+            positionTickets: remainingTickets,
+            trades: trimTrades([...s.trades, trade]),
+          });
+          notifyAlert('Ticket Closed', `Closed ${ticket.id} (${ticket.symbol} ${ticket.size}) at ${fmtPrice(mark, ticket.symbol)}. PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}.`);
         },
 
         closePartialPosition: (symbol, fraction = 0.5) => {
@@ -588,7 +947,7 @@ export const useTerminalStore = create<TerminalState>()(
             orders = trimOrders([...orders, { id: uid(), symbol: pos.symbol, side, type: 'MARKET', price: mark, qty: pos.size, status: 'FILLED', timestamp: Date.now() }]);
           }
           orders = orders.map((o) => (o.status === 'PENDING' && o.reduceOnly ? { ...o, status: 'CANCELLED' as const } : o));
-          set({ positions, balance, trades, orders });
+          set({ positions, balance, trades, orders, positionTickets: [] });
           notifyAlert('Emergency Flatten', `Closed all ${open.length} open positions.`);
         },
 
@@ -1028,10 +1387,40 @@ export const useTerminalStore = create<TerminalState>()(
       // Account, journal, alerts, watchlist and view survive a reload; market data is always refetched.
       partialize: (s) => ({
         symbol: s.symbol, timeframe: s.timeframe, instruments: s.instruments, positions: s.positions,
+        positionTickets: s.positionTickets, positionViewMode: s.positionViewMode,
         orders: s.orders, trades: s.trades, alerts: s.alerts, balance: s.balance,
         accounts: s.accounts, activeAccountId: s.activeAccountId,
+        activePineScripts: s.activePineScripts,
+        showPeriodSeparators: s.showPeriodSeparators,
+        periodSeparatorInterval: s.periodSeparatorInterval,
       }),
-      onRehydrateStorage: () => (state) => { if (state) registerInstruments(state.instruments); },
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          registerInstruments(state.instruments);
+          if (!state.activePineScripts || state.activePineScripts.length === 0) {
+            state.activePineScripts = DEFAULT_PINE_SCRIPTS;
+          }
+          if (!state.positionTickets) {
+            state.positionTickets = [];
+          }
+          if (!state.positionViewMode) {
+            state.positionViewMode = 'TICKETS';
+          }
+          if (state.positionTickets.length === 0 && Object.keys(state.positions || {}).length > 0) {
+            state.positionTickets = Object.values(state.positions).map((pos) => ({
+              id: `TKT-${Math.floor(100000 + Math.random() * 900000)}`,
+              orderId: `ORD-${Date.now()}`,
+              symbol: pos.symbol,
+              side: pos.side,
+              size: pos.size,
+              entryPrice: pos.entryPrice,
+              entryTime: pos.entryTime || Date.now(),
+              leverage: pos.leverage || 1,
+              unrealizedPnl: pos.unrealizedPnl || 0,
+            }));
+          }
+        }
+      },
     },
   ),
 );

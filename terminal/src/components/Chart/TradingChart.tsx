@@ -3,7 +3,7 @@ import {
   createChart, ColorType, CrosshairMode, LineStyle, PriceScaleMode,
   type CandlestickData, type IChartApi, type IPriceLine, type ISeriesApi, type SeriesType, type Time, type UTCTimestamp,
 } from 'lightweight-charts';
-import { useTerminalStore } from '../../store/useTerminalStore';
+import { useTerminalStore, type ActivePineScript } from '../../store/useTerminalStore';
 import { usePsychologyStore } from '../../store/usePsychologyStore';
 import { useDerivativesStore } from '../../store/useDerivativesStore';
 import { liveCandleBus } from '../../hooks/useMarketFeed';
@@ -44,6 +44,8 @@ import DeepStudiesOverlay from './DeepStudiesOverlay';
 import PriceScaleActionFlyout from './PriceScaleActionFlyout';
 import SymbolSearchModal from '../Search/SymbolSearchModal';
 import PineDrawingsOverlay from './PineDrawingsOverlay';
+import PeriodSeparatorsOverlay from './PeriodSeparatorsOverlay';
+import PineSettingsModal from './PineSettingsModal';
 import OnChartNewsOverlay from './OnChartNewsOverlay';
 import CustomIntervalModal from './CustomIntervalModal';
 import {
@@ -61,6 +63,7 @@ import RiskHUD from '../RiskHUD';
 import { useLayoutStore } from '../../store/useLayoutStore';
 import { chartSyncBus } from '../../services/crosshairSyncBus';
 import { datafeedHub } from '../../services/datafeed';
+import { computeActiveSessions } from '../../services/marketSessions';
 
 const SMA_N = 20, EMA_N = 50, EMA_K = 2 / (EMA_N + 1);
 const FAVORITE_TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
@@ -102,12 +105,14 @@ export interface TradingChartProps {
   paneId?: string;
   symbolOverride?: string;
   timeframeOverride?: Timeframe;
+  hideTopToolbar?: boolean;
 }
 
 export default function TradingChart({
   paneId = 'pane-1',
   symbolOverride,
   timeframeOverride,
+  hideTopToolbar,
 }: TradingChartProps = {}) {
   const storeSymbol = useTerminalStore((s) => s.symbol);
   const symbol = symbolOverride ?? storeSymbol;
@@ -121,6 +126,10 @@ export default function TradingChart({
   const placeOrder = useTerminalStore((s) => s.placeOrder);
   const addAlert = useTerminalStore((s) => s.addAlert);
   const pinePlots = useTerminalStore((s) => s.pinePlots);
+  const activePineScripts = useTerminalStore((s) => s.activePineScripts);
+  const togglePineScript = useTerminalStore((s) => s.togglePineScript);
+  const removePineScript = useTerminalStore((s) => s.removePineScript);
+  const recalculatePineScripts = useTerminalStore((s) => s.recalculatePineScripts);
   const trades = useTerminalStore((s) => s.trades);
 
   // Layout & Multi-Chart Store
@@ -210,8 +219,11 @@ export default function TradingChart({
 
   const provider = getInstrument(symbol)?.provider ?? 'binance';
 
-  // Indicators & Chart Styles (Default ALL indicators OFF for clean institutional startup)
-  const [chartStyle, setChartStyle] = useState<ChartStyle>('CANDLE');
+  // Indicators & Chart Styles
+  const layoutChartStyle = useLayoutStore((s) => s.chartStyle);
+  const setLayoutChartStyle = useLayoutStore((s) => s.setChartStyle);
+  const chartStyle = layoutChartStyle || 'CANDLE';
+  const setChartStyle = setLayoutChartStyle;
   const [showSma, setShowSma] = useState(false);
   const [showEma, setShowEma] = useState(false);
   const [showVwap, setShowVwap] = useState(false);
@@ -254,6 +266,7 @@ export default function TradingChart({
 
   // Indicators Modal State
   const [isIndicatorsModalOpen, setIsIndicatorsModalOpen] = useState(false);
+  const [selectedPineScriptForSettings, setSelectedPineScriptForSettings] = useState<ActivePineScript | null>(null);
 
   // Bar Replay Historical Time Machine State
   const [isReplayActive, setIsReplayActive] = useState(false);
@@ -273,11 +286,14 @@ export default function TradingChart({
     }
   });
 
+  const shouldShowTopToolbar = hideTopToolbar !== undefined ? !hideTopToolbar : Boolean(chartSettings.showSubToolbar);
+
   const updateChartSettings = (patch: Partial<ChartSettingsState>) => {
     setChartSettings((prev) => {
       const next = { ...prev, ...patch };
       try {
         localStorage.setItem('crt_chart_settings', JSON.stringify(next));
+        window.dispatchEvent(new CustomEvent('crt-chart-settings-changed', { detail: next }));
       } catch {}
       return next;
     });
@@ -287,8 +303,19 @@ export default function TradingChart({
     setChartSettings(DEFAULT_CHART_SETTINGS);
     try {
       localStorage.setItem('crt_chart_settings', JSON.stringify(DEFAULT_CHART_SETTINGS));
+      window.dispatchEvent(new CustomEvent('crt-chart-settings-changed', { detail: DEFAULT_CHART_SETTINGS }));
     } catch {}
   };
+
+  useEffect(() => {
+    const handleSettingsChanged = (e: any) => {
+      if (e.detail) {
+        setChartSettings((prev) => ({ ...prev, ...e.detail }));
+      }
+    };
+    window.addEventListener('crt-chart-settings-changed', handleSettingsChanged);
+    return () => window.removeEventListener('crt-chart-settings-changed', handleSettingsChanged);
+  }, []);
 
   // Live inside-chart TradingView Legend HUD state
   const [currentOhlc, setCurrentOhlc] = useState<{ open: number; high: number; low: number; close: number; volume?: number } | null>(null);
@@ -301,6 +328,11 @@ export default function TradingChart({
   }>({});
   const [scaleMode, setScaleMode] = useState<PriceScaleType>('NORMAL');
   const [timezone, setTimezone] = useState<ChartTimezone>('UTC');
+  const [sessionData, setSessionData] = useState(() => computeActiveSessions());
+  useEffect(() => {
+    const timer = setInterval(() => setSessionData(computeActiveSessions()), 10000);
+    return () => clearInterval(timer);
+  }, []);
   const [showVolumeProfile, setShowVolumeProfile] = useState(false);
   const [showVolume, setShowVolume] = useState(false);
   const [isSymbolSearchOpen, setIsSymbolSearchOpen] = useState(false);
@@ -489,6 +521,50 @@ export default function TradingChart({
     setTimeout(() => setSnapshotToast(null), 3000);
   };
 
+  // Expose global window triggers for active pane when unified topbar is active
+  useEffect(() => {
+    if (isCurrentPaneActive) {
+      (window as any).__openIndicatorsModal = () => setIsIndicatorsModalOpen(true);
+      (window as any).__openChartSettings = () => setIsChartSettingsOpen(true);
+      (window as any).__toggleBarReplay = () => {
+        if (isReplayActive) exitReplay();
+        else startReplay();
+      };
+      (window as any).__openCreateAlert = () => {
+        setAlertInitialPrice(currentPrice);
+        setIsCreateAlertOpen(true);
+      };
+      (window as any).__openChartSkinsModal = () => setShowSkinsModal(true);
+      (window as any).__updateChartSettings = (patch: any) => updateChartSettings(patch);
+      (window as any).__getChartSettings = () => chartSettings;
+      (window as any).__openObjectTree = () => setIsObjectTreeOpen(true);
+      (window as any).__toggleVolumeProfile = () => setShowVolumeProfile((v) => !v);
+      (window as any).__toggleGhost = () => toggleGhost();
+      (window as any).__toggleSessionOHL = () => setShowSessionOHL((v) => !v);
+      (window as any).__takeChartSnapshot = (action: 'download' | 'copy' | 'link') => {
+        if (action === 'download') handleDownloadScreenshot();
+        else if (action === 'copy') handleCopyScreenshotImage();
+        else if (action === 'link') handleCopyShareLink();
+      };
+    }
+    return () => {
+      if (isCurrentPaneActive) {
+        delete (window as any).__openIndicatorsModal;
+        delete (window as any).__openChartSettings;
+        delete (window as any).__toggleBarReplay;
+        delete (window as any).__openCreateAlert;
+        delete (window as any).__openChartSkinsModal;
+        delete (window as any).__updateChartSettings;
+        delete (window as any).__getChartSettings;
+        delete (window as any).__openObjectTree;
+        delete (window as any).__toggleVolumeProfile;
+        delete (window as any).__toggleGhost;
+        delete (window as any).__toggleSessionOHL;
+        delete (window as any).__takeChartSnapshot;
+      }
+    };
+  }, [isCurrentPaneActive, isReplayActive, currentPrice]);
+
   const favoriteTimeframes = useMemo(
     () => TIMEFRAMES[provider].filter((t) => FAVORITE_TIMEFRAMES.includes(t)),
     [provider]
@@ -551,6 +627,18 @@ export default function TradingChart({
   // Active indicator list for in-chart legend controls
   const activeIndicatorsList = useMemo<ActiveIndicatorInfo[]>(() => {
     const list: ActiveIndicatorInfo[] = [];
+
+    const openRegistrySettings = (indicatorId: string) => {
+      const store = useIndicatorsStore.getState();
+      let inst = store.activeInstances.find((i) => i.indicatorId === indicatorId);
+      if (!inst) {
+        inst = store.addInstance(indicatorId) || undefined;
+      }
+      if (inst) {
+        store.openSettings(inst);
+      }
+    };
+
     if (showSma) {
       list.push({
         id: 'sma',
@@ -559,6 +647,7 @@ export default function TradingChart({
         value: indicatorValues.sma,
         visible: showSma,
         onToggleVisible: () => setShowSma((v) => !v),
+        onOpenSettings: () => openRegistrySettings('sma'),
         onRemove: () => setShowSma(false),
       });
     }
@@ -570,6 +659,7 @@ export default function TradingChart({
         value: indicatorValues.ema,
         visible: showEma,
         onToggleVisible: () => setShowEma((v) => !v),
+        onOpenSettings: () => openRegistrySettings('ema'),
         onRemove: () => setShowEma(false),
       });
     }
@@ -581,6 +671,7 @@ export default function TradingChart({
         value: indicatorValues.vwap,
         visible: showVwap,
         onToggleVisible: () => setShowVwap((v) => !v),
+        onOpenSettings: () => openRegistrySettings('vwap'),
         onRemove: () => setShowVwap(false),
       });
     }
@@ -591,6 +682,7 @@ export default function TradingChart({
         color: 'rgba(56, 189, 248, 0.85)',
         visible: showBbands,
         onToggleVisible: () => setShowBbands((v) => !v),
+        onOpenSettings: () => openRegistrySettings('bbands'),
         onRemove: () => setShowBbands(false),
       });
     }
@@ -602,6 +694,7 @@ export default function TradingChart({
         value: indicatorValues.rsi ? indicatorValues.rsi.toFixed(1) : undefined,
         visible: showRsi,
         onToggleVisible: () => setShowRsi((v) => !v),
+        onOpenSettings: () => openRegistrySettings('rsi'),
         onRemove: () => setShowRsi(false),
       });
     }
@@ -663,6 +756,19 @@ export default function TradingChart({
       });
     });
 
+    // Active Pine Script indicators in Chart Legend HUD
+    activePineScripts.forEach((ps) => {
+      list.push({
+        id: ps.id,
+        name: ps.name,
+        color: '#38bdf8',
+        visible: ps.visible,
+        onToggleVisible: () => togglePineScript(ps.id),
+        onOpenSettings: () => setSelectedPineScriptForSettings(ps),
+        onRemove: () => removePineScript(ps.id),
+      });
+    });
+
     return list;
   }, [
     showSma,
@@ -677,10 +783,22 @@ export default function TradingChart({
     indicatorValues,
     activeInstances,
     overlayValues,
+    activePineScripts,
     toggleInstanceVisibility,
+    togglePineScript,
     openSettings,
     removeInstance,
+    removePineScript,
   ]);
+
+  // Automatically evaluate and synchronize active Pine Script indicators (e.g. CRT Model Pro by default)
+  useEffect(() => {
+    if (!candles || candles.length < 5) return;
+    const timer = setTimeout(() => {
+      recalculatePineScripts();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [candles.length, symbol, timeframe, activePineScripts, recalculatePineScripts]);
 
   // Synchronize live candle OHLC and active indicators telemetry for Data Window panel
   useEffect(() => {
@@ -848,6 +966,7 @@ export default function TradingChart({
     api.current?.rsi.applyOptions({ visible: false });
     api.current?.oi.applyOptions({ visible: false });
     clearAllInstances();
+    useTerminalStore.setState({ activePineScripts: [], pinePlots: [], pineDrawings: null });
   };
 
   const handleApplyCustomInterval = (valToApply?: number, unitToApply?: IntervalUnit) => {
@@ -963,7 +1082,7 @@ export default function TradingChart({
       },
       rightPriceScale: {
         borderColor: chartBorderColor,
-        scaleMargins: { top: 0.08, bottom: 0.12 },
+        scaleMargins: { top: 0.04, bottom: 0.04 },
         autoScale: true,
         alignLabels: true,
         borderVisible: true,
@@ -975,7 +1094,7 @@ export default function TradingChart({
         tickMarkFormatter: tickLabel,
         barSpacing: 12,
         minBarSpacing: 3,
-        rightOffset: 12,
+        rightOffset: 20,
         borderVisible: true,
       },
       handleScale: {
@@ -1021,21 +1140,21 @@ export default function TradingChart({
       wickDownColor: borderDownInit,
       visible: chartStyle === 'CANDLE' || chartStyle === 'HOLLOW_CANDLE' || chartStyle === 'HEIKIN_ASHI' || chartStyle === 'FOOTPRINT',
     });
-    cs.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.12 } });
+    cs.priceScale().applyOptions({ scaleMargins: { top: 0.05, bottom: 0.05 } });
 
     const barSeries = chart.addBarSeries({
       upColor: chartSettings.candleUpColor || '#ffffff',
       downColor: borderDownInit,
       visible: chartStyle === 'BAR',
     });
-    barSeries.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.12 } });
+    barSeries.priceScale().applyOptions({ scaleMargins: { top: 0.05, bottom: 0.05 } });
 
     const lineSeries = chart.addLineSeries({
       color: chartSettings.candleUpColor || '#ffffff',
       lineWidth: 2,
       visible: chartStyle === 'LINE',
     });
-    lineSeries.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.12 } });
+    lineSeries.priceScale().applyOptions({ scaleMargins: { top: 0.05, bottom: 0.05 } });
 
     const areaSeries = chart.addAreaSeries({
       topColor: 'rgba(255, 255, 255, 0.28)',
@@ -1044,7 +1163,7 @@ export default function TradingChart({
       lineWidth: 2,
       visible: chartStyle === 'AREA',
     });
-    areaSeries.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.12 } });
+    areaSeries.priceScale().applyOptions({ scaleMargins: { top: 0.05, bottom: 0.05 } });
 
     const baselineSeries = chart.addBaselineSeries({
       baseValue: { type: 'price', price: 0 },
@@ -1056,7 +1175,7 @@ export default function TradingChart({
       bottomFillColor2: 'rgba(242, 54, 69, 0.28)',
       visible: chartStyle === 'BASELINE',
     });
-    baselineSeries.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.12 } });
+    baselineSeries.priceScale().applyOptions({ scaleMargins: { top: 0.05, bottom: 0.05 } });
 
     const vs = chart.addHistogramSeries({
       priceFormat: { type: 'volume' },
@@ -1861,7 +1980,7 @@ export default function TradingChart({
 
   // Dynamic Pine Script Indicator Series rendering
   useEffect(() => {
-    const chart = api.current?.chart;
+    const chart = chartApi || api.current?.chart;
     if (!chart) return;
 
     // Remove existing pine series
@@ -1874,16 +1993,23 @@ export default function TradingChart({
 
     if (!pinePlots || !pinePlots.length) return;
 
+    const PALETTE = ['#38bdf8', '#f59e0b', '#a855f7', '#10b981', '#f43f5e', '#3b82f6', '#ec4899', '#14b8a6'];
+    let plotIdx = 0;
     for (const plot of pinePlots) {
       if (!plot.data || !plot.data.length) continue;
       try {
+        const lowerCol = (plot.color || '').toLowerCase();
+        const isBoring = !plot.color || lowerCol === '#ffffff' || lowerCol === '#787b86' || lowerCol === '#000000' || lowerCol === 'white' || lowerCol === 'gray';
+        const distinctColor = isBoring ? PALETTE[plotIdx % PALETTE.length] : plot.color;
+        plotIdx++;
+
         const line = chart.addLineSeries({
-          color: plot.color || '#ffffff',
-          lineWidth: 1,
+          color: distinctColor,
+          lineWidth: 2,
           title: plot.title,
           priceLineVisible: false,
           lastValueVisible: true,
-          crosshairMarkerVisible: false,
+          crosshairMarkerVisible: true,
         });
         line.setData(plot.data as any);
         pineSeriesRef.current.push(line);
@@ -1891,7 +2017,7 @@ export default function TradingChart({
         console.warn('Failed to add Pine Script line series:', err);
       }
     }
-  }, [pinePlots]);
+  }, [pinePlots, chartApi]);
 
   // Handler for placing order from Canvas Drag-and-Drop Order lines
   const handleExecuteCanvasOrders = (entry: CanvasOrderLine, sl?: CanvasOrderLine, tp?: CanvasOrderLine) => {
@@ -1970,10 +2096,11 @@ export default function TradingChart({
       <ChartSkinsLayer />
 
       {/* Institutional TradingView-Style Chart Top Toolbar */}
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative z-30 flex items-center justify-between border-b border-grid bg-panel px-2.5 py-1 select-none text-xs gap-2 overflow-visible"
-      >
+      {shouldShowTopToolbar && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="relative z-30 flex items-center justify-between border-b border-grid bg-panel px-2.5 py-1 select-none text-xs gap-2 overflow-visible"
+        >
         {/* Left Section: Symbol, Timeframes, Candle Style, Indicators, Replay, Alert, Undo/Redo, Layers */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none min-w-0 flex-1 py-0.5">
           {/* Symbol Search Trigger */}
@@ -2515,19 +2642,18 @@ export default function TradingChart({
 
           <span className="h-4 w-px bg-grid shrink-0" />
 
-          {/* fx Indicators Button */}
+          {/* fx Indicators Icon Button */}
           <button
             onClick={() => {
               audioHaptics.tick();
               setIsIndicatorsModalOpen(true);
             }}
-            className="flex items-center gap-1.5 clay-pill px-2.5 py-0.5 text-xs font-semibold text-white transition shrink-0"
+            className="relative flex items-center justify-center p-1.5 rounded hover:bg-surface text-secondary hover:text-primary transition shrink-0"
             title="Indicators, Metrics & Strategies (fx)"
           >
-            <span className="font-bold text-[#38bdf8]">fx</span>
-            <span className="hidden sm:inline">Indicators</span>
+            <span className="font-bold text-xs tracking-tight">fx</span>
             {activeIndicatorsList.filter((i) => i.id !== 'vol').length > 0 && (
-              <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-white text-black text-[10px] font-bold">
+              <span className="absolute -top-1 -right-1 px-1 py-0.1 min-w-[14px] text-center rounded-full bg-accent text-black text-[9px] font-bold">
                 {activeIndicatorsList.filter((i) => i.id !== 'vol').length}
               </span>
             )}
@@ -2539,16 +2665,15 @@ export default function TradingChart({
               audioHaptics.tick();
               setIsIndicatorsModalOpen(true);
             }}
-            className="flex items-center gap-1.5 clay-pill px-2 py-0.5 text-xs font-semibold text-slate-300 hover:text-white transition shrink-0 hidden md:flex"
+            className="flex items-center justify-center p-1.5 rounded hover:bg-surface text-secondary hover:text-primary transition shrink-0"
             title="Institutional Indicator Templates & Saved Presets"
           >
-            <svg className="h-3.5 w-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <svg className="h-4 w-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}>
               <rect x="3" y="3" width="7" height="7" />
               <rect x="14" y="3" width="7" height="7" />
               <rect x="14" y="14" width="7" height="7" />
               <rect x="3" y="14" width="7" height="7" />
             </svg>
-            <span className="hidden lg:inline text-[11px]">Templates</span>
           </button>
 
           {/* Quick Volume Histogram Toggle */}
@@ -2559,15 +2684,16 @@ export default function TradingChart({
               setShowVolume(next);
               api.current?.volume.applyOptions({ visible: next });
             }}
-            className={`flex items-center gap-1 px-2 py-0.5 text-xs font-semibold transition shrink-0 rounded ${
-              showVolume ? 'clay-pill-active' : 'clay-pill text-slate-400 hover:text-white'
+            className={`flex items-center justify-center p-1.5 rounded transition shrink-0 ${
+              showVolume
+                ? 'bg-surface text-primary font-bold'
+                : 'text-secondary hover:text-primary hover:bg-surface/50'
             }`}
             title="Toggle Bottom Volume Bars"
           >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
-            <span>Vol</span>
           </button>
 
           {/* Quick Visible Range Volume Profile (VPVR) Toggle */}
@@ -2576,15 +2702,16 @@ export default function TradingChart({
               audioHaptics.tick();
               setShowVolumeProfile((v) => !v);
             }}
-            className={`flex items-center gap-1 px-2 py-0.5 text-xs font-semibold transition shrink-0 rounded ${
-              showVolumeProfile ? 'clay-pill-active' : 'clay-pill text-slate-400 hover:text-white'
+            className={`flex items-center justify-center p-1.5 rounded transition shrink-0 ${
+              showVolumeProfile
+                ? 'bg-surface text-primary font-bold'
+                : 'text-secondary hover:text-primary hover:bg-surface/50'
             }`}
             title="Toggle Visible Range Volume Profile (VPVR & POC/VAH/VAL lines)"
           >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h10M4 14h14M4 18h8" />
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6h16M4 10h10M4 14h14M4 18h8" />
             </svg>
-            <span>VPVR</span>
           </button>
 
           {/* Bar Replay Historical Time Machine Trigger */}
@@ -2594,17 +2721,16 @@ export default function TradingChart({
               if (isReplayActive) exitReplay();
               else startReplay();
             }}
-            className={`flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold transition shrink-0 rounded ${
+            className={`flex items-center justify-center p-1.5 rounded transition shrink-0 ${
               isReplayActive
-                ? 'clay-pill-active'
-                : 'clay-pill'
+                ? 'bg-surface text-accent font-bold'
+                : 'text-secondary hover:text-primary hover:bg-surface/50'
             }`}
             title="Bar Replay Historical Time Machine (Space: Play/Pause, Shift+Right: Step)"
           >
-            <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
             </svg>
-            <span className="hidden md:inline">Replay</span>
           </button>
 
           {/* Create Alert Dialog Trigger Button */}
@@ -2614,27 +2740,44 @@ export default function TradingChart({
               setAlertInitialPrice(currentPrice);
               setIsCreateAlertOpen(true);
             }}
-            className="flex items-center gap-1.5 clay-pill px-2.5 py-0.5 text-xs font-semibold text-white transition shrink-0"
+            className="flex items-center justify-center p-1.5 rounded hover:bg-surface text-secondary hover:text-primary transition shrink-0"
             title="Create Institutional Alert (Alt+A)"
           >
-            <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            <span className="hidden lg:inline">Alert</span>
+          </button>
+
+          {/* Quick Trade History Execution Markers Toggle Button */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              updateChartSettings({ showExecutionsOnChart: !chartSettings.showExecutionsOnChart });
+            }}
+            className={`flex items-center justify-center p-1.5 rounded transition shrink-0 ${
+              chartSettings.showExecutionsOnChart
+                ? 'bg-surface text-primary font-bold'
+                : 'text-secondary hover:text-primary hover:bg-surface/50'
+            }`}
+            title={chartSettings.showExecutionsOnChart ? 'Hide Trade History Markers on Chart' : 'Show Trade History Markers on Chart'}
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
           </button>
 
           {/* Undo / Redo Controls */}
-          <div className="flex items-center gap-1 border-l border-grid pl-1.5 shrink-0">
+          <div className="flex items-center gap-0.5 border-l border-grid pl-1 shrink-0">
             <button
               onClick={() => {
                 audioHaptics.tick();
                 drawingEvents.undo();
               }}
-              className="p-1 rounded-full clay-btn transition"
+              className="p-1.5 rounded hover:bg-surface text-secondary hover:text-primary transition shrink-0"
               title="Undo Drawing (Ctrl+Z)"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a5 5 0 015 5v2m-15-7l4-4m-4 4l4 4" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 10h10a5 5 0 015 5v2m-15-7l4-4m-4 4l4 4" />
               </svg>
             </button>
             <button
@@ -2642,11 +2785,11 @@ export default function TradingChart({
                 audioHaptics.tick();
                 drawingEvents.redo();
               }}
-              className="p-1 rounded-full clay-btn transition"
+              className="p-1.5 rounded hover:bg-surface text-secondary hover:text-primary transition shrink-0"
               title="Redo Drawing (Ctrl+Y)"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10H11a5 5 0 00-5 5v2m15-7l-4-4m4 4l-4 4" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 10H11a5 5 0 00-5 5v2m15-7l-4-4m4 4l-4 4" />
               </svg>
             </button>
           </div>
@@ -2660,25 +2803,21 @@ export default function TradingChart({
                 audioHaptics.tick();
                 toggleLayersMenu();
               }}
-              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold transition ${
+              className={`relative flex items-center justify-center p-1.5 rounded transition shrink-0 ${
                 activeLayersCount > 0
-                  ? 'clay-pill-active'
-                  : 'clay-pill'
+                  ? 'bg-surface text-primary font-bold'
+                  : 'text-secondary hover:text-primary hover:bg-surface/50'
               }`}
               title="Chart Overlays & Layers"
             >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
-              <span>Layers</span>
               {activeLayersCount > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-black text-white text-[10px] font-bold">
+                <span className="absolute -top-1 -right-1 px-1 py-0.1 min-w-[14px] text-center rounded-full bg-accent text-black text-[9px] font-bold">
                   {activeLayersCount}
                 </span>
               )}
-              <svg className={`h-3 w-3 transition-transform ${isLayersMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
             </button>
 
             {/* Layers Dropdown Menu */}
@@ -2771,6 +2910,13 @@ export default function TradingChart({
                           showEventsOnChart: prev.showEventsOnChart === false ? true : false,
                         }));
                       },
+                    },
+                    {
+                      id: 'executions',
+                      label: 'Trade History Markers',
+                      desc: 'Show buy/sell fills & executions on candles',
+                      active: chartSettings.showExecutionsOnChart,
+                      onToggle: () => updateChartSettings({ showExecutionsOnChart: !chartSettings.showExecutionsOnChart }),
                     },
                   ].map((layer) => (
                     <button
@@ -2938,6 +3084,7 @@ export default function TradingChart({
           </button>
         </div>
       </div>
+      )}
 
 
       {/* Chart Center Area: Docked Left Rail + Canvas */}
@@ -3151,6 +3298,7 @@ export default function TradingChart({
 
           {/* TradingView-Style SVG Drawing Tools Canvas Layer */}
           <DrawingOverlay
+            paneId={paneId}
             symbol={symbol}
             activeTool={activeTool}
             onSelectTool={setActiveTool}
@@ -3197,6 +3345,11 @@ export default function TradingChart({
             seriesApi={seriesApi}
             chartApi={chartApi}
             onExecuteOrders={handleExecuteCanvasOrders}
+          />
+
+          {/* TradingView-Style Period Separators & Session Breaks */}
+          <PeriodSeparatorsOverlay
+            chartApi={chartApi}
           />
 
           {/* Pine Script Geometry & Drawings Overlay (CRT Boxes, Lines, Labels, Tables) */}
@@ -3316,7 +3469,7 @@ export default function TradingChart({
       {/* TradingView Bottom Range & Scale Bar */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="h-8 shrink-0 border-t border-grid bg-panel/95 backdrop-blur-md px-2.5 flex items-center justify-between text-[11px] text-slate-300 select-none font-mono z-10 overflow-x-auto scrollbar-none"
+        className="h-7 shrink-0 border-t border-grid bg-panel px-2 flex items-center justify-between text-[10px] select-none font-mono z-10 overflow-x-auto scrollbar-none"
       >
         {/* Left: Time Range Presets */}
         <div className="flex items-center gap-1 shrink-0 overflow-x-auto scrollbar-none">
@@ -3327,10 +3480,10 @@ export default function TradingChart({
                 e.stopPropagation();
                 handleSelectTimeRange(r);
               }}
-              className={`px-1.5 sm:px-2 py-0.5 rounded-[4px] text-[9.5px] sm:text-[10px] font-semibold transition cursor-pointer ${
+              className={`px-1.5 py-0.5 rounded text-[9.5px] font-semibold transition cursor-pointer ${
                 activeTimeRange === r
-                  ? 'bg-white text-black font-bold shadow-sm'
-                  : 'bg-white/[0.04] hover:bg-white/15 text-slate-300 hover:text-white border border-white/10'
+                  ? 'bg-accent text-white font-bold shadow-sm'
+                  : 'bg-surface hover:bg-surface/80 text-muted hover:text-white border border-grid'
               }`}
             >
               {r}
@@ -3338,8 +3491,60 @@ export default function TradingChart({
           ))}
         </div>
 
-        {/* Right: Scale & Timezone */}
-        <div className="flex items-center gap-1 text-[10px] shrink-0 ml-auto pl-2">
+        {/* Right: Scale, Separators, Sessions & Timezone */}
+        <div className="flex items-center gap-1 text-[9.5px] shrink-0 ml-auto pl-2">
+          {/* Live Market Sessions & Killzones Indicator Pill */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              if ((window as any).__openSessionsModal) {
+                (window as any).__openSessionsModal();
+              } else if ((window as any).__openSessions) {
+                (window as any).__openSessions();
+              }
+            }}
+            className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition flex items-center gap-1 cursor-pointer shrink-0 ${
+              sessionData.isLondonNyOverlap
+                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                : sessionData.activeKillzones.filter((k: any) => k.isActive).length > 0
+                ? 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+                : sessionData.activeCount > 0
+                ? 'border-slate-500/40 bg-slate-500/10 text-slate-300'
+                : 'bg-surface text-zinc-400 border-grid'
+            }`}
+            title={`Market Sessions: ${sessionData.sessions.filter((s: any) => s.isActive).map((s: any) => s.name).join(', ') || 'Inter-Session'} (Click to open Sessions Dialog)`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${
+              sessionData.isLondonNyOverlap ? 'bg-emerald-400 animate-pulse' :
+              sessionData.activeKillzones.filter((k: any) => k.isActive).length > 0 ? 'bg-amber-400 animate-pulse' :
+              sessionData.activeCount > 0 ? 'bg-cyan-400' : 'bg-zinc-500'
+            }`} />
+            <span>
+              {sessionData.isLondonNyOverlap
+                ? 'LON/NY'
+                : sessionData.activeKillzones.filter((k: any) => k.isActive).length > 0
+                ? sessionData.activeKillzones.filter((k: any) => k.isActive)[0].name.toUpperCase()
+                : sessionData.sessions.filter((s: any) => s.isActive).length > 0
+                ? sessionData.sessions.filter((s: any) => s.isActive)[0].name.toUpperCase()
+                : 'INTER-SESSION'}
+            </span>
+          </button>
+
+          {/* Period Separators Toggle Badge */}
+          <button
+            onClick={() => {
+              audioHaptics.tick();
+              useTerminalStore.getState().togglePeriodSeparators();
+            }}
+            className={`px-1.5 py-0.5 rounded border border-grid font-mono transition cursor-pointer ${
+              useTerminalStore.getState().showPeriodSeparators
+                ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-400 font-bold'
+                : 'bg-surface text-muted hover:text-white'
+            }`}
+            title="Toggle Period Separators / Session Breaks (also in right-click menu)"
+          >
+            SEP
+          </button>
           <button
             onClick={() => {
               audioHaptics.tick();
@@ -3347,7 +3552,7 @@ export default function TradingChart({
               const nextTz = tzs[(tzs.indexOf(timezone) + 1) % tzs.length];
               setTimezone(nextTz);
             }}
-            className="px-2 py-0.5 rounded-[4px] bg-white/[0.04] hover:bg-white/15 text-slate-300 hover:text-white border border-white/10 font-mono transition cursor-pointer"
+            className="px-1.5 py-0.5 rounded bg-surface hover:bg-surface/80 text-muted hover:text-white border border-grid font-mono transition cursor-pointer"
             title={`Timezone: ${timezone} (Click to toggle)`}
           >
             {timezone === 'UTC' ? 'UTC' : timezone === 'Asia/Kolkata' ? 'IST' : timezone === 'America/New_York' ? 'EDT' : timezone === 'Europe/London' ? 'GMT' : 'JST'}
@@ -3357,7 +3562,7 @@ export default function TradingChart({
               audioHaptics.tick();
               api.current?.candles.priceScale().applyOptions({ autoScale: true });
             }}
-            className="px-2 py-0.5 rounded-[4px] bg-white text-black font-bold text-[10px] shadow-sm transition cursor-pointer"
+            className="px-1.5 py-0.5 rounded bg-surface hover:bg-surface/80 text-white font-bold border border-grid transition cursor-pointer"
             title="Auto scale (or double-click price scale)"
           >
             auto
@@ -3367,10 +3572,10 @@ export default function TradingChart({
               audioHaptics.tick();
               handleSetScaleMode('NORMAL');
             }}
-            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-semibold transition cursor-pointer ${
+            className={`px-1.5 py-0.5 rounded font-semibold transition cursor-pointer ${
               scaleMode === 'NORMAL'
-                ? 'bg-white text-black font-bold shadow-sm'
-                : 'bg-white/[0.04] text-slate-300 hover:text-white border border-white/10'
+                ? 'bg-accent text-white font-bold shadow-sm'
+                : 'bg-surface text-muted hover:text-white border border-grid'
             }`}
             title="Linear / Normal scale"
           >
@@ -3381,10 +3586,10 @@ export default function TradingChart({
               audioHaptics.tick();
               handleSetScaleMode('LOGARITHMIC');
             }}
-            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-semibold transition cursor-pointer ${
+            className={`px-1.5 py-0.5 rounded font-semibold transition cursor-pointer ${
               scaleMode === 'LOGARITHMIC'
-                ? 'bg-white text-black font-bold shadow-sm'
-                : 'bg-white/[0.04] text-slate-300 hover:text-white border border-white/10'
+                ? 'bg-accent text-white font-bold shadow-sm'
+                : 'bg-surface text-muted hover:text-white border border-grid'
             }`}
             title="Logarithmic scale"
           >
@@ -3395,10 +3600,10 @@ export default function TradingChart({
               audioHaptics.tick();
               handleSetScaleMode('PERCENTAGE');
             }}
-            className={`px-2 py-0.5 rounded-[4px] text-[10px] font-semibold transition cursor-pointer ${
+            className={`px-1.5 py-0.5 rounded font-semibold transition cursor-pointer ${
               scaleMode === 'PERCENTAGE'
-                ? 'bg-white text-black font-bold shadow-sm'
-                : 'bg-white/[0.04] text-slate-300 hover:text-white border border-white/10'
+                ? 'bg-accent text-white font-bold shadow-sm'
+                : 'bg-surface text-muted hover:text-white border border-grid'
             }`}
             title="Percentage scale"
           >
@@ -3526,6 +3731,13 @@ export default function TradingChart({
           setTimeframe(tf);
           setPaneTimeframe(paneId, tf);
         }}
+      />
+
+      {/* TradingView-Style Pine Script Indicator Settings Dialog */}
+      <PineSettingsModal
+        script={selectedPineScriptForSettings}
+        isOpen={!!selectedPineScriptForSettings}
+        onClose={() => setSelectedPineScriptForSettings(null)}
       />
     </div>
   );

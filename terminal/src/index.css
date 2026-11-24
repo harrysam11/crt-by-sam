@@ -343,21 +343,66 @@ html.theme-light .bg-panel,
 html.theme-light .bg-\[\#09090b\],
 html.theme-light .bg-\[\#050508\],
 html.theme-light .bg-\[\#0b0e14\],
+html.theme-light .bg-\[\#0b0c14\],
+html.theme-light .bg-\[\#0d1117\],
+html.theme-light .bg-\[\#0a0a0f\],
+html.theme-light .bg-\[\#0c0c12\],
+html.theme-light .bg-\[\#101018\],
 html.theme-light .bg-\[\#101015\] {
   background-color: #ffffff !important;
 }
 html.theme-light .bg-\[\#17171b\],
 html.theme-light .bg-\[\#181820\],
+html.theme-light .bg-\[\#181824\],
+html.theme-light .bg-\[\#161b22\],
+html.theme-light .bg-\[\#21262d\],
+html.theme-light .bg-\[\#1e222d\],
+html.theme-light .bg-\[\#1a1f2c\],
+html.theme-light .bg-\[\#161a25\],
+html.theme-light .bg-\[\#131722\],
+html.theme-light .bg-\[\#0f0f16\],
+html.theme-light .bg-\[\#0e0e16\],
+html.theme-light .bg-\[\#151520\],
 html.theme-light .bg-\[\#1a1d26\] {
-  background-color: #f4f4f5 !important;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+html.theme-light .bg-black\/40,
+html.theme-light .bg-black\/50,
+html.theme-light .bg-black\/60,
+html.theme-light .bg-black\/75,
+html.theme-light .bg-black\/80 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+html.theme-light input,
+html.theme-light select,
+html.theme-light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #d1d4dc !important;
+}
+html.theme-light .border-\[\#2d2d3e\],
+html.theme-light .border-\[\#30363d\],
+html.theme-light .border-\[\#21262d\],
+html.theme-light .border-\[\#2a2e39\],
+html.theme-light .border-\[\#363c4e\],
+html.theme-light .border-\[\#20202e\],
+html.theme-light .border-\[\#242434\],
+html.theme-light .border-\[\#262638\] {
+  border-color: #d1d4dc !important;
 }
 html.theme-light .bg-white\/5 {
   background-color: rgba(0, 0, 0, 0.04) !important;
 }
 html.theme-light .bg-white\/10 {
-  background-color: rgba(0, 0, 0, 0.07) !important;
+  background-color: rgba(0, 0, 0, 0.06) !important;
 }
 html.theme-light .hover\:bg-white\/10:hover {
-  background-color: rgba(0, 0, 0, 0.06) !important;
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+html.theme-light .bg-zinc-800,
+html.theme-light .bg-zinc-900 {
+  background-color: #e2e8f0 !important;
 }
 

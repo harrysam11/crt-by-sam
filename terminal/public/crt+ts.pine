@@ -40,7 +40,7 @@ indicator("CRT Model Pro - Sam", shorttitle="CRT by Sam", overlay=true, max_boxe
 
 string g_sep = "HTF Separator  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-sepColorInput = input.color(color.rgb(0, 0, 0), "Separator Color", group=g_sep)
+sepColorInput = input.color(color.rgb(100, 116, 139), "Separator Color", group=g_sep)
 
 sepStyleInput = input.string(
      "Dotted",
@@ -537,6 +537,22 @@ f_get_ronin_correlation() =>
     string check_sym = syminfo.root != "" ? syminfo.root : syminfo.ticker
 
     switch check_sym
+        "PAXGUSDT", "PAXG" =>
+            t2 := f_get_ticker("XAGUSD")
+            inv2 := false
+            t3 := f_get_ticker("DXY")
+            inv3 := true
+            t4 := f_get_ticker("XAUEUR")
+            inv4 := false
+
+        "BTCUSDT", "BTC" =>
+            t2 := f_get_ticker("ETHUSDT")
+            inv2 := false
+            t3 := f_get_ticker("SOLUSDT")
+            inv3 := false
+            t4 := f_get_ticker("DXY")
+            inv4 := true
+
         "XAUUSD" =>
             t2 := f_get_ticker("XAGUSD")
             inv2 := false
@@ -4088,7 +4104,9 @@ bool showCRTDashboard = input.bool(true, "Show Dashboard", group=g_dashboard)
 var table crtDash = table.new(position.top_right, 2, 5, border_width=1)
 
 string crtDashBias = not na(c0) and not na(o0) ? (c0 > o0 ? "Bullish" : c0 < o0 ? "Bearish" : "Neutral") : "Neutral"
-string crtDashPair = smt_pair != "" ? syminfo.ticker + " / " + smt_pair + " (" + smt_pair_selection + ")" : syminfo.ticker + " / — (" + smt_pair_selection + ")"
+string safeTicker = str.length(syminfo.ticker) > 0 ? syminfo.ticker : (str.length(syminfo.root) > 0 ? syminfo.root : "XAUUSD")
+string safeSmtPair = str.length(smt_pair) > 0 ? smt_pair : (safeTicker == "BTCUSDT" ? "ETHUSDT" : "XAGUSD")
+string crtDashPair = safeTicker + " / " + safeSmtPair + " (" + smt_pair_selection + ")"
 string crtDashMode = qtAlignment ? "QT Alignment" : "ICT"
 string crtDashTf = not na(activeTimeframe) ? crtFormatTF(activeTimeframe) : "—"
 string crtDashDate = str.format_time(time, "dd MMM yyyy", "America/New_York")

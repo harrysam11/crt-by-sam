@@ -155,7 +155,7 @@ export default function DrawingToolbar({
   return (
     <div
       ref={toolbarRef}
-      className="relative z-30 flex w-12 shrink-0 flex-col items-center gap-1.5 border-r border-grid bg-panel py-2 select-none font-mono text-xs overflow-y-auto overflow-x-hidden scrollbar-none max-h-full"
+      className="relative z-30 flex w-10 shrink-0 flex-col items-center gap-1 border-r border-grid bg-panel py-1.5 select-none font-mono text-xs overflow-y-auto overflow-x-hidden scrollbar-none max-h-full"
     >
       {/* Drawer 1: Cursors */}
       <div>
@@ -310,8 +310,8 @@ export default function DrawingToolbar({
       <div>
         <button
           onClick={(e) => toggleDrawer('POSITION', e)}
-          className={btnCls(isCurrentInGroup(['POSITION_LONG', 'POSITION_SHORT', 'POSITION_TOOL', 'MEASURE_RULER']))}
-          title="Long & Short Position / Measurement"
+          className={btnCls(isCurrentInGroup(['POSITION_LONG', 'POSITION_SHORT', 'POSITION_TOOL', 'MEASURE_RULER', 'ANCHORED_VOLUME_PROFILE']))}
+          title="Long & Short Position / Measurement / Volume Profile"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -324,10 +324,11 @@ export default function DrawingToolbar({
               top: `${Math.max(50, Math.min(window.innerHeight - 180, drawerAnchor?.top ?? 250))}px`,
               left: `${drawerAnchor?.left ?? 50}px`,
             }}
-            className="fixed z-50 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[190px] max-h-[85vh] overflow-y-auto"
+            className="fixed z-50 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[210px] max-h-[85vh] overflow-y-auto"
           >
             {renderToolRow('POSITION_LONG', 'Long Position (R:R)')}
             {renderToolRow('POSITION_SHORT', 'Short Position (R:R)')}
+            {renderToolRow('ANCHORED_VOLUME_PROFILE', 'Anchored Volume Profile (AVP)')}
             {renderToolRow('MEASURE_RULER', 'Measure Ruler')}
           </div>
         )}

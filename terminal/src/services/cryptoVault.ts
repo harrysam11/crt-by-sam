@@ -119,6 +119,9 @@ export async function decryptSecret(payloadStr: string, password: string): Promi
 
 export type SupportedBroker =
   | 'METATRADER_5'
+  | 'METAQUOTES'
+  | 'PEPPERSTONE'
+  | 'OANDA'
   | 'TRADOVATE'
   | 'INTERACTIVE_BROKERS'
   | 'ZERODHA_KITE'
@@ -127,7 +130,6 @@ export type SupportedBroker =
   | 'DELTA_EXCHANGE'
   | 'BINANCE'
   | 'BYBIT'
-  | 'OANDA'
   | 'CUSTOM';
 
 export interface ApiCredentials {

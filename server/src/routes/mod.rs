@@ -50,6 +50,10 @@ async fn health_handler(
     })
 }
 
+fn is_safe_subpath(path: &str) -> bool {
+    !path.contains("..") && !path.contains('\0') && !path.contains('\\')
+}
+
 async fn yahoo_handler(
     OriginalUri(uri): OriginalUri,
     Query(params): Query<YahooParams>,
@@ -57,6 +61,14 @@ async fn yahoo_handler(
 ) -> Response {
     let full_path = uri.path();
     let subpath = full_path.strip_prefix("/api/yahoo").unwrap_or(full_path);
+
+    if !is_safe_subpath(subpath) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Invalid or unsafe path characters detected" })),
+        )
+            .into_response();
+    }
 
     let yahoo_url = if !subpath.is_empty() && subpath != "/" {
         let query_str = uri.query().map(|q| format!("?{}", q)).unwrap_or_default();
@@ -119,6 +131,15 @@ async fn calendar_handler(
 ) -> Response {
     let full_path = uri.path();
     let subpath = full_path.strip_prefix("/api/calendar").unwrap_or(full_path);
+
+    if !is_safe_subpath(subpath) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Invalid or unsafe path characters detected" })),
+        )
+            .into_response();
+    }
+
     let target_subpath = if subpath.is_empty() || subpath == "/" {
         "/ff_calendar_thisweek.json"
     } else {
@@ -166,6 +187,15 @@ async fn binance_handler(
 ) -> Response {
     let full_path = uri.path();
     let subpath = full_path.strip_prefix("/api/binance").unwrap_or(full_path);
+
+    if !is_safe_subpath(subpath) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Invalid or unsafe path characters detected" })),
+        )
+            .into_response();
+    }
+
     let target_subpath = if subpath.starts_with("/api/v3") {
         subpath.to_string()
     } else {

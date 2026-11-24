@@ -9,7 +9,9 @@
 
 import { PineTS } from 'pinets';
 import type { Candle } from '../types/terminal';
+import { parseTimeframeToSeconds } from '../utils/timeframe';
 import crtModelPine from '../features/pine/presets/crtModel.pine?raw';
+import silverBulletsPine from '../features/pine/presets/silverBullets.pine?raw';
 
 export interface PinePlotOutput {
   title: string;
@@ -69,6 +71,7 @@ export interface PineDrawingOutput {
   lines: PineDrawingLine[];
   labels: PineDrawingLabel[];
   tables: PineDrawingTable[];
+  barOffset?: number;
 }
 
 export interface PineExecutionResult {
@@ -84,6 +87,11 @@ export const PRESET_PINE_SCRIPTS = [
     name: 'CRT Model Pro - Sam',
     description: 'Candle Range Theory with HTF boxes, PSP correlation, CISD projections, True Opens & live dashboard.',
     code: crtModelPine,
+  },
+  {
+    name: 'ICT Silver Bullets (Sessions & Killzones)',
+    description: 'ICT London (03-04), New York (09-10/10-11), and Asia (21-22) Silver Bullet time windows.',
+    code: silverBulletsPine,
   },
   {
     name: 'Dual EMA Ribbon (9 & 21)',
@@ -139,15 +147,19 @@ export async function executePineScript(
   code: string,
   candles: Candle[],
   symbol: string = 'BTCUSDT',
-  timeframe: string = '1m'
+  timeframe: string = '1m',
+  fullCandlesCount?: number
 ): Promise<PineExecutionResult> {
   const startTime = performance.now();
   if (!candles || candles.length < 5) {
     return { ok: false, plots: [], error: 'Insufficient candle data (need >= 5 bars)' };
   }
 
+  console.log(`[PineRunner] Starting execution: symbol=${symbol}, timeframe=${timeframe}, candles=${candles.length}, fullCandles=${fullCandlesCount || candles.length}, codeLen=${code.length}`);
   try {
     // Format candles for PineTS market data format
+    const durSec = parseTimeframeToSeconds(timeframe) || 60;
+    const durMs = durSec * 1000;
     const pineCandles = candles.map((c) => {
       const openTimeMs = c.time > 10000000000 ? c.time : c.time * 1000;
       return {
@@ -157,11 +169,23 @@ export async function executePineScript(
         low: c.low,
         close: c.close,
         volume: c.volume || 1,
-        closeTime: openTimeMs + 59999,
+        closeTime: openTimeMs + durMs - 1,
       };
     });
 
     const runner = new PineTS(pineCandles, symbol, timeframe, pineCandles.length);
+    const cleanSym = symbol.replace(/[^A-Za-z0-9]/g, '');
+    (runner as any)._syminfo = {
+      ticker: cleanSym,
+      tickerid: `BINANCE:${cleanSym}`,
+      root: cleanSym,
+      prefix: 'BINANCE',
+      currency: 'USD',
+      basecurrency: cleanSym.replace('USDT', ''),
+      mintick: 0.01,
+      pointvalue: 1,
+      timezone: 'America/New_York',
+    };
     await runner.ready();
     const result = await runner.run(code);
 
@@ -186,11 +210,24 @@ export async function executePineScript(
         }
 
         if (dataPoints.length > 0) {
-          plots.push({
-            title: plotObj.title || key,
-            color: plotObj.options?.color || '#ffffff',
-            data: dataPoints,
-          });
+          // Sort and ensure strictly ascending timestamps
+          dataPoints.sort((a, b) => a.time - b.time);
+          const uniqueDataPoints: Array<{ time: number; value: number }> = [];
+          let lastTime = -1;
+          for (const dp of dataPoints) {
+            if (dp.time > lastTime) {
+              uniqueDataPoints.push(dp);
+              lastTime = dp.time;
+            }
+          }
+
+          if (uniqueDataPoints.length > 0) {
+            plots.push({
+              title: plotObj.title || key,
+              color: plotObj.options?.color || '#ffffff',
+              data: uniqueDataPoints,
+            });
+          }
         }
       }
     }
@@ -201,11 +238,77 @@ export async function executePineScript(
       return Array.isArray(last?.value) ? last.value.filter((item: any) => !item._deleted) : [];
     }
 
+    // Extract background shading plots into full-height background boxes
+    const bgBoxes: PineDrawingBox[] = [];
+    if (result && result.plots) {
+      for (const [key, plotObj] of Object.entries<any>(result.plots)) {
+        if (!key.startsWith('bgcolor') && plotObj?.options?.style !== 'background') continue;
+        if (!plotObj || !Array.isArray(plotObj.data)) continue;
+
+        let curStart = -1;
+        let curColor = '';
+
+        for (let bIdx = 0; bIdx < plotObj.data.length; bIdx++) {
+          const pt = plotObj.data[bIdx];
+          const col = pt?.options?.color;
+          if (col && typeof col === 'string') {
+            if (curStart === -1) {
+              curStart = bIdx;
+              curColor = col;
+            } else if (curColor !== col) {
+              bgBoxes.push({
+                id: Math.round(Math.random() * 1000000),
+                left: curStart,
+                right: bIdx - 1,
+                top: 1e9,
+                bottom: -1e9,
+                bgcolor: curColor,
+                border_color: curColor,
+                border_width: 1,
+              });
+              curStart = bIdx;
+              curColor = col;
+            }
+          } else {
+            if (curStart !== -1) {
+              bgBoxes.push({
+                id: Math.round(Math.random() * 1000000),
+                left: curStart,
+                right: bIdx - 1,
+                top: 1e9,
+                bottom: -1e9,
+                bgcolor: curColor,
+                border_color: curColor,
+                border_width: 1,
+              });
+              curStart = -1;
+              curColor = '';
+            }
+          }
+        }
+        if (curStart !== -1) {
+          bgBoxes.push({
+            id: Math.round(Math.random() * 1000000),
+            left: curStart,
+            right: plotObj.data.length - 1,
+            top: 1e9,
+            bottom: -1e9,
+            bgcolor: curColor,
+            border_color: curColor,
+            border_width: 1,
+          });
+        }
+      }
+    }
+
+    const barOffset = Math.max(0, (fullCandlesCount || candles.length) - pineCandles.length);
+    const scriptBoxes = extractLast(result?.plots?.__boxes__?.data);
     const drawings: PineDrawingOutput = {
-      boxes: extractLast(result?.plots?.__boxes__?.data),
+      boxes: [...scriptBoxes, ...bgBoxes],
       lines: extractLast(result?.plots?.__lines__?.data),
       labels: extractLast(result?.plots?.__labels__?.data),
       tables: extractLast(result?.plots?.__tables__?.data),
+      barOffset,
     };
 
     const hasOutputs =
@@ -216,6 +319,7 @@ export async function executePineScript(
       drawings.tables.length > 0;
 
     const runtimeMs = Math.round(performance.now() - startTime);
+    console.log(`[PineRunner] Execution complete in ${runtimeMs}ms: ok=${hasOutputs}, plots=${plots.length}, boxes=${drawings.boxes.length}, lines=${drawings.lines.length}, labels=${drawings.labels.length}, tables=${drawings.tables.length}`);
     return {
       ok: hasOutputs,
       plots,
@@ -223,6 +327,7 @@ export async function executePineScript(
       runtimeMs,
     };
   } catch (err: any) {
+    console.error(`[PineRunner] Execution failed:`, err);
     return {
       ok: false,
       plots: [],

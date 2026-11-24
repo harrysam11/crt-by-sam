@@ -44,6 +44,7 @@ export default function ExecutionPanel({
   const placeOrder = useTerminalStore((s) => s.placeOrder);
   const trades = useTerminalStore((s) => s.trades);
   const positions = useTerminalStore((s) => s.positions);
+  const positionTickets = useTerminalStore((s) => s.positionTickets || []);
   const equity = useTerminalStore((s) => s.balance + Object.values(s.positions).reduce((a, p) => a + p.unrealizedPnl, 0));
   const balance = useTerminalStore((s) => s.balance);
   const free = useTerminalStore((s) => freeMargin(s));
@@ -247,7 +248,7 @@ export default function ExecutionPanel({
         leverage: lev,
         accountEquity: equity,
         currentBalance: balance,
-        openPositionsCount: Object.keys(positions).length,
+        openPositionsCount: positionTickets.length > 0 ? positionTickets.length : Object.keys(positions).length,
         tradesTodayCount: todayTrades.length,
         dailyRealizedLoss: realizedLossToday,
         consecutiveLosses: streak,

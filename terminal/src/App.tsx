@@ -42,10 +42,16 @@ import { useTerminalStore } from './store/useTerminalStore';
 import { useDerivativesStore } from './store/useDerivativesStore';
 import { useLayoutStore } from './store/useLayoutStore';
 import { useDrawingStore } from './store/useDrawingStore';
+import { useGuardianStore } from './store/useGuardianStore';
 import { getInstrument } from './services/instruments';
 import { audioHaptics } from './utils/notify';
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+if (typeof window !== 'undefined') {
+  (window as any).useTerminalStore = useTerminalStore;
+  (window as any).__terminalStore = useTerminalStore;
+}
 
 export default function App() {
   useMarketFeed();
@@ -143,12 +149,31 @@ export default function App() {
   const [quantAIInitialPrompt, setQuantAIInitialPrompt] = useState<string | undefined>(undefined);
 
   useEffect(() => {
+    (window as any).__terminalStore = useTerminalStore;
+    (window as any).__guardianStore = useGuardianStore;
+    (window as any).__drawingStore = useDrawingStore;
     window.__openQuantAI = (prompt?: string) => {
       setQuantAIInitialPrompt(prompt);
       setIsQuantAIOpen(true);
     };
+    (window as any).__openPortfolio = () => {
+      setIsPortfolioOpen(true);
+    };
+    (window as any).__closePortfolio = () => {
+      setIsPortfolioOpen(false);
+    };
+    (window as any).__openSessions = () => {
+      setIsSessionManagerOpen(true);
+    };
+    (window as any).__openSessionsModal = () => {
+      setIsSessionManagerOpen(true);
+    };
     return () => {
       delete window.__openQuantAI;
+      delete (window as any).__openPortfolio;
+      delete (window as any).__closePortfolio;
+      delete (window as any).__openSessions;
+      delete (window as any).__openSessionsModal;
     };
   }, []);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);

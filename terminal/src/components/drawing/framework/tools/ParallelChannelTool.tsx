@@ -108,6 +108,7 @@ export class ParallelChannelTool extends BaseDrawingTool {
           x2={pt2.x}
           y2={pt2.y}
           stroke={this.color}
+          strokeOpacity={this.lineOpacity !== undefined ? this.lineOpacity : 1}
           strokeWidth={this.lineWidth}
           strokeDasharray={strokeDash}
         />
@@ -119,6 +120,7 @@ export class ParallelChannelTool extends BaseDrawingTool {
             x2={par2.x}
             y2={par2.y}
             stroke={this.color}
+            strokeOpacity={this.lineOpacity !== undefined ? this.lineOpacity : 1}
             strokeWidth={this.lineWidth}
             strokeDasharray={strokeDash}
           />
@@ -131,6 +133,7 @@ export class ParallelChannelTool extends BaseDrawingTool {
             x2={mid2.x}
             y2={mid2.y}
             stroke={this.color}
+            strokeOpacity={0.6 * (this.lineOpacity !== undefined ? this.lineOpacity : 1)}
             strokeWidth={1}
             strokeDasharray="4 4"
             opacity={0.6}

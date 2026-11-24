@@ -47,21 +47,21 @@ export function StandardCard({
   testId,
 }: StandardCardProps) {
   const badgeClasses = {
-    default: 'bg-[#181824] text-slate-400 border-[#2a2a3c]',
-    accent: 'bg-[#0c2438] text-[#38bdf8] border-[#18496e]',
-    emerald: 'bg-[#0d281e] text-emerald-400 border-[#1b4d3a]',
-    amber: 'bg-[#291e0a] text-amber-400 border-[#4a3512]',
+    default: 'bg-surface text-secondary border-grid',
+    accent: 'bg-accent/15 text-accent border-accent/30',
+    emerald: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30',
+    amber: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
   }[badgeColor];
 
   return (
     <div
       data-testid={testId}
-      className={`group relative flex h-full flex-col justify-between rounded-xl bg-[#101016] p-4 border border-[#262634] shadow-md shadow-black/40 transition-all duration-150 hover:-translate-y-0.5 hover:border-[#38bdf8]/60 focus-within:ring-2 focus-within:ring-[#38bdf8] focus-within:ring-offset-2 focus-within:ring-offset-[#101016] motion-reduce:transform-none motion-reduce:transition-none ${className}`}
+      className={`group relative flex h-full flex-col justify-between rounded-xl bg-panel p-4 border border-grid shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-accent/60 focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2 focus-within:ring-offset-panel motion-reduce:transform-none motion-reduce:transition-none ${className}`}
     >
       {/* Top Section: Icon & Header */}
       <div>
         <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#181824] border border-[#2a2a3c] text-[#38bdf8]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface border border-grid text-accent">
             {icon}
           </div>
           {badge && (
@@ -74,26 +74,26 @@ export function StandardCard({
         </div>
 
         {/* Title */}
-        <h3 className="font-mono text-sm font-semibold text-slate-100 line-clamp-1 group-hover:text-white transition-colors">
+        <h3 className="font-mono text-sm font-semibold text-primary line-clamp-1 group-hover:text-accent transition-colors">
           {title}
         </h3>
 
         {/* Muted Metadata */}
-        <p className="mt-1 font-mono text-xs text-slate-400 line-clamp-1" title={meta}>
+        <p className="mt-1 font-mono text-xs text-secondary line-clamp-1" title={meta}>
           {meta}
         </p>
       </div>
 
       {/* Bottom Section: Primary Action & Quiet Secondary Link */}
-      <div className="mt-4 pt-3 border-t border-[#1d1d28] flex items-center justify-between gap-2">
+      <div className="mt-4 pt-3 border-t border-grid flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={primaryAction.onClick}
           disabled={primaryAction.disabled}
           className={`flex-1 flex items-center justify-center px-3 py-1.5 rounded-lg font-mono text-xs font-medium transition-all ${
             primaryAction.active
-              ? 'bg-[#38bdf8] text-black font-semibold shadow-sm'
-              : 'bg-[#181824] text-[#38bdf8] border border-[#2a2a3c] hover:bg-[#38bdf8] hover:text-black hover:border-[#38bdf8]'
+              ? 'bg-accent text-black font-semibold shadow-sm'
+              : 'bg-surface text-accent border border-grid hover:bg-accent hover:text-black hover:border-accent'
           } disabled:opacity-40 disabled:cursor-not-allowed`}
         >
           {primaryAction.label}
@@ -105,8 +105,8 @@ export function StandardCard({
             onClick={secondaryAction.onClick}
             className={`p-1.5 rounded-lg font-mono text-xs transition-colors ${
               secondaryAction.active
-                ? 'text-amber-400 hover:text-amber-300'
-                : 'text-slate-500 hover:text-slate-300'
+                ? 'text-amber-500 hover:text-amber-400'
+                : 'text-muted hover:text-primary'
             }`}
             title={secondaryAction.label}
           >
@@ -141,18 +141,18 @@ export function StandardCardGrid({
  */
 export function StandardCardSkeleton() {
   return (
-    <div className="flex h-full flex-col justify-between rounded-xl bg-[#101016] p-4 border border-[#262634] shadow-md shadow-black/40 animate-pulse">
+    <div className="flex h-full flex-col justify-between rounded-xl bg-panel p-4 border border-grid shadow-sm animate-pulse">
       <div>
         <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="h-10 w-10 rounded-lg bg-[#181824]" />
-          <div className="h-4 w-12 rounded bg-[#181824]" />
+          <div className="h-10 w-10 rounded-lg bg-surface" />
+          <div className="h-4 w-12 rounded bg-surface" />
         </div>
-        <div className="h-4 w-3/4 rounded bg-[#181824]" />
-        <div className="mt-2 h-3 w-1/2 rounded bg-[#181824]" />
+        <div className="h-4 w-3/4 rounded bg-surface" />
+        <div className="mt-2 h-3 w-1/2 rounded bg-surface" />
       </div>
-      <div className="mt-4 pt-3 border-t border-[#1d1d28] flex items-center justify-between gap-2">
-        <div className="h-7 flex-1 rounded-lg bg-[#181824]" />
-        <div className="h-7 w-7 rounded-lg bg-[#181824]" />
+      <div className="mt-4 pt-3 border-t border-grid flex items-center justify-between gap-2">
+        <div className="h-7 flex-1 rounded-lg bg-surface" />
+        <div className="h-7 w-7 rounded-lg bg-surface" />
       </div>
     </div>
   );

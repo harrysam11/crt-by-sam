@@ -85,6 +85,7 @@ export class RectangleTool extends BaseDrawingTool {
           fill={this.fillColor || this.color}
           fillOpacity={this.fillOpacity ?? 0.15}
           stroke={this.color}
+          strokeOpacity={this.lineOpacity !== undefined ? this.lineOpacity : 1}
           strokeWidth={this.lineWidth}
           strokeDasharray={strokeDash}
         />

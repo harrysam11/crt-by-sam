@@ -66,6 +66,8 @@ export default function ChartTradingOverlay({
   }, [chartApi]);
 
   const closePosition = useTerminalStore((s) => s.closePosition);
+  const closePositionTicket = useTerminalStore((s) => s.closePositionTicket);
+  const positionTickets = useTerminalStore((s) => (s.positionTickets || []).filter((t) => t.symbol === symbol));
   const flipPosition = useTerminalStore((s) => s.flipPosition);
   const snapBreakEven = useTerminalStore((s) => s.snapBreakEven);
   const cancelOrder = useTerminalStore((s) => s.cancelOrder);
@@ -79,9 +81,14 @@ export default function ChartTradingOverlay({
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
   const [dragCurrentPrice, setDragCurrentPrice] = useState<number | null>(null);
   const [quickQty, setQuickQty] = useState('0.1');
-  const [isQuickTradeCollapsed, setIsQuickTradeCollapsed] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false
-  );
+  const [isQuickTradeCollapsed, setIsQuickTradeCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem('crt_quick_trade_collapsed');
+      return stored !== null ? stored === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
   const [isPosActionsOpen, setIsPosActionsOpen] = useState(false);
   const [isPosHovered, setIsPosHovered] = useState(false);
 
@@ -329,6 +336,16 @@ export default function ChartTradingOverlay({
                 {/* Entry Price */}
                 <span className="font-mono text-slate-300">@{fmtPrice(position.entryPrice, symbol)}</span>
 
+                {/* Tickets Count Pill when multiple tickets open */}
+                {positionTickets.length > 1 && (
+                  <span
+                    className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9.5px] font-bold"
+                    title={`${positionTickets.length} separate order tickets open for ${symbol}`}
+                  >
+                    {positionTickets.length} Tickets
+                  </span>
+                )}
+
                 {/* Live PnL */}
                 <span className={`px-1.5 py-0.2 rounded font-mono ${
                   isPosProfit ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/80 text-rose-300 border border-rose-500/30'
@@ -545,6 +562,36 @@ export default function ChartTradingOverlay({
                     <span>Close 50%</span>
                     <span className="text-[9px] text-slate-400 ml-2">Half</span>
                   </button>
+
+                  {/* Individual Position Tickets */}
+                  {positionTickets.length > 0 && (
+                    <div className="flex flex-col gap-1 border-t border-white/10 pt-1 mt-0.5">
+                      <div className="text-[9px] text-slate-400 font-semibold flex items-center justify-between">
+                        <span>Open Tickets ({positionTickets.length}):</span>
+                      </div>
+                      {positionTickets.map((t) => (
+                        <div
+                          key={t.id}
+                          className="flex items-center justify-between px-1.5 py-0.5 rounded bg-black/40 border border-white/5 text-[9px]"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="text-[#38bdf8] font-bold">{t.id}</span>
+                            <span className="text-slate-300">{fmtQty(t.size)} @ {fmtPrice(t.entryPrice, symbol)}</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              audioHaptics.error();
+                              closePositionTicket(t.id);
+                            }}
+                            className="px-1.5 py-0.2 rounded bg-rose-500/30 text-rose-300 hover:bg-rose-500 hover:text-white font-bold transition ml-2"
+                            title={`Close ticket ${t.id}`}
+                          >
+                            Close
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Close All Market */}
                   <button

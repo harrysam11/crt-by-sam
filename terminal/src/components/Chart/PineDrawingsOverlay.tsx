@@ -24,6 +24,7 @@ export default function PineDrawingsOverlay({ chartApi, seriesApi }: PineDrawing
   const candles = useTerminalStore((s) => s.candles);
 
   const [, setTick] = useState(0);
+  const [isTableCollapsed, setIsTableCollapsed] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Force re-render whenever chart pans, zooms, or resizes
@@ -66,14 +67,44 @@ export default function PineDrawingsOverlay({ chartApi, seriesApi }: PineDrawing
   // Convert logical bar index to coordinate X
   const logicalToX = (barIdx: number): number | null => {
     try {
+      const actualBar = barIdx + (pineDrawings?.barOffset || 0);
       if (typeof timeScale.logicalToCoordinate === 'function') {
-        const coord = timeScale.logicalToCoordinate(barIdx);
+        const coord = timeScale.logicalToCoordinate(actualBar);
         if (coord !== null && typeof coord === 'number' && Number.isFinite(coord)) {
           return coord;
+        }
+        // Continuous linear extrapolation for offscreen/historical bars
+        const visibleRange = timeScale.getVisibleLogicalRange();
+        if (visibleRange) {
+          const fromCoord = timeScale.logicalToCoordinate(visibleRange.from);
+          const toCoord = timeScale.logicalToCoordinate(visibleRange.to);
+          const span = visibleRange.to - visibleRange.from;
+          if (span > 0 && fromCoord !== null && toCoord !== null) {
+            const barSpacing = (toCoord - fromCoord) / span;
+            return fromCoord + (actualBar - visibleRange.from) * barSpacing;
+          }
         }
       }
     } catch {}
     return null;
+  };
+
+  // Convert coordinate X supporting bar_index and bar_time (xloc)
+  const toX = (val: number, xloc?: string): number | null => {
+    try {
+      if (xloc === 'bt' || val > 1000000000) {
+        const timeSec = val > 10000000000 ? Math.floor(val / 1000) : val;
+        if (typeof timeScale.timeToCoordinate === 'function') {
+          const coord = timeScale.timeToCoordinate(timeSec as any);
+          if (coord !== null && typeof coord === 'number' && Number.isFinite(coord)) {
+            return coord;
+          }
+        }
+      }
+      return logicalToX(val);
+    } catch {
+      return null;
+    }
   };
 
   // Convert price to coordinate Y
@@ -92,11 +123,18 @@ export default function PineDrawingsOverlay({ chartApi, seriesApi }: PineDrawing
   // Parse color strings (e.g. #4caf50FF -> rgba or hex)
   const formatColor = (col?: string, fallback: string = '#38bdf8'): string => {
     if (!col) return fallback;
+    const lower = col.toLowerCase();
+    if (lower === '#000000' || lower === 'black' || lower === 'rgb(0, 0, 0)' || lower === '#000000ff') {
+      return 'rgba(255, 255, 255, 0.4)';
+    }
     if (col.startsWith('#') && col.length === 9) {
       const r = parseInt(col.slice(1, 3), 16);
       const g = parseInt(col.slice(3, 5), 16);
       const b = parseInt(col.slice(5, 7), 16);
       const a = parseInt(col.slice(7, 9), 16) / 255;
+      if (r < 30 && g < 30 && b < 30 && a > 0.5) {
+        return 'rgba(255, 255, 255, 0.4)';
+      }
       return `rgba(${r}, ${g}, ${b}, ${a.toFixed(2)})`;
     }
     return col;
@@ -105,16 +143,18 @@ export default function PineDrawingsOverlay({ chartApi, seriesApi }: PineDrawing
   return (
     <div
       ref={containerRef}
-      className="pointer-events-none absolute inset-0 z-15 overflow-hidden font-mono select-none"
+      style={{ zIndex: 25 }}
+      className="pointer-events-none absolute inset-0 z-[25] overflow-hidden font-mono select-none"
     >
       {/* SVG Layer for Boxes, Lines, and Geometry */}
       <svg className="absolute inset-0 h-full w-full pointer-events-none">
-        {/* 1. Pine Script Boxes (HTF Candles, FVGs, Order Blocks) */}
+        {/* 1. Pine Script Boxes (HTF Candles, FVGs, Order Blocks, Session Highlights) */}
         {pineDrawings.boxes.map((b) => {
-          const x1 = logicalToX(b.left);
-          const x2 = logicalToX(b.right);
-          const y1 = priceToY(b.top);
-          const y2 = priceToY(b.bottom);
+          const x1 = toX(b.left, (b as any).xloc);
+          const x2 = toX(b.right, (b as any).xloc);
+          const isFullScreenHeight = b.top >= 1e8 || b.bottom <= -1e8;
+          const y1 = isFullScreenHeight ? 0 : priceToY(b.top);
+          const y2 = isFullScreenHeight ? height : priceToY(b.bottom);
 
           if (x1 === null || x2 === null || y1 === null || y2 === null) return null;
 
@@ -123,6 +163,26 @@ export default function PineDrawingsOverlay({ chartApi, seriesApi }: PineDrawing
           const boxW = Math.max(1, Math.abs(x2 - x1));
           const boxH = Math.max(1, Math.abs(y2 - y1));
 
+          const isDarkBox = (b.bgcolor || '').toLowerCase().startsWith('#2e2e2e') || (b.bgcolor || '').toLowerCase().startsWith('#000000');
+          const rawBg = (b.bgcolor || '').toLowerCase();
+          const rawBorder = (b.border_color || '').toLowerCase();
+          const isGreenish = rawBorder.includes('089981') || rawBorder.includes('22c55e') || rawBorder.includes('10b981') || rawBorder.includes('4caf50') || rawBg.includes('089981') || rawBg.includes('22c55e');
+          const isReddish = rawBorder.includes('f23645') || rawBorder.includes('f43f5e') || rawBorder.includes('ef4444') || rawBg.includes('f23645') || rawBg.includes('f43f5e');
+
+          let boxFill: string;
+          let boxStroke: string;
+
+          if (isGreenish) {
+            boxFill = 'rgba(16, 185, 129, 0.12)';
+            boxStroke = 'rgba(16, 185, 129, 0.65)';
+          } else if (isReddish) {
+            boxFill = 'rgba(244, 63, 94, 0.12)';
+            boxStroke = 'rgba(244, 63, 94, 0.65)';
+          } else {
+            boxFill = isDarkBox ? 'rgba(56, 189, 248, 0.08)' : formatColor(b.bgcolor, 'rgba(56, 189, 248, 0.08)');
+            boxStroke = isDarkBox ? 'rgba(56, 189, 248, 0.45)' : formatColor(b.border_color, 'rgba(56, 189, 248, 0.45)');
+          }
+
           return (
             <g key={`pine-box-${b.id}`}>
               <rect
@@ -130,24 +190,33 @@ export default function PineDrawingsOverlay({ chartApi, seriesApi }: PineDrawing
                 y={boxY}
                 width={boxW}
                 height={boxH}
-                fill={formatColor(b.bgcolor, 'rgba(56, 189, 248, 0.15)')}
-                stroke={formatColor(b.border_color, 'rgba(56, 189, 248, 0.6)')}
+                fill={boxFill}
+                stroke={boxStroke}
                 strokeWidth={b.border_width || 1}
                 strokeDasharray={b.border_style === 'style_dotted' ? '2,2' : b.border_style === 'style_dashed' ? '4,4' : undefined}
-                rx={2}
+                rx={3}
               />
               {b.text && (
-                <text
-                  x={boxX + boxW / 2}
-                  y={boxY + boxH / 2}
-                  fill={formatColor(b.text_color, '#ffffff')}
-                  fontSize={10}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  className="font-mono font-bold select-none"
-                >
-                  {b.text}
-                </text>
+                <g>
+                  <rect
+                    x={boxX + 4}
+                    y={boxY + 4}
+                    width={b.text.length * 6.2 + 8}
+                    height={16}
+                    rx={3}
+                    fill="rgba(10, 12, 18, 0.65)"
+                  />
+                  <text
+                    x={boxX + 8}
+                    y={boxY + 15}
+                    fill={formatColor(b.text_color, '#ffffff')}
+                    fontSize={9.5}
+                    textAnchor="start"
+                    className="font-mono font-semibold select-none tracking-wide"
+                  >
+                    {b.text}
+                  </text>
+                </g>
               )}
             </g>
           );
@@ -155,8 +224,8 @@ export default function PineDrawingsOverlay({ chartApi, seriesApi }: PineDrawing
 
         {/* 2. Pine Script Lines (Separators, True Opens, Trace Lines) */}
         {pineDrawings.lines.map((l) => {
-          let x1 = logicalToX(l.x1);
-          let x2 = logicalToX(l.x2);
+          let x1 = toX(l.x1, (l as any).xloc);
+          let x2 = toX(l.x2, (l as any).xloc);
           const y1 = priceToY(Number.isFinite(l.y1) ? l.y1 : (l.y2 || 0));
           const y2 = priceToY(Number.isFinite(l.y2) ? l.y2 : (l.y1 || 0));
 
@@ -176,9 +245,9 @@ export default function PineDrawingsOverlay({ chartApi, seriesApi }: PineDrawing
                 y1={0}
                 x2={x1 || 0}
                 y2={height}
-                stroke={formatColor(l.color, 'rgba(255, 255, 255, 0.4)')}
+                stroke={formatColor(l.color, 'rgba(255, 255, 255, 0.25)')}
                 strokeWidth={l.width || 1}
-                strokeDasharray={l.style === 'style_dotted' ? '2,2' : l.style === 'style_dashed' ? '5,5' : undefined}
+                strokeDasharray={l.style === 'style_dotted' ? '2,2' : l.style === 'style_dashed' ? '4,4' : undefined}
               />
             );
           }
@@ -193,16 +262,16 @@ export default function PineDrawingsOverlay({ chartApi, seriesApi }: PineDrawing
               y1={validY1}
               x2={x2}
               y2={validY2}
-              stroke={formatColor(l.color, 'rgba(255, 255, 255, 0.7)')}
+              stroke={formatColor(l.color, 'rgba(56, 189, 248, 0.55)')}
               strokeWidth={l.width || 1}
-              strokeDasharray={l.style === 'style_dotted' ? '2,2' : l.style === 'style_dashed' ? '5,5' : undefined}
+              strokeDasharray={l.style === 'style_dotted' ? '2,2' : l.style === 'style_dashed' ? '4,4' : undefined}
             />
           );
         })}
 
         {/* 3. Pine Script Labels & Markers */}
         {pineDrawings.labels.map((lbl) => {
-          const x = logicalToX(lbl.x);
+          const x = toX(lbl.x, (lbl as any).xloc);
           const y = priceToY(lbl.y);
 
           if (x === null || y === null) return null;
@@ -235,46 +304,72 @@ export default function PineDrawingsOverlay({ chartApi, seriesApi }: PineDrawing
       </svg>
 
       {/* 4. Pine Script Dashboard Tables (CRT Model Table, SMT Matrix) */}
-      {pineDrawings.tables.map((tbl) => (
-        <div
-          key={`pine-table-${tbl.id}`}
-          className="pointer-events-auto absolute top-14 right-4 z-30 clay-card bg-[#0b0c14]/95 border border-white/10 rounded-xl shadow-2xl p-2 font-mono text-[10.5px] backdrop-blur-md max-w-xs transition"
-        >
-          <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-white/10 text-white font-bold tracking-wide">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
-              <span>CRT Pine Dashboard</span>
-            </span>
+      {pineDrawings.tables.map((tbl) => {
+        if (isTableCollapsed) {
+          return (
             <button
-              onClick={() => useTerminalStore.getState().setPineDrawings(null)}
-              className="text-slate-500 hover:text-white px-1 transition text-xs"
-              title="Close Pine Dashboard"
+              key={`pine-table-pill-${tbl.id}`}
+              onClick={() => setIsTableCollapsed(false)}
+              className="pointer-events-auto absolute top-14 right-4 z-30 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0b0c14]/90 border border-white/10 shadow-lg text-[10px] text-slate-300 hover:text-white backdrop-blur-md transition hover:scale-105"
+              title="Expand CRT Dashboard"
             >
-              x
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              <span>CRT Dashboard</span>
+              <span className="text-slate-400 font-bold ml-1">+</span>
             </button>
+          );
+        }
+
+        return (
+          <div
+            key={`pine-table-${tbl.id}`}
+            className="pointer-events-auto absolute top-14 right-4 z-30 bg-[#0b0c14]/95 border border-white/15 rounded-xl shadow-2xl p-2.5 font-mono text-[10.5px] backdrop-blur-xl max-w-xs transition"
+          >
+            <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-white/10 text-white font-bold tracking-wide">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="text-xs">CRT Dashboard</span>
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setIsTableCollapsed(true)}
+                  className="text-slate-400 hover:text-white px-1.5 py-0.5 rounded hover:bg-white/10 transition text-xs font-bold"
+                  title="Minimize Dashboard"
+                >
+                  –
+                </button>
+                <button
+                  onClick={() => useTerminalStore.getState().setPineDrawings(null)}
+                  className="text-slate-400 hover:text-rose-400 px-1.5 py-0.5 rounded hover:bg-white/10 transition text-xs font-bold"
+                  title="Close Pine Dashboard"
+                >
+                  x
+                </button>
+              </div>
+            </div>
+            <table className="w-full border-collapse">
+              <tbody>
+                {tbl.cells.map((row, rIdx) => (
+                  <tr key={`r-${rIdx}`} className="border-b border-white/5 last:border-0">
+                    {row.map((cell, cIdx) => (
+                      <td
+                        key={`c-${cIdx}`}
+                        className="px-2 py-0.5 text-left whitespace-nowrap"
+                        style={{
+                          backgroundColor: cell.bgcolor ? formatColor(cell.bgcolor, 'transparent') : undefined,
+                          color: cell.text_color ? formatColor(cell.text_color, '#ffffff') : '#e2e8f0',
+                        }}
+                      >
+                        {cell.text || '-'}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <table className="w-full border-collapse">
-            <tbody>
-              {tbl.cells.map((row, rIdx) => (
-                <tr key={`r-${rIdx}`} className="border-b border-white/5 last:border-0">
-                  {row.map((cell, cIdx) => (
-                    <td
-                      key={`c-${cIdx}`}
-                      className="px-2 py-1 text-left whitespace-nowrap"
-                      style={{
-                        backgroundColor: cell.bgcolor ? formatColor(cell.bgcolor, 'transparent') : undefined,
-                        color: cell.text_color ? formatColor(cell.text_color, '#ffffff') : '#e2e8f0',
-                      }}
-                    >
-                      {cell.text || '-'}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

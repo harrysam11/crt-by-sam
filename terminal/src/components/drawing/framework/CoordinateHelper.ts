@@ -1,5 +1,6 @@
 import type { IChartApi, ISeriesApi, SeriesType, UTCTimestamp, Time } from 'lightweight-charts';
 import type { Point2D } from '../types';
+import type { Candle } from '../../../types/terminal';
 
 export class CoordinateHelper {
   constructor(
@@ -7,7 +8,7 @@ export class CoordinateHelper {
     private seriesApi: ISeriesApi<SeriesType> | null,
     public width: number,
     public height: number,
-    private candles?: Array<{ time: number }>
+    public candles?: Candle[]
   ) {}
 
   timeToX(time?: number, fallbackX: number = 0): number {

@@ -56,17 +56,20 @@ export class MeasureTool extends BaseDrawingTool {
     const fillColor = isUp ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)';
     const strokeColor = isUp ? '#22c55e' : '#ef4444';
 
-    // Time elapsed string
+    // Time elapsed string & estimated bars
     let timeLabel = '';
+    let barsLabel = '';
     if (this.p1.time && this.p2?.time) {
       const secDiff = Math.abs(this.p2.time - this.p1.time);
       const hours = Math.floor(secDiff / 3600);
       const mins = Math.floor((secDiff % 3600) / 60);
       timeLabel = hours > 24 ? `${Math.floor(hours / 24)}d ${hours % 24}h` : `${hours}h ${mins}m`;
+      const approxBars = Math.max(1, Math.round(secDiff / 60));
+      barsLabel = `${approxBars} bars`;
     }
 
-    const badgeX = Math.max(10, minX + width / 2 - 70);
-    const badgeY = Math.max(20, minY + height / 2 - 18);
+    const badgeX = Math.max(10, minX + width / 2 - 80);
+    const badgeY = Math.max(20, minY + height / 2 - 20);
 
     return (
       <g key={this.id}>
@@ -97,8 +100,8 @@ export class MeasureTool extends BaseDrawingTool {
           <rect
             x={badgeX}
             y={badgeY}
-            width={140}
-            height={36}
+            width={160}
+            height={40}
             rx={4}
             fill="#101015"
             stroke={strokeColor}
@@ -106,7 +109,7 @@ export class MeasureTool extends BaseDrawingTool {
             opacity={0.95}
           />
           <text
-            x={badgeX + 8}
+            x={badgeX + 10}
             y={badgeY + 16}
             fill={isUp ? '#4ade80' : '#f87171'}
             fontSize={11}
@@ -115,15 +118,15 @@ export class MeasureTool extends BaseDrawingTool {
           >
             {isUp ? '+' : ''}{priceDelta.toFixed(2)} ({isUp ? '+' : ''}{pctDelta.toFixed(2)}%)
           </text>
-          {timeLabel && (
+          {(timeLabel || barsLabel) && (
             <text
-              x={badgeX + 8}
-              y={badgeY + 30}
+              x={badgeX + 10}
+              y={badgeY + 31}
               fill="#94a3b8"
               fontSize={10}
               fontFamily="monospace"
             >
-              Time: {timeLabel}
+              {barsLabel ? `${barsLabel}, ` : ''}{timeLabel}
             </text>
           )}
         </g>

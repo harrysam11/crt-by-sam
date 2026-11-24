@@ -179,14 +179,23 @@ export default function OnChartNewsOverlay({
   const visibleMarkers = useMemo(() => {
     if (!chartApi || !visible || newsItems.length === 0) return [];
     const timeScale = chartApi.timeScale();
+    const timeRange = (timeScale as any).getVisibleRange ? (timeScale as any).getVisibleRange() : null;
 
     const markers: Array<{ item: UnifiedChartNewsItem; x: number }> = [];
 
     newsItems.forEach((item) => {
       try {
-        const coord = timeScale.timeToCoordinate(item.timestamp as UTCTimestamp);
+        let coord = timeScale.timeToCoordinate(item.timestamp as UTCTimestamp);
+        if ((coord === null || isNaN(coord)) && timeRange && typeof timeRange.from === 'number' && typeof timeRange.to === 'number') {
+          const fromTime = Number(timeRange.from);
+          const toTime = Number(timeRange.to);
+          if (item.timestamp >= fromTime && item.timestamp <= toTime && toTime > fromTime) {
+            const ratio = (item.timestamp - fromTime) / (toTime - fromTime);
+            coord = (ratio * chartWidth) as unknown as import('lightweight-charts').Coordinate;
+          }
+        }
         if (coord !== null && typeof coord === 'number' && !isNaN(coord)) {
-          if (coord >= 0 && coord <= chartWidth - 30) {
+          if (coord >= 10 && coord <= chartWidth - 30) {
             markers.push({ item, x: coord });
           }
         }
@@ -195,6 +204,24 @@ export default function OnChartNewsOverlay({
 
     return markers;
   }, [chartApi, visible, newsItems, chartWidth, timeRange]);
+
+  const upcomingEvent = useMemo(() => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const future = newsItems
+      .filter((i) => i.timestamp >= nowSec)
+      .sort((a, b) => a.timestamp - b.timestamp);
+    return future[0] || newsItems.find((i) => i.impact === 'HIGH') || null;
+  }, [newsItems]);
+
+  const formatCountdown = (targetSec: number): string => {
+    const diff = Math.max(0, targetSec - Math.floor(Date.now() / 1000));
+    if (diff === 0) return 'NOW';
+    const hrs = Math.floor(diff / 3600);
+    const mins = Math.floor((diff % 3600) / 60);
+    if (hrs > 24) return `${Math.floor(hrs / 24)}d ${hrs % 24}h`;
+    if (hrs > 0) return `${hrs}h ${mins}m`;
+    return `${mins}m`;
+  };
 
   if (!visible) return null;
 

@@ -27,7 +27,8 @@ export type ToolType =
   | 'POSITION_LONG'
   | 'POSITION_SHORT'
   | 'POSITION_TOOL'
-  | 'MEASURE_RULER';
+  | 'MEASURE_RULER'
+  | 'ANCHORED_VOLUME_PROFILE';
 
 export interface Point2D {
   x: number;
@@ -44,6 +45,7 @@ export interface DrawingItem {
   p3?: Point2D;
   points?: Point2D[];
   color: string;
+  lineOpacity?: number;
   fillColor?: string;
   fillOpacity?: number;
   lineWidth: number;

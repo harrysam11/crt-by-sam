@@ -15,10 +15,13 @@ import { ArrowTool } from './tools/ArrowTool';
 import { BrushTool } from './tools/BrushTool';
 import { CircleTool } from './tools/CircleTool';
 import { PriceLabelTool } from './tools/PriceLabelTool';
+import { AnchoredVolumeProfileTool } from './tools/AnchoredVolumeProfileTool';
 
 export class ToolFactory {
   static create(item: DrawingItem): BaseDrawingTool {
     switch (item.type) {
+      case 'ANCHORED_VOLUME_PROFILE':
+        return new AnchoredVolumeProfileTool(item);
       case 'TRENDLINE':
         return new TrendlineTool(item);
       case 'RAY':
