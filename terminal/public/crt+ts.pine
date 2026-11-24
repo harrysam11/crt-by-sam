@@ -940,12 +940,6 @@ int eff_hr = i_sess_mode == "Auto" ? auto_hr : i_daily_hr
 int eff_min = i_sess_mode == "Auto" ? auto_min : i_daily_min
 
 //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// DYNAMIC LOWER TIMEFRAME
-//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-string auto_base_tf = timeframe.in_seconds() < 900 ? timeframe.period : "15"
-
-//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ARRAYS
 //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -968,74 +962,96 @@ var array<float> g_c4 = array.new<float>()
 var array<int> g_t4 = array.new<int>()
 
 //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// LOWER TF DATA
-//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-[o15, h15, l15, c15, t15] = request.security_lower_tf(
-     syminfo.tickerid,
-     auto_base_tf,
-     [open, high, low, close, time])
-
-[o15_2, c15_2, t15_2] = request.security_lower_tf(
-     ticker2 != "" ? ticker2 : syminfo.tickerid,
-     auto_base_tf,
-     [open, close, time],
-     ignore_invalid_symbol=true)
-
-[o15_3, c15_3, t15_3] = request.security_lower_tf(
-     ticker3 != "" ? ticker3 : syminfo.tickerid,
-     auto_base_tf,
-     [open, close, time],
-     ignore_invalid_symbol=true)
-
-[o15_4, c15_4, t15_4] = request.security_lower_tf(
-     ticker4 != "" ? ticker4 : syminfo.tickerid,
-     auto_base_tf,
-     [open, close, time],
-     ignore_invalid_symbol=true)
-
-//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ARRAY HELPERS
 //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 f_push_arrays(arr_src, arr_dst) =>
-    if array.size(arr_src) > 0
+    if not na(arr_src) and array.size(arr_src) > 0
         for i = 0 to array.size(arr_src) - 1
             array.push(arr_dst, array.get(arr_src, i))
 
 f_clip_arrays(arr) =>
     int max_bars = 5000
-
     if array.size(arr) > max_bars
         int excess = array.size(arr) - max_bars
-
         for i = 1 to excess
             array.shift(arr)
 
 //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// PUSH DATA
+// LOWER TF DATA (GUARDED)
 //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-f_push_arrays(o15, g_o15)
-f_push_arrays(h15, g_h15)
-f_push_arrays(l15, g_l15)
-f_push_arrays(c15, g_c15)
-f_push_arrays(t15, g_t15)
+// Only call request.security_lower_tf when chart timeframe is strictly higher than 15 minutes (900s).
+// When on <= 15m timeframes, chart candles and standard request.security provide native resolution without throwing runtime errors.
+bool can_fetch_ltf = timeframe.in_seconds > 900
 
-if ticker2 != ""
-    f_push_arrays(o15_2, g_o2)
-    f_push_arrays(c15_2, g_c2)
-    f_push_arrays(t15_2, g_t2)
+if can_fetch_ltf
+    [o15, h15, l15, c15, t15] = request.security_lower_tf(
+         syminfo.tickerid,
+         "15",
+         [open, high, low, close, time])
+    f_push_arrays(o15, g_o15)
+    f_push_arrays(h15, g_h15)
+    f_push_arrays(l15, g_l15)
+    f_push_arrays(c15, g_c15)
+    f_push_arrays(t15, g_t15)
 
-if ticker3 != ""
-    f_push_arrays(o15_3, g_o3)
-    f_push_arrays(c15_3, g_c3)
-    f_push_arrays(t15_3, g_t3)
+    if ticker2 != ""
+        [o15_2, c15_2, t15_2] = request.security_lower_tf(
+             ticker2,
+             "15",
+             [open, close, time],
+             ignore_invalid_symbol=true)
+        f_push_arrays(o15_2, g_o2)
+        f_push_arrays(c15_2, g_c2)
+        f_push_arrays(t15_2, g_t2)
 
-if ticker4 != ""
-    f_push_arrays(o15_4, g_o4)
-    f_push_arrays(c15_4, g_c4)
-    f_push_arrays(t15_4, g_t4)
+    if ticker3 != ""
+        [o15_3, c15_3, t15_3] = request.security_lower_tf(
+             ticker3,
+             "15",
+             [open, close, time],
+             ignore_invalid_symbol=true)
+        f_push_arrays(o15_3, g_o3)
+        f_push_arrays(c15_3, g_c3)
+        f_push_arrays(t15_3, g_t3)
+
+    if ticker4 != ""
+        [o15_4, c15_4, t15_4] = request.security_lower_tf(
+             ticker4,
+             "15",
+             [open, close, time],
+             ignore_invalid_symbol=true)
+        f_push_arrays(o15_4, g_o4)
+        f_push_arrays(c15_4, g_c4)
+        f_push_arrays(t15_4, g_t4)
+else
+    array.push(g_o15, open)
+    array.push(g_h15, high)
+    array.push(g_l15, low)
+    array.push(g_c15, close)
+    array.push(g_t15, time)
+
+    if ticker2 != ""
+        [t2_o, t2_c, t2_t] = request.security(ticker2, "", [open, close, time], ignore_invalid_symbol=true)
+        if not na(t2_t)
+            array.push(g_o2, t2_o)
+            array.push(g_c2, t2_c)
+            array.push(g_t2, t2_t)
+
+    if ticker3 != ""
+        [t3_o, t3_c, t3_t] = request.security(ticker3, "", [open, close, time], ignore_invalid_symbol=true)
+        if not na(t3_t)
+            array.push(g_o3, t3_o)
+            array.push(g_c3, t3_c)
+            array.push(g_t3, t3_t)
+
+    if ticker4 != ""
+        [t4_o, t4_c, t4_t] = request.security(ticker4, "", [open, close, time], ignore_invalid_symbol=true)
+        if not na(t4_t)
+            array.push(g_o4, t4_o)
+            array.push(g_c4, t4_c)
+            array.push(g_t4, t4_t)
 
 //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // CLIP
@@ -4240,17 +4256,10 @@ detectSweep() =>
     ph = ta.pivothigh(high, lookbackMax, lookbackMin)
     pl = ta.pivotlow(low, lookbackMax, lookbackMin)
 
-    var float lastSwingHigh     = na
-    var float lastSwingLow      = na
-    var int   lastSwingHighTime = na
-    var int   lastSwingLowTime  = na
-
-    if not na(ph)
-        lastSwingHigh     := ph
-        lastSwingHighTime := time[lookbackMin]
-    if not na(pl)
-        lastSwingLow     := pl
-        lastSwingLowTime := time[lookbackMin]
+    lastSwingHigh     = ta.valuewhen(not na(ph), ph, 0)
+    lastSwingHighTime = ta.valuewhen(not na(ph), time[lookbackMin], 0)
+    lastSwingLow      = ta.valuewhen(not na(pl), pl, 0)
+    lastSwingLowTime  = ta.valuewhen(not na(pl), time[lookbackMin], 0)
 
     bullSweep = not na(lastSwingLow)  and low  < lastSwingLow  and close > lastSwingLow
     bearSweep = not na(lastSwingHigh) and high > lastSwingHigh and close < lastSwingHigh
@@ -4259,8 +4268,8 @@ detectSweep() =>
 
 // ───────────────────────── Drawing (time-anchored) ─────────────────────────
 drawConfirmed(isBull, level, fromTime, tfLabel) =>
-    var line  ln = na
-    var label lb = na
+    line  ln = na
+    label lb = na
     if showSweeps
         ln := line.new(fromTime, level, time, level, xloc = xloc.bar_time,
              color = tsColor, style = getLineStyle(lineStyleInput), width = 1)
@@ -4372,11 +4381,12 @@ if showCurrentTF
     processSource(curLevels, curBulls, curLines, curLabels, pCur, bull, bear, sh, sl, shTime, slTime, "", barstate.isconfirmed, curClose, maxSweeps)
 
 // ───────────────────────── Higher timeframe wrapper ─────────────────────────
+calcHtfSweep() =>
+    [b, r, sh, sl, shTime, slTime] = detectSweep()
+    [b, r, sh, sl, shTime, slTime, barstate.isconfirmed, close]
+
 htfSweep(tf) =>
-    [b, r, sh, sl, shTime, slTime] = request.security(syminfo.tickerid, tf, detectSweep(), lookahead = barmerge.lookahead_off)
-    htfConfirmed = request.security(syminfo.tickerid, tf, barstate.isconfirmed, lookahead = barmerge.lookahead_off)
-    htfClose     = request.security(syminfo.tickerid, tf, close, lookahead = barmerge.lookahead_off)
-    [b, r, sh, sl, shTime, slTime, htfConfirmed, htfClose]
+    request.security(syminfo.tickerid, tf, calcHtfSweep(), lookahead = barmerge.lookahead_off)
 
 var float[] h1Levels = array.new_float()
 var bool[]  h1Bulls  = array.new_bool()
