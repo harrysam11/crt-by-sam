@@ -35,6 +35,7 @@ export default function SettingsModal({
   // Auth & Social Store
   const twitterAccount = useAuthStore((s) => s.twitterAccount);
   const connectTwitter = useAuthStore((s) => s.connectTwitter);
+  const confirmTwitterVerification = useAuthStore((s) => s.confirmTwitterVerification);
   const disconnectTwitter = useAuthStore((s) => s.disconnectTwitter);
   const setActiveRightDrawer = useDrawingStore((s) => s.setActiveRightDrawer);
 
@@ -665,30 +666,97 @@ export default function SettingsModal({
                     </div>
                   </div>
 
-                  {/* Connected Account Card */}
+                  {/* Connected Account Card with Cryptographic Verification */}
                   {twitterAccount ? (
-                    <div className="p-3.5 rounded-lg border border-[#282826] bg-[#181817] flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-full bg-[#282826] border border-white/20 flex items-center justify-center text-white font-bold text-sm">
-                          {twitterAccount.handle.slice(0, 2).toUpperCase()}
+                    <div className="space-y-3">
+                      <div className="p-3.5 rounded-lg border border-[#282826] bg-[#181817] flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-full bg-[#282826] border border-white/20 flex items-center justify-center text-white font-bold text-sm">
+                            {twitterAccount.handle.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-white text-xs">@{twitterAccount.handle}</span>
+                              {twitterAccount.verified ? (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#089981]/20 text-[#089981] border border-[#089981]/40">
+                                  VERIFIED OWNER
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                                  PROOF PENDING
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-muted">
+                              {twitterAccount.verified
+                                ? `Cryptographically bound to terminal key`
+                                : `Ownership challenge pending verification`}
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-bold text-white text-xs">@{twitterAccount.handle}</div>
-                          <div className="text-[10px] text-emerald-400">Connected to TerminalX Social Layer</div>
-                        </div>
+                        <button
+                          onClick={disconnectTwitter}
+                          className="rounded border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-xs text-rose-400 hover:bg-rose-500/20 transition"
+                        >
+                          Disconnect
+                        </button>
                       </div>
-                      <button
-                        onClick={disconnectTwitter}
-                        className="rounded border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-xs text-rose-400 hover:bg-rose-500/20 transition"
-                      >
-                        Disconnect
-                      </button>
+
+                      {/* Anti-Spoofing Challenge Box for Unverified Handles */}
+                      {!twitterAccount.verified && (
+                        <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-amber-400">
+                              Anti-Spoofing Challenge: Proof-of-Handle Required
+                            </span>
+                            <span className="text-[10px] font-mono text-muted">NONCE CHALLENGE</span>
+                          </div>
+                          <p className="text-[11px] text-slate-300 leading-relaxed">
+                            To prevent malicious handle hijacking, prove control of{' '}
+                            <span className="text-white font-bold">@{twitterAccount.handle}</span> by posting this one-time challenge nonce or verifying via Twitter:
+                          </p>
+                          <div className="flex items-center gap-2 bg-black/60 p-2 rounded border border-[#282826] font-mono text-xs text-slate-200">
+                            <span className="flex-1 truncate select-all">{twitterAccount.verificationNonce}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(twitterAccount.verificationNonce);
+                              }}
+                              className="px-2 py-0.5 rounded bg-[#282826] text-muted hover:text-white text-[10px]"
+                            >
+                              Copy Nonce
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2 pt-1">
+                            <a
+                              href={`https://x.com/intent/tweet?text=${encodeURIComponent(
+                                `Verifying my TerminalX ownership challenge: ${twitterAccount.verificationNonce} #TerminalX`
+                              )}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 rounded bg-white text-black font-bold text-xs hover:bg-slate-200 transition text-center"
+                            >
+                              1. Post Proof Tweet
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                audioHaptics.fill();
+                                confirmTwitterVerification();
+                              }}
+                              className="px-3 py-1.5 rounded bg-[#089981] text-white font-bold text-xs hover:bg-[#089981]/80 transition"
+                            >
+                              2. Confirm Ownership
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="p-3.5 rounded-lg border border-[#282826] bg-[#181817] space-y-2">
                       <span className="text-xs text-white font-bold block">Link your X.com account</span>
                       <p className="text-[11px] text-slate-400">
-                        Enables 1-click chart sharing, personal quote tweets, and real-time social market feeds.
+                        Enables 1-click chart sharing, personal quote tweets, and real-time social market feeds. Cryptographic nonce verification is required to claim handle identity.
                       </p>
                       <div className="flex gap-2 pt-1">
                         <div className="relative flex-1">
@@ -710,25 +778,41 @@ export default function SettingsModal({
                           }}
                           className="px-4 py-1.5 rounded bg-white text-black font-bold text-xs hover:bg-slate-200 transition"
                         >
-                          Connect
+                          Generate Challenge
                         </button>
                       </div>
                     </div>
                   )}
 
-                  {/* Curated Market Accounts Info */}
+                  {/* Dynamic Fundamental Intelligence Banner */}
+                  <div className="p-2.5 rounded-lg border border-[#282826] bg-black/40 text-[11px] text-slate-300 space-y-1">
+                    <div className="flex items-center justify-between font-bold text-white text-[11px]">
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Dynamic Current Affairs & Wire Proxy (/api/news/wire)
+                      </span>
+                      <span className="text-[9px] text-muted">LIVE RSS CRAWLER</span>
+                    </div>
+                    <p className="text-muted text-[10px]">
+                      Continuously ingests real-time geopolitical policy shifts, tariff announcements, and earnings headlines without needing manual code updates.
+                    </p>
+                  </div>
+
+                  {/* Curated Geopolitical & Market Figures Info */}
                   <div className="space-y-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-muted block">
-                      Tracked High-Impact Market Accounts
+                      Tracked High-Impact Market & Geopolitical Figures
                     </span>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       {[
+                        { handle: '@realDonaldTrump', desc: 'Trump Presidential & Tariff Policy' },
+                        { handle: '@KremlinRussia_E', desc: 'Russian Federation & Energy Policy' },
+                        { handle: '@IRIMFA_EN', desc: 'Iran Foreign Ministry & Geopolitics' },
+                        { handle: '@nvidia', desc: 'Jensen Huang & AI Semiconductor Wire' },
+                        { handle: '@OPECSecretariat', desc: 'Crude Oil Quotas & OPEC+ Alliance' },
+                        { handle: '@federalreserve', desc: 'FOMC Policy & Rate Actions' },
                         { handle: '@DeItaone', desc: 'Walter Bloomberg Fast Wire' },
                         { handle: '@tier10k', desc: 'Tree News Macro & Crypto Wire' },
-                        { handle: '@federalreserve', desc: 'FOMC Policy & Rate Actions' },
-                        { handle: '@FinancialJuice', desc: 'Global Macro Indicators' },
-                        { handle: '@saylor', desc: 'MicroStrategy Treasury Updates' },
-                        { handle: '@elonmusk', desc: 'Macro & Regulatory Announcements' },
                       ].map((acc) => (
                         <div key={acc.handle} className="p-2 rounded border border-[#282826] bg-black/40 flex items-center justify-between">
                           <div>

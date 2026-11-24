@@ -53,6 +53,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/calendar/*path", get(calendar_handler))
         .route("/binance", get(binance_handler))
         .route("/binance/*path", get(binance_handler))
+        .route("/news/wire", get(live_news_wire_handler))
         .layer(axum::middleware::from_fn(rate_limit_proxy_middleware));
 
     Router::new()
@@ -641,3 +642,193 @@ async fn binance_handler(
             .into_response(),
     }
 }
+
+#[derive(Debug, Deserialize)]
+pub struct WireQuery {
+    pub q: Option<String>,
+    pub category: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct DynamicWireItem {
+    pub id: String,
+    pub title: String,
+    pub source: String,
+    pub link: String,
+    pub pub_date: String,
+    pub category: String,
+    pub impact: String,
+    pub sentiment: String,
+    pub figures: Vec<String>,
+    pub symbols: Vec<String>,
+}
+
+fn extract_xml_tag<'a>(xml: &'a str, tag: &str) -> Option<&'a str> {
+    let open = format!("<{}>", tag);
+    let close = format!("</{}>", tag);
+    let start = xml.find(&open)? + open.len();
+    let end = xml[start..].find(&close)? + start;
+    Some(&xml[start..end])
+}
+
+fn parse_rss_items(xml: &str) -> Vec<DynamicWireItem> {
+    let mut items = Vec::new();
+    let mut cursor = 0;
+
+    while let Some(item_start) = xml[cursor..].find("<item>") {
+        let abs_start = cursor + item_start + "<item>".len();
+        let Some(item_len) = xml[abs_start..].find("</item>") else {
+            break;
+        };
+        let item_xml = &xml[abs_start..abs_start + item_len];
+        cursor = abs_start + item_len + "</item>".len();
+
+        let raw_title = extract_xml_tag(item_xml, "title").unwrap_or_default();
+        let link = extract_xml_tag(item_xml, "link").unwrap_or_default();
+        let pub_date = extract_xml_tag(item_xml, "pubDate").unwrap_or_default();
+
+        let (title, source) = if let Some(dash_idx) = raw_title.rfind(" - ") {
+            (&raw_title[..dash_idx], &raw_title[dash_idx + 3..])
+        } else {
+            (raw_title, "Global Wire")
+        };
+
+        if title.is_empty() {
+            continue;
+        }
+
+        let upper = title.to_uppercase();
+        let mut figures = Vec::new();
+        let mut symbols = Vec::new();
+        let mut category = "MACRO".to_string();
+        let mut impact = "MED".to_string();
+        let mut sentiment = "NEUTRAL".to_string();
+
+        if upper.contains("TRUMP") {
+            figures.push("Donald Trump".to_string());
+            category = "TRUMP_POLICY".to_string();
+            impact = "HIGH".to_string();
+            symbols.push("SPX".to_string());
+            symbols.push("DXY".to_string());
+        }
+        if upper.contains("PUTIN") || upper.contains("KREMLIN") || upper.contains("RUSSIA") {
+            figures.push("Vladimir Putin (Russia)".to_string());
+            category = "GEOPOLITICAL".to_string();
+            impact = "HIGH".to_string();
+            symbols.push("USOIL".to_string());
+            symbols.push("XAUUSD".to_string());
+        }
+        if upper.contains("IRAN") || upper.contains("TEHRAN") || upper.contains("HORMUZ") {
+            figures.push("Iran Republic".to_string());
+            category = "GEOPOLITICAL".to_string();
+            impact = "HIGH".to_string();
+            symbols.push("USOIL".to_string());
+            symbols.push("XAUUSD".to_string());
+        }
+        if upper.contains("NVIDIA") || upper.contains("HUANG") || upper.contains("BLACKWELL") || upper.contains("CHIP") || upper.contains("SEMICONDUCTOR") {
+            figures.push("Jensen Huang (NVIDIA)".to_string());
+            category = "SEMICONDUCTOR_AI".to_string();
+            impact = "HIGH".to_string();
+            symbols.push("NVDA".to_string());
+            symbols.push("SPX".to_string());
+        }
+        if upper.contains("FED") || upper.contains("POWELL") || upper.contains("RATE") || upper.contains("INFLATION") {
+            figures.push("Jerome Powell (Fed)".to_string());
+            category = "CENTRAL_BANK".to_string();
+            impact = "HIGH".to_string();
+            symbols.push("XAUUSD".to_string());
+            symbols.push("DXY".to_string());
+        }
+        if upper.contains("OPEC") || upper.contains("OIL") || upper.contains("CRUDE") {
+            figures.push("OPEC+ Alliance".to_string());
+            category = "ENERGY_OPEC".to_string();
+            symbols.push("USOIL".to_string());
+        }
+        if upper.contains("BITCOIN") || upper.contains("CRYPTO") || upper.contains("SAYLOR") {
+            figures.push("Michael Saylor".to_string());
+            category = "CRYPTO".to_string();
+            symbols.push("BTCUSDT".to_string());
+        }
+
+        if upper.contains("CUT") || upper.contains("SURGE") || upper.contains("JUMP") || upper.contains("RALLY") || upper.contains("GAIN") {
+            sentiment = "BULLISH".to_string();
+        } else if upper.contains("WAR") || upper.contains("STRIKE") || upper.contains("SANCTION") || upper.contains("DROP") || upper.contains("FALL") || upper.contains("CRACKDOWN") || upper.contains("DUMP") {
+            sentiment = "BEARISH".to_string();
+        }
+
+        let id = format!("wire-{}", uuid::Uuid::new_v4().simple());
+
+        items.push(DynamicWireItem {
+            id,
+            title: title.to_string(),
+            source: source.to_string(),
+            link: link.to_string(),
+            pub_date: pub_date.to_string(),
+            category,
+            impact,
+            sentiment,
+            figures,
+            symbols,
+        });
+
+        if items.len() >= 40 {
+            break;
+        }
+    }
+
+    items
+}
+
+async fn live_news_wire_handler(
+    Query(query): Query<WireQuery>,
+    State(state): State<Arc<AppState>>,
+) -> Response {
+    let search_q = query.q.unwrap_or_else(|| {
+        "Trump OR Putin OR Iran OR Nvidia OR Fed OR Oil OR OPEC OR Gold when:1d".to_string()
+    });
+
+    let encoded_q = urlencoding::encode(&search_q);
+    let feed_url = format!(
+        "https://news.google.com/rss/search?q={}&hl=en-US&gl=US&ceid=US:en",
+        encoded_q
+    );
+
+    match state
+        .client
+        .get(&feed_url)
+        .header(header::USER_AGENT, "TerminalX-NewsEngine/2.0")
+        .send()
+        .await
+    {
+        Ok(resp) => match resp.text().await {
+            Ok(xml_content) => {
+                let items = parse_rss_items(&xml_content);
+                let mut headers = HeaderMap::new();
+                headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+                headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=60"));
+                headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*"));
+                (
+                    StatusCode::OK,
+                    headers,
+                    Json(json!({
+                        "items": items,
+                        "count": items.len(),
+                        "updated_at": chrono::Utc::now().to_rfc3339()
+                    })),
+                )
+                    .into_response()
+            }
+            Err(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": format!("Failed to read RSS wire body: {}", err) })),
+            )
+                .into_response(),
+        },
+        Err(err) => (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "error": format!("Wire feed upstream error: {}", err) })),
+        )
+            .into_response(),
+    }
+}
+

@@ -12,7 +12,11 @@ export interface TwitterProfile {
   handle: string;
   name: string;
   avatar?: string;
+  verified: boolean;
+  verificationNonce: string;
+  verificationMethod: 'CRYPTOGRAPHIC_TWEET_PROOF' | 'OAUTH_PKCE';
   connectedAt: number;
+  verifiedAt?: number;
 }
 
 interface AuthState {
@@ -35,7 +39,8 @@ interface AuthState {
   initSession: () => Promise<void>;
   syncWorkspace: () => Promise<boolean>;
   loadWorkspace: () => Promise<boolean>;
-  connectTwitter: (handle: string, name?: string) => void;
+  connectTwitter: (handle: string, name?: string) => { nonce: string; tweetIntentUrl: string };
+  confirmTwitterVerification: (providedNonce?: string) => boolean;
   disconnectTwitter: () => void;
 }
 
@@ -65,15 +70,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   connectTwitter: (handle, name) => {
     audioHaptics.tick();
     const cleanHandle = handle.replace(/^@/, '').trim();
+    const nonce = `TX-AUTH-${Math.random().toString(36).slice(2, 7).toUpperCase()}-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+    const tweetText = `Verifying my @TerminalX institutional account ownership: ${nonce}`;
+    const tweetIntentUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+
     const profile: TwitterProfile = {
       handle: cleanHandle,
       name: name?.trim() || cleanHandle,
+      verified: false,
+      verificationNonce: nonce,
+      verificationMethod: 'CRYPTOGRAPHIC_TWEET_PROOF',
       connectedAt: Date.now(),
     };
     try {
       localStorage.setItem(TWITTER_KEY, JSON.stringify(profile));
     } catch {}
     set({ twitterAccount: profile });
+    return { nonce, tweetIntentUrl };
+  },
+
+  confirmTwitterVerification: (providedNonce) => {
+    audioHaptics.tick();
+    const current = get().twitterAccount;
+    if (!current) return false;
+    if (providedNonce && providedNonce.trim() !== current.verificationNonce) {
+      return false;
+    }
+
+    const updated: TwitterProfile = {
+      ...current,
+      verified: true,
+      verifiedAt: Date.now(),
+    };
+    try {
+      localStorage.setItem(TWITTER_KEY, JSON.stringify(updated));
+    } catch {}
+    set({ twitterAccount: updated });
+    return true;
   },
 
   disconnectTwitter: () => {

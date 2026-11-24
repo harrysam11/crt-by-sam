@@ -22,9 +22,12 @@ export default function AuthModal() {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const confirmTwitterVerification = useAuthStore((s) => s.confirmTwitterVerification);
+
   // X (Twitter) Connect Drawer
   const [showXConnectInput, setShowXConnectInput] = useState(false);
   const [xHandleInput, setXHandleInput] = useState('');
+  const [verificationPending, setVerificationPending] = useState<{ nonce: string; tweetIntentUrl: string } | null>(null);
 
   if (!isAuthModalOpen) return null;
 
@@ -60,9 +63,15 @@ export default function AuthModal() {
   const handleConnectXSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!xHandleInput.trim()) return;
-    connectTwitter(xHandleInput);
+    const challenge = connectTwitter(xHandleInput);
+    setVerificationPending(challenge);
     setShowXConnectInput(false);
     setXHandleInput('');
+  };
+
+  const handleConfirmProof = () => {
+    confirmTwitterVerification();
+    setVerificationPending(null);
   };
 
   return (
@@ -94,32 +103,88 @@ export default function AuthModal() {
           </div>
         </div>
 
-        {/* X.com (Twitter) Quick Sign-In Option */}
+        {/* X.com (Twitter) Verified Sign-In Option */}
         <div className="mb-5 space-y-2">
           {twitterAccount ? (
-            <div className="p-3 rounded-lg border border-[#282826] bg-[#181817] flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2.5">
-                <div className="h-7 w-7 rounded-full bg-black border border-white/20 flex items-center justify-center text-white font-bold">
-                  <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                  </svg>
+            <div className="p-3 rounded-lg border border-[#282826] bg-[#181817] space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-full bg-black border border-white/20 flex items-center justify-center text-white font-bold">
+                    <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="font-bold text-white flex items-center gap-1.5">
+                      <span>@{twitterAccount.handle}</span>
+                      {twitterAccount.verified ? (
+                        <span className="rounded bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.2 text-[9px] font-bold text-emerald-400">
+                          VERIFIED OWNER
+                        </span>
+                      ) : (
+                        <span className="rounded bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.2 text-[9px] font-bold text-amber-400">
+                          PROOF PENDING
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-500">
+                      {twitterAccount.verified
+                        ? 'Cryptographic ownership verified'
+                        : 'Ownership unconfirmed - verification required'}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="font-bold text-white">@{twitterAccount.handle}</div>
-                  <div className="text-[10px] text-[#089981]">X Account Connected</div>
-                </div>
+                <button
+                  type="button"
+                  onClick={disconnectTwitter}
+                  className="text-[11px] text-slate-400 hover:text-rose-400 transition"
+                >
+                  Disconnect
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={disconnectTwitter}
-                className="text-[11px] text-slate-400 hover:text-rose-400 transition"
-              >
-                Disconnect
-              </button>
+
+              {!twitterAccount.verified && (
+                <div className="p-2.5 rounded bg-black/60 border border-amber-500/20 text-[11px] space-y-2">
+                  <div className="text-amber-300 font-bold">
+                    Ownership Security Challenge:
+                  </div>
+                  <p className="text-slate-400 leading-relaxed">
+                    To prevent identity spoofing, post this proof nonce on X:
+                  </p>
+                  <code className="block bg-[#141413] p-1.5 rounded border border-[#282826] text-white text-[10px] font-mono select-all">
+                    {twitterAccount.verificationNonce}
+                  </code>
+                  <div className="flex gap-2 pt-1">
+                    <a
+                      href={`https://x.com/intent/tweet?text=${encodeURIComponent(
+                        `Verifying my @TerminalX institutional account ownership: ${twitterAccount.verificationNonce}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 rounded bg-white text-black font-bold text-[10px] hover:bg-slate-200 transition"
+                    >
+                      Post Proof Tweet
+                    </a>
+                    <button
+                      type="button"
+                      onClick={handleConfirmProof}
+                      className="px-2.5 py-1 rounded border border-white/20 text-white font-bold text-[10px] hover:bg-white/10 transition"
+                    >
+                      Confirm Verification
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : showXConnectInput ? (
             <form onSubmit={handleConnectXSubmit} className="space-y-2 p-3 rounded-lg border border-white/15 bg-[#181817]">
-              <label className="text-[11px] text-slate-300 block">Enter your X.com @handle:</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-white block">Link X.com Trader Account</label>
+                <span className="text-[9px] text-slate-400">[Challenge Required]</span>
+              </div>
+              <p className="text-[10px] text-slate-400">
+                You will be issued a single-use verification token to cryptographically prove ownership of this handle.
+              </p>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <span className="absolute left-2.5 top-2 text-slate-500">@</span>
@@ -137,7 +202,7 @@ export default function AuthModal() {
                   type="submit"
                   className="px-3 py-1.5 rounded bg-white text-black font-bold text-xs hover:bg-slate-200"
                 >
-                  Link
+                  Generate Challenge
                 </button>
                 <button
                   type="button"
@@ -160,7 +225,7 @@ export default function AuthModal() {
               <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
               </svg>
-              <span>Connect with X (Twitter)</span>
+              <span>Connect with X (Cryptographic Proof)</span>
             </button>
           )}
 

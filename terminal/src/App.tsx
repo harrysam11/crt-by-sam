@@ -163,6 +163,7 @@ export default function App() {
     (window as any).__guardianStore = useGuardianStore;
     (window as any).__drawingStore = useDrawingStore;
     (window as any).__cloudStorageStore = useCloudStorageStore;
+    (window as any).__authStore = useAuthStore;
     (window as any).__openSettings = (tab?: any) => {
       if (tab) setSettingsTab(tab);
       setIsSettingsOpen(true);
@@ -187,6 +188,7 @@ export default function App() {
       setIsSessionManagerOpen(true);
     };
     return () => {
+      delete (window as any).__authStore;
       delete (window as any).__openSettings;
       delete (window as any).__openShareModal;
       delete window.__openQuantAI;
