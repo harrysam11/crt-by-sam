@@ -93,7 +93,7 @@ export default function QuantAIAgentModal({
     {
       id: 'init-1',
       sender: 'AI',
-      text: `TerminalX MCP Quant Engine active. Connected to ${symbol} (${timeframe}).\nEquipped with 6 real-time tools: Market Quotes, Orderflow Imbalance, TradeXGuardian Risk, Lot Sizing, Macro Calendar, and PineScript Audit.\n\nAll tools execute in your browser with zero server latency or load.`,
+      text: `TerminalX MCP Quant Engine active. Connected to ${symbol} (${timeframe}).\nEquipped with 7 real-time tools: Market Quotes, Orderflow Imbalance, TradeXGuardian Risk, Lot Sizing, Macro Calendar, PineScript Audit, and X.com Alpha Wire Market Tweets.\n\nAll tools execute in your browser with zero server latency or load.`,
       timestamp: Date.now(),
     },
   ]);

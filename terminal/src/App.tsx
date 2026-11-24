@@ -33,6 +33,8 @@ import PortfolioDashboardModal from './components/portfolio/PortfolioDashboardMo
 import LandingPage from './components/landing/LandingPage';
 import CommandPaletteModal from './components/common/CommandPaletteModal';
 import MacroNewsPanel from './components/news/MacroNewsPanel';
+import XAlphaNewsPanel from './components/news/XAlphaNewsPanel';
+import ShareChartModal from './components/share/ShareChartModal';
 import LayoutCustomizerModal from './components/Layout/LayoutCustomizerModal';
 import AppDownloadModal from './components/landing/AppDownloadModal';
 import QuantAIAgentModal from './features/ai/QuantAIAgentModal';
@@ -145,7 +147,10 @@ export default function App() {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isScreenerOpen, setIsScreenerOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'PROFILE' | 'BILLING' | 'THEME' | 'LANGUAGE' | 'TELEGRAM'>('PROFILE');
+  const [settingsTab, setSettingsTab] = useState<
+    'PROFILE' | 'BILLING' | 'THEME' | 'LANGUAGE' | 'TELEGRAM' | 'MCP_AI' | 'X_TWITTER'
+  >('PROFILE');
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isSessionManagerOpen, setIsSessionManagerOpen] = useState(false);
   const [isPopoutOpen, setIsPopoutOpen] = useState(false);
   const [isGuardianOpen, setIsGuardianOpen] = useState(false);
@@ -158,6 +163,13 @@ export default function App() {
     (window as any).__guardianStore = useGuardianStore;
     (window as any).__drawingStore = useDrawingStore;
     (window as any).__cloudStorageStore = useCloudStorageStore;
+    (window as any).__openSettings = (tab?: any) => {
+      if (tab) setSettingsTab(tab);
+      setIsSettingsOpen(true);
+    };
+    (window as any).__openShareModal = () => {
+      setIsShareModalOpen(true);
+    };
     window.__openQuantAI = (prompt?: string) => {
       setQuantAIInitialPrompt(prompt);
       setIsQuantAIOpen(true);
@@ -175,6 +187,8 @@ export default function App() {
       setIsSessionManagerOpen(true);
     };
     return () => {
+      delete (window as any).__openSettings;
+      delete (window as any).__openShareModal;
       delete window.__openQuantAI;
       delete (window as any).__openPortfolio;
       delete (window as any).__closePortfolio;
@@ -409,6 +423,12 @@ export default function App() {
         initialTab={settingsTab}
       />
 
+      {/* Share Chart Snapshot & Social Post Modal */}
+      <ShareChartModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+      />
+
       {/* Trading Sessions & Database Engine Modal */}
       <SessionManagerModal
         isOpen={isSessionManagerOpen}
@@ -562,6 +582,7 @@ export default function App() {
                 <ObjectTreePanel onClose={() => setActiveRightDrawer(null)} />
               )}
               {activeRightDrawer === 'NEWS_FEED' && <MacroNewsPanel />}
+              {activeRightDrawer === 'X_FEED' && <XAlphaNewsPanel />}
             </div>
           </>
         )}
@@ -681,7 +702,7 @@ export default function App() {
 
             <span className="my-1 h-px w-6 bg-grid" />
 
-            {/* Macro News & Tweets Feed Toggle */}
+            {/* Macro News Wire Toggle */}
             <button
               onClick={() => {
                 audioHaptics.tick();
@@ -690,10 +711,26 @@ export default function App() {
               className={`p-2.5 rounded-xl transition ${
                 activeRightDrawer === 'NEWS_FEED' ? 'clay-btn-active' : 'clay-btn text-slate-300'
               }`}
-              title="Macro News Wire, Celebrity Tweets & Forex Factory Calendar"
+              title="Macro News Wire & Forex Factory Calendar"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+              </svg>
+            </button>
+
+            {/* X.com (Twitter) Market Wire Toggle */}
+            <button
+              onClick={() => {
+                audioHaptics.tick();
+                setActiveRightDrawer((prev) => (prev === 'X_FEED' ? null : 'X_FEED'));
+              }}
+              className={`p-2.5 rounded-xl transition ${
+                activeRightDrawer === 'X_FEED' ? 'clay-btn-active' : 'clay-btn text-slate-300'
+              }`}
+              title="X.com Alpha Wire (Market-Moving Posts from @DeItaone, @tier10k, @federalreserve)"
+            >
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
               </svg>
             </button>
 

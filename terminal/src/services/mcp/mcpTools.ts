@@ -11,6 +11,8 @@ import { useGuardianStore } from '../../store/useGuardianStore';
 import { useDerivativesStore } from '../../store/useDerivativesStore';
 import { fmtPrice, fmtUsd } from '../../utils/formatters';
 
+import { CURATED_MARKET_TWEETS, filterMarketTweets } from '../xAlphaWireService';
+
 export interface McpToolDefinition {
   name: string;
   description: string;
@@ -34,6 +36,24 @@ export const TERMINALX_MCP_TOOLS: McpToolDefinition[] = [
         },
       },
       required: ['symbol'],
+    },
+  },
+  {
+    name: 'scan_market_tweets',
+    description: 'Scan breaking market-moving posts and news from influential accounts (@DeItaone, @tier10k, @federalreserve, @FinancialJuice, @saylor, @elonmusk).',
+    parameters: {
+      type: 'object',
+      properties: {
+        symbol: {
+          type: 'string',
+          description: 'Optional symbol filter (e.g. XAUUSD, BTC, EURUSD).',
+        },
+        category: {
+          type: 'string',
+          description: 'Optional category (MACRO, CENTRAL_BANK, CRYPTO, COMMODITIES, ALL).',
+          enum: ['MACRO', 'CENTRAL_BANK', 'CRYPTO', 'COMMODITIES', 'ALL'],
+        },
+      },
     },
   },
   {
@@ -262,6 +282,28 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
         valid_syntax: issues.length === 0,
         detected_warnings: issues,
         recommendation: issues.length === 0 ? 'PineScript code is production clean.' : 'Fix version directive and lookahead flags.',
+      });
+    }
+
+    case 'scan_market_tweets': {
+      const sym = (args.symbol || terminalState.symbol).toUpperCase();
+      const cat = args.category || 'ALL';
+      const filtered = filterMarketTweets(CURATED_MARKET_TWEETS, {
+        symbol: sym !== 'ALL' ? sym : undefined,
+        category: cat !== 'ALL' ? cat : undefined,
+      });
+
+      return JSON.stringify({
+        matched_posts_count: filtered.length,
+        posts: filtered.slice(0, 5).map((t) => ({
+          author: `@${t.handle} (${t.name})`,
+          text: t.content,
+          impact: t.impact,
+          sentiment: t.sentiment,
+          category: t.category,
+          timestamp: new Date(t.timestamp).toISOString(),
+        })),
+        wire_status: 'REALTIME_ACTIVE',
       });
     }
 

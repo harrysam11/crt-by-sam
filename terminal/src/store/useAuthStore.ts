@@ -8,6 +8,13 @@ export interface UserPublic {
   created_at: number;
 }
 
+export interface TwitterProfile {
+  handle: string;
+  name: string;
+  avatar?: string;
+  connectedAt: number;
+}
+
 interface AuthState {
   user: UserPublic | null;
   token: string | null;
@@ -17,6 +24,7 @@ interface AuthState {
   authModalMode: 'LOGIN' | 'REGISTER';
   isSyncing: boolean;
   lastSyncedAt: number | null;
+  twitterAccount: TwitterProfile | null;
 
   // Actions
   openAuthModal: (mode?: 'LOGIN' | 'REGISTER') => void;
@@ -27,9 +35,21 @@ interface AuthState {
   initSession: () => Promise<void>;
   syncWorkspace: () => Promise<boolean>;
   loadWorkspace: () => Promise<boolean>;
+  connectTwitter: (handle: string, name?: string) => void;
+  disconnectTwitter: () => void;
 }
 
 const TOKEN_KEY = 'terminalx_auth_token';
+const TWITTER_KEY = 'terminalx_twitter_account';
+
+function getStoredTwitter(): TwitterProfile | null {
+  try {
+    const raw = localStorage.getItem(TWITTER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
@@ -40,6 +60,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   authModalMode: 'LOGIN',
   isSyncing: false,
   lastSyncedAt: null,
+  twitterAccount: typeof window !== 'undefined' ? getStoredTwitter() : null,
+
+  connectTwitter: (handle, name) => {
+    audioHaptics.tick();
+    const cleanHandle = handle.replace(/^@/, '').trim();
+    const profile: TwitterProfile = {
+      handle: cleanHandle,
+      name: name?.trim() || cleanHandle,
+      connectedAt: Date.now(),
+    };
+    try {
+      localStorage.setItem(TWITTER_KEY, JSON.stringify(profile));
+    } catch {}
+    set({ twitterAccount: profile });
+  },
+
+  disconnectTwitter: () => {
+    audioHaptics.tick();
+    try {
+      localStorage.removeItem(TWITTER_KEY);
+    } catch {}
+    set({ twitterAccount: null });
+  },
 
   openAuthModal: (mode = 'LOGIN') => {
     audioHaptics.tick();
