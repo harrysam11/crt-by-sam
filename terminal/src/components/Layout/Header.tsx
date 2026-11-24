@@ -20,6 +20,7 @@ import { drawingEvents } from '../drawing/framework/DrawingEvents';
 import { useIndicatorsStore } from '../../store/useIndicatorsStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useCloudStorageStore } from '../../store/useCloudStorageStore';
+import TerminalXLogo from '../common/TerminalXLogo';
 import type { ChartStyle, Timeframe } from '../../types/terminal';
 
 import { TIMEFRAMES } from '../../services/instruments';
@@ -443,13 +444,11 @@ export default function Header({
               window.dispatchEvent(new PopStateEvent('popstate'));
             }
           }}
-          className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded hover:bg-white/10 transition group cursor-pointer"
+          className="flex items-center gap-2 shrink-0 px-2 py-0.5 rounded hover:bg-white/10 transition group cursor-pointer"
           title="TerminalX Home & Landing"
         >
-          <span className="font-heading font-black tracking-tighter text-black text-[10px] px-1.5 py-0.2 rounded bg-cyan-400 font-mono shadow-xs">
-            TX
-          </span>
-          <span className="hidden lg:inline text-xs font-black tracking-tight text-white group-hover:text-cyan-300 transition">
+          <TerminalXLogo size={20} variant="white" />
+          <span className="hidden lg:inline text-xs font-black tracking-tight text-white group-hover:text-slate-200 transition font-heading">
             TerminalX
           </span>
         </a>
@@ -1822,7 +1821,7 @@ export default function Header({
                   audioHaptics.tick();
                   setIsUserMenuOpen((v) => !v);
                 }}
-                className="flex items-center gap-1.5 px-2 py-1 rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-semibold transition"
+                className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white border border-white/15 text-xs font-semibold transition"
                 title="User Account & Cloud Workspace Sync"
               >
                 <span className={`h-2 w-2 rounded-full ${isSyncing ? 'bg-amber-400 animate-spin' : 'bg-emerald-400'}`} />
@@ -1834,10 +1833,10 @@ export default function Header({
                   audioHaptics.tick();
                   openAuthModal('LOGIN');
                 }}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition font-mono shrink-0"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-white border border-white/15 text-xs font-bold transition font-mono shrink-0"
                 title="Sign In to sync your workspace"
               >
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-3.5 w-3.5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                 </svg>
                 <span className="hidden sm:inline">Sign In</span>
@@ -1861,7 +1860,7 @@ export default function Header({
                   className="flex w-full items-center justify-between px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-200 hover:text-white transition"
                 >
                   <span className="flex items-center gap-2">
-                    <svg className="h-3.5 w-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                     <span>Sync Workspace</span>
@@ -1877,7 +1876,7 @@ export default function Header({
                   }}
                   className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded hover:bg-white/10 text-slate-200 hover:text-white transition"
                 >
-                  <svg className="h-3.5 w-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 00-9.78 2.096A4.001 4.001 0 003 15z" />
                   </svg>
                   <span>Cloud Storage (BYOS)</span>

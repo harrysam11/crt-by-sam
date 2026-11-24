@@ -286,7 +286,7 @@ export default function App() {
   // Landing Page View
   if (viewMode === 'LANDING') {
     return (
-      <div className="min-h-screen bg-bg text-slate-200 overflow-x-hidden font-mono">
+      <div id="landing-scroll-container" className="h-screen overflow-y-auto overflow-x-hidden bg-bg text-slate-200 font-mono">
         <LandingPage
           onLaunchTerminal={(targetSymbol) => {
             if (targetSymbol) {
