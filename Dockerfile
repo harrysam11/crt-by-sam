@@ -27,7 +27,7 @@ RUN npm --prefix terminal run build
 # ------------------------------------------------------------------------------
 # Stage 2: Build Rust Backend Binary
 # ------------------------------------------------------------------------------
-FROM rust:1.80-slim-bookworm AS backend-builder
+FROM rust:slim-bookworm AS backend-builder
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config ca-certificates && rm -rf /var/lib/apt/lists/*
