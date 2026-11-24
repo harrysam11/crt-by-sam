@@ -292,7 +292,7 @@ export default function Header({
       </div>
 
       {/* Left Symbol & Price Cluster */}
-      <div className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap min-w-0 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap min-w-0 shrink-0 mr-3 sm:mr-6">
         <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate">{labelOf(symbol)}</span>
         <span className={`num text-xs sm:text-base font-bold transition-colors ${dir === 'up' ? 'text-up' : dir === 'down' ? 'text-down' : 'text-slate-100'}`}>
           {fmtPrice(price, symbol)}
@@ -362,7 +362,7 @@ export default function Header({
       {/* Right Controls & Tools Cluster */}
       <div className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap min-w-0 justify-end">
         {/* Compact Account Capsule Pill & Detailed Popover */}
-        <div className="relative" ref={accountRef}>
+        <div className="relative shrink-0" ref={accountRef}>
           <button
             onClick={() => {
               audioHaptics.tick();
@@ -1040,7 +1040,7 @@ export default function Header({
                 audioHaptics.tick();
                 onOpenPortfolio();
               }}
-              className="clay-btn px-2 py-1 text-xs font-semibold rounded-[6px] transition hidden md:flex items-center gap-1.5 text-white hover:text-white"
+              className="clay-btn px-2 py-1 text-xs font-semibold rounded-[6px] transition hidden xl:flex items-center gap-1.5 text-white hover:text-white"
               title="Portfolio Tracker, Analytics, PnL Calendar & AI Journal (Alt+J)"
             >
               <svg className="h-3.5 w-3.5 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1079,7 +1079,7 @@ export default function Header({
                 audioHaptics.tick();
                 onOpenLanding();
               }}
-              className="clay-btn px-2 sm:px-2.5 py-1 text-xs font-semibold transition hidden lg:flex items-center gap-1 text-slate-300 hover:text-white"
+              className="clay-btn px-2 sm:px-2.5 py-1 text-xs font-semibold transition hidden 2xl:flex items-center gap-1 text-slate-300 hover:text-white"
               title="Institutional Showcase & Platform Overview"
             >
               <svg className="h-3.5 w-3.5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

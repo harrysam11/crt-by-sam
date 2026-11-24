@@ -2746,6 +2746,18 @@ export default function TradingChart({
                       active: isNotesOpen,
                       onToggle: () => setIsNotesOpen((v) => !v),
                     },
+                    {
+                      id: 'quicktrade',
+                      label: 'Buy / Sell Quick Buttons',
+                      desc: 'Instant in-chart market buy, sell & size pill',
+                      active: chartSettings.showQuickTradeButtons !== false,
+                      onToggle: () => {
+                        setChartSettings((prev) => ({
+                          ...prev,
+                          showQuickTradeButtons: prev.showQuickTradeButtons === false ? true : false,
+                        }));
+                      },
+                    },
                   ].map((layer) => (
                     <button
                       key={layer.id}
@@ -3180,6 +3192,7 @@ export default function TradingChart({
             chartApi={chartApi}
             showPositions={chartSettings.showPositionsOnChart}
             showOrders={chartSettings.showOrdersOnChart}
+            showQuickTrade={chartSettings.showQuickTradeButtons !== false}
           />
 
           {/* Risk Sizing HUD Widget */}

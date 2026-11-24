@@ -37,6 +37,7 @@ export interface ChartSettingsState {
   showOrdersOnChart: boolean;
   showExecutionsOnChart: boolean;
   showEventsOnChart: boolean;
+  showQuickTradeButtons?: boolean;
 }
 
 export const DEFAULT_CHART_SETTINGS: ChartSettingsState = {
@@ -68,6 +69,7 @@ export const DEFAULT_CHART_SETTINGS: ChartSettingsState = {
   showOrdersOnChart: true,
   showExecutionsOnChart: true,
   showEventsOnChart: true,
+  showQuickTradeButtons: true,
 };
 
 interface ChartSettingsModalProps {
@@ -468,6 +470,15 @@ export default function ChartSettingsModal({
                     className="rounded border-grid text-accent focus:ring-0"
                   />
                   <span>Show Economic & Market Event Markers</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.showQuickTradeButtons !== false}
+                    onChange={(e) => onUpdateSettings({ showQuickTradeButtons: e.target.checked })}
+                    className="rounded border-grid text-accent focus:ring-0"
+                  />
+                  <span>Show In-Chart Instant Buy / Sell Quick Buttons</span>
                 </label>
               </div>
             )}
