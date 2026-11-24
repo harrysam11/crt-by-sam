@@ -59,7 +59,7 @@ export default function SubPaneChart({
 
     const isLight = themeMode === 'LIGHT' || document.documentElement.classList.contains('theme-light');
     const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
-    const chartBgColor = isCustomBg ? 'transparent' : (isLight ? '#ffffff' : '#050508');
+    const chartBgColor = isCustomBg ? 'transparent' : (themeConfig.solidColor || (isLight ? '#ffffff' : '#141413'));
 
     const chart = createChart(containerRef.current, {
       autoSize: true,
@@ -182,7 +182,7 @@ export default function SubPaneChart({
     if (!chart) return;
     const isLight = themeMode === 'LIGHT';
     const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
-    const chartBg = isCustomBg ? 'transparent' : (isLight ? '#ffffff' : '#050508');
+    const chartBg = isCustomBg ? 'transparent' : (themeConfig.solidColor || (isLight ? '#ffffff' : '#141413'));
 
     chart.applyOptions({
       layout: {
@@ -208,7 +208,7 @@ export default function SubPaneChart({
         },
       },
     });
-  }, [themeMode, themeConfig.wallpaperType, themeConfig.mediaUrl]);
+  }, [themeMode, themeConfig.wallpaperType, themeConfig.mediaUrl, themeConfig.solidColor]);
 
   // Compute and update plot data
   useEffect(() => {
@@ -284,10 +284,11 @@ export default function SubPaneChart({
 
   return (
     <div
-      style={{ height }}
-      className={`relative w-full border-t border-grid select-none font-mono shrink-0 ${
-        isCustomBg ? 'bg-transparent' : (isLight ? 'bg-white' : 'bg-[#050508]')
-      }`}
+      style={{
+        height,
+        backgroundColor: isCustomBg ? 'transparent' : (themeConfig.solidColor || (isLight ? '#ffffff' : '#141413')),
+      }}
+      className="relative w-full border-t border-grid select-none font-mono shrink-0"
     >
       {/* Sub-Pane Legend HUD */}
       <div

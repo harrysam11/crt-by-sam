@@ -131,11 +131,25 @@ export default function ChartSkinsModal({ isOpen, onClose }: ChartSkinsModalProp
     setCustomUrl('');
   };
 
-  const handleResetSolid = () => {
+  const SOLID_COLOR_PRESETS = [
+    { name: 'Charcoal Dark', hex: '#141413' },
+    { name: 'Pitch Black', hex: '#000000' },
+    { name: 'Deep Void', hex: '#080808' },
+    { name: 'Institutional Slate', hex: '#181817' },
+    { name: 'TradingView Dark', hex: '#131722' },
+    { name: 'Midnight Navy', hex: '#0b0e14' },
+    { name: 'Cyber Graphite', hex: '#1e1e24' },
+    { name: 'Emerald Shadow', hex: '#0a1914' },
+    { name: 'Pure White', hex: '#ffffff' },
+    { name: 'Soft Light Gray', hex: '#f4f4f6' },
+  ];
+
+  const handleApplySolidColor = (color: string) => {
     audioHaptics.tick();
     clearCustomWallpaper().catch(() => {});
     setThemeConfig({
       wallpaperType: 'SOLID',
+      solidColor: color,
       mediaUrl: null,
       fitMode: 'cover',
       scale: 1.0,
@@ -146,6 +160,10 @@ export default function ChartSkinsModal({ isOpen, onClose }: ChartSkinsModalProp
       flipV: false,
       playbackSpeed: 1.0,
     });
+  };
+
+  const handleResetSolid = () => {
+    handleApplySolidColor('#141413');
   };
 
   const handleResetTransform = () => {
@@ -259,12 +277,58 @@ export default function ChartSkinsModal({ isOpen, onClose }: ChartSkinsModalProp
               onClick={handleResetSolid}
               className={`rounded border px-2.5 py-1 text-xs transition ${
                 themeConfig.wallpaperType === 'SOLID'
-                  ? 'border-cyan-400 bg-cyan-400/20 text-cyan-300 font-bold'
+                  ? 'border-white bg-white/10 text-white font-bold'
                   : 'border-grid text-muted hover:text-white'
               }`}
             >
-              [Default Solid Dark]
+              [Reset Solid Charcoal]
             </button>
+          </div>
+
+          {/* Custom Solid Background Color Section */}
+          <div className="rounded-xl border border-white/10 bg-black/40 p-3.5 space-y-3">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <div>
+                <span className="text-xs font-bold text-white block">Custom Solid Canvas Background</span>
+                <span className="text-[10px] text-slate-400 block">Choose an institutional dark tone or pick any custom solid color</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-white uppercase">{themeConfig.solidColor || '#141413'}</span>
+                <input
+                  type="color"
+                  value={themeConfig.solidColor || '#141413'}
+                  onChange={(e) => handleApplySolidColor(e.target.value)}
+                  className="h-7 w-8 rounded cursor-pointer border border-white/20 bg-transparent p-0"
+                  title="Pick Any Solid Background Color"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              {SOLID_COLOR_PRESETS.map((preset) => {
+                const isActive =
+                  themeConfig.wallpaperType === 'SOLID' &&
+                  (themeConfig.solidColor || '#141413').toLowerCase() === preset.hex.toLowerCase();
+                return (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    onClick={() => handleApplySolidColor(preset.hex)}
+                    className={`flex items-center gap-2 p-2 rounded-lg border text-left transition text-xs ${
+                      isActive
+                        ? 'border-white bg-white/15 font-bold text-white'
+                        : 'border-white/10 bg-black/50 text-slate-300 hover:border-white/30 hover:text-white'
+                    }`}
+                  >
+                    <span
+                      className="w-3.5 h-3.5 rounded-full border border-white/30 shrink-0 shadow-sm"
+                      style={{ backgroundColor: preset.hex }}
+                    />
+                    <span className="truncate text-[10px]">{preset.name}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Transform, Crop & Relocation Engine (Active when media is loaded) */}

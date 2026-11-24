@@ -209,6 +209,7 @@ export default function TradingChart({
   // Psychology and Skins Store
   const zenMode = usePsychologyStore((s) => s.zenMode);
   const themeConfig = usePsychologyStore((s) => s.themeConfig);
+  const setThemeConfig = usePsychologyStore((s) => s.setThemeConfig);
 
   // Derivatives & Institutional Overlay Store
   const isGhostVisible = useDerivativesStore((s) => s.isGhostVisible);
@@ -1049,7 +1050,9 @@ export default function TradingChart({
     const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
     const isZen = zenMode.active && zenMode.softPastelCandles;
 
-    const chartBgColor = isCustomBg ? 'rgba(0, 0, 0, 0)' : (isLightMode ? '#ffffff' : '#050508');
+    const chartBgColor = isCustomBg
+      ? 'rgba(0, 0, 0, 0)'
+      : (themeConfig.solidColor || (isLightMode ? '#ffffff' : '#141413'));
     const chartTextColor = isLightMode ? '#555555' : '#828290';
     const chartGridColor = isLightMode ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.03)';
     const chartBorderColor = isLightMode ? 'rgba(0, 0, 0, 0.1)' : '#1e1e26';
@@ -1404,19 +1407,20 @@ export default function TradingChart({
     };
   }, []);
 
-  // Update background transparency when ChartSkins changes
+  // Update background transparency & solid color when ChartSkins or solidColor changes
   useEffect(() => {
     if (!api.current) return;
     const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
+    const solidBg = themeConfig.solidColor || (themeMode === 'LIGHT' ? '#ffffff' : '#141413');
     api.current.chart.applyOptions({
       layout: {
         background: {
           type: ColorType.Solid,
-          color: isCustomBg ? 'rgba(0, 0, 0, 0)' : '#0b0e14',
+          color: isCustomBg ? 'rgba(0, 0, 0, 0)' : solidBg,
         },
       },
     });
-  }, [themeConfig.wallpaperType, themeConfig.mediaUrl]);
+  }, [themeConfig.wallpaperType, themeConfig.mediaUrl, themeConfig.solidColor, themeMode]);
 
   // Update pastel candle palette ONLY when Zen Mode is explicitly active
   useEffect(() => {
@@ -1492,7 +1496,9 @@ export default function TradingChart({
     }
 
     const gridBase = isLight ? '0, 0, 0' : '255, 255, 255';
-    const chartBg = isCustomBg ? 'rgba(0, 0, 0, 0)' : (isLight ? '#ffffff' : '#050508');
+    const chartBg = isCustomBg
+      ? 'rgba(0, 0, 0, 0)'
+      : (themeConfig.solidColor || (isLight ? '#ffffff' : '#141413'));
     const chartText = isLight ? '#555555' : '#828290';
     const chartBorder = isLight ? 'rgba(0, 0, 0, 0.1)' : '#1e1e26';
 
@@ -2657,6 +2663,72 @@ export default function TradingChart({
                           className="h-6 w-7 rounded cursor-pointer border-0 bg-transparent p-0"
                           title="Pick Bear Candle Color"
                         />
+                      </div>
+                    </div>
+
+                    {/* Canvas Custom Solid Background Color */}
+                    <div className="flex items-center justify-between bg-black/40 px-2.5 py-1.5 rounded-lg border border-white/5">
+                      <span className="text-slate-300 flex items-center gap-1.5">
+                        <span
+                          className="w-2 h-2 rounded-full border border-white/20"
+                          style={{ backgroundColor: themeConfig.solidColor || '#141413' }}
+                        />
+                        Canvas Solid Background
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase">
+                          {themeConfig.solidColor || '#141413'}
+                        </span>
+                        <input
+                          type="color"
+                          value={themeConfig.solidColor || '#141413'}
+                          onChange={(e) => {
+                            audioHaptics.tick();
+                            setThemeConfig({
+                              wallpaperType: 'SOLID',
+                              mediaUrl: null,
+                              solidColor: e.target.value,
+                            });
+                          }}
+                          className="h-6 w-7 rounded cursor-pointer border-0 bg-transparent p-0"
+                          title="Pick Chart Canvas Background Color"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Canvas Background Presets */}
+                    <div className="pt-1">
+                      <div className="text-[9px] text-slate-500 font-semibold mb-1 uppercase tracking-wider">Canvas Presets</div>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {[
+                          { name: 'Charcoal', color: '#141413' },
+                          { name: 'Pitch Black', color: '#000000' },
+                          { name: 'Deep Void', color: '#080808' },
+                          { name: 'Slate', color: '#181817' },
+                          { name: 'Navy', color: '#0b0e14' },
+                          { name: 'White', color: '#ffffff' },
+                        ].map((bg) => (
+                          <button
+                            key={bg.name}
+                            type="button"
+                            onClick={() => {
+                              audioHaptics.tick();
+                              setThemeConfig({
+                                wallpaperType: 'SOLID',
+                                mediaUrl: null,
+                                solidColor: bg.color,
+                              });
+                            }}
+                            className={`px-1.5 py-0.5 rounded text-[9px] border flex items-center gap-1 transition ${
+                              (themeConfig.solidColor || '#141413').toLowerCase() === bg.color.toLowerCase()
+                                ? 'border-white text-white font-bold bg-white/10'
+                                : 'border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                            }`}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full border border-white/30" style={{ backgroundColor: bg.color }} />
+                            {bg.name}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>

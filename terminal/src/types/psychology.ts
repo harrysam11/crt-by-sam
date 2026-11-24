@@ -26,6 +26,7 @@ export type WallpaperFitMode = 'cover' | 'contain' | 'fill' | 'none';
 
 export interface CustomThemeConfig {
   wallpaperType: 'SOLID' | 'IMAGE' | 'GIF' | 'VIDEO';
+  solidColor?: string;           // Custom solid background color (e.g., #141413, #000000, #080808)
   mediaUrl: string | null;       // Canvas background MP4, WebM, GIF, PNG, or WebP URL
   overlayOpacity: number;        // 0.1 to 0.95 for readability
   blurAmount?: number;           // 0 to 12px blur for aesthetics

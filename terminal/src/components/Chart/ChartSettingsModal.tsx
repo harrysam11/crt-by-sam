@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { audioHaptics } from '../../utils/notify';
+import { usePsychologyStore } from '../../store/usePsychologyStore';
 
 export interface ChartSettingsState {
   candleBodyVisible: boolean;
@@ -90,6 +91,8 @@ export default function ChartSettingsModal({
   onResetDefaults,
 }: ChartSettingsModalProps) {
   const [activeTab, setActiveTab] = useState<'SYMBOL' | 'STATUS_LINE' | 'SCALES' | 'CANVAS' | 'TRADING'>('SYMBOL');
+  const themeConfig = usePsychologyStore((s) => s.themeConfig);
+  const setThemeConfig = usePsychologyStore((s) => s.setThemeConfig);
 
   if (!isOpen) return null;
 
@@ -429,6 +432,32 @@ export default function ChartSettingsModal({
                     <option value="solid">Solid</option>
                   </select>
                 </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-semibold text-white block text-xs">Canvas Solid Background Color</span>
+                    <span className="text-[10px] text-slate-400 block">Solid color for the main and sub-pane chart panes</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-slate-300 uppercase">
+                      {themeConfig.solidColor || '#141413'}
+                    </span>
+                    <input
+                      type="color"
+                      value={themeConfig.solidColor || '#141413'}
+                      onChange={(e) => {
+                        audioHaptics.tick();
+                        setThemeConfig({
+                          wallpaperType: 'SOLID',
+                          mediaUrl: null,
+                          solidColor: e.target.value,
+                        });
+                      }}
+                      className="h-7 w-8 rounded cursor-pointer border border-white/20 bg-transparent p-0"
+                      title="Pick Solid Background Color"
+                    />
+                  </div>
+                </div>
+
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"

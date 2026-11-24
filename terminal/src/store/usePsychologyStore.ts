@@ -49,6 +49,7 @@ const DEFAULT_ZEN_MODE: ZenModeConfig = {
 
 const DEFAULT_THEME: CustomThemeConfig = {
   wallpaperType: 'SOLID',
+  solidColor: '#141413',
   mediaUrl: null,
   overlayOpacity: 0.82,
   accentColor: '#4c8dff',
