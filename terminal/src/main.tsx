@@ -6,10 +6,16 @@ import { useTerminalStore } from './store/useTerminalStore';
 import { useLayoutStore } from './store/useLayoutStore';
 import { useDrawingStore } from './store/useDrawingStore';
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   (window as any).__terminalStore = useTerminalStore;
   (window as any).__layoutStore = useLayoutStore;
   (window as any).__drawingStore = useDrawingStore;
+}
+
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator && window.location.protocol === 'https:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

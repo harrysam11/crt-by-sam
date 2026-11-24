@@ -40,7 +40,7 @@ interface AuthState {
   syncWorkspace: () => Promise<boolean>;
   loadWorkspace: () => Promise<boolean>;
   connectTwitter: (handle: string, name?: string) => { nonce: string; tweetIntentUrl: string };
-  confirmTwitterVerification: (providedNonce?: string) => boolean;
+  confirmTwitterVerification: (providedNonce: string) => boolean;
   disconnectTwitter: () => void;
 }
 
@@ -89,11 +89,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return { nonce, tweetIntentUrl };
   },
 
-  confirmTwitterVerification: (providedNonce) => {
+  confirmTwitterVerification: (providedNonce: string) => {
     audioHaptics.tick();
     const current = get().twitterAccount;
-    if (!current) return false;
-    if (providedNonce && providedNonce.trim() !== current.verificationNonce) {
+    if (!current || !current.verificationNonce) return false;
+
+    // Strict validation: never allow empty or bypassed nonce confirmation
+    const trimmed = providedNonce.trim();
+    if (!trimmed || trimmed.toUpperCase() !== current.verificationNonce.toUpperCase()) {
       return false;
     }
 

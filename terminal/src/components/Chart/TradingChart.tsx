@@ -1537,6 +1537,31 @@ export default function TradingChart({
     }
   }, [chartSettings, timezone, themeMode, themeConfig.wallpaperType, themeConfig.mediaUrl, chartStyle]);
 
+  // Synchronize Lightweight Charts Crosshair Visibility with Selected Drawing Tool
+  useEffect(() => {
+    const a = api.current;
+    if (!a?.chart) return;
+    try {
+      if (activeTool === 'CURSOR_ARROW' || activeTool === 'CURSOR_ERASER') {
+        a.chart.applyOptions({
+          crosshair: {
+            mode: CrosshairMode.Hidden,
+            vertLine: { visible: false },
+            horzLine: { visible: false },
+          },
+        });
+      } else {
+        a.chart.applyOptions({
+          crosshair: {
+            mode: CrosshairMode.Normal,
+            vertLine: { visible: true },
+            horzLine: { visible: true },
+          },
+        });
+      }
+    } catch {}
+  }, [activeTool]);
+
   // Trade Execution & Order Fill Markers on Candlestick Series (Clean TradingView arrows without text watermark)
   useEffect(() => {
     const a = api.current;

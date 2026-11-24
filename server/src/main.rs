@@ -36,7 +36,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // 2. Initialize Database Pool (PostgreSQL / SQLite fallback)
+    // 2. Validate and Initialize Cryptographic JWT Secrets
+    auth::init_jwt_secret().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+    // 3. Initialize Database Pool (PostgreSQL / SQLite fallback)
     let db = DbPool::init().await?;
 
     // 3. Shared In-Memory Stores
@@ -69,11 +72,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         guardian,
     });
 
-    // 8. CORS configuration
+    // 8. CORS configuration (Restricted institutional policy)
     let cors = CorsLayer::new()
         .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::PUT,
+            axum::http::Method::DELETE,
+            axum::http::Method::OPTIONS,
+        ])
+        .allow_headers([
+            axum::http::header::AUTHORIZATION,
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::ACCEPT,
+            axum::http::header::ORIGIN,
+            axum::http::HeaderName::from_static("x-requested-with"),
+        ]);
 
     // 9. Static file serving with SPA fallback
     let dist_path = std::env::var("DIST_PATH").unwrap_or_else(|_| "../terminal/dist".to_string());
@@ -133,6 +148,20 @@ async fn security_headers_middleware(
     headers.insert(
         axum::http::header::X_XSS_PROTECTION,
         axum::http::HeaderValue::from_static("1; mode=block"),
+    );
+    headers.insert(
+        axum::http::header::STRICT_TRANSPORT_SECURITY,
+        axum::http::HeaderValue::from_static("max-age=31536000; includeSubDomains; preload"),
+    );
+    headers.insert(
+        axum::http::HeaderName::from_static("permissions-policy"),
+        axum::http::HeaderValue::from_static("camera=(), microphone=(), geolocation=(), payment=()"),
+    );
+    headers.insert(
+        axum::http::HeaderName::from_static("content-security-policy"),
+        axum::http::HeaderValue::from_static(
+            "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss: ws:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';"
+        ),
     );
     res
 }

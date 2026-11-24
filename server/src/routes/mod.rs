@@ -12,8 +12,9 @@ use std::time::Instant;
 use uuid::Uuid;
 
 use crate::auth::{
-    create_token, hash_password, verify_password, verify_token, AuthResponse, LoginRequest,
-    RegisterRequest, SyncWorkspaceRequest, SyncWorkspaceResponse, UserPublic,
+    create_token, hash_password, validate_email, validate_password, validate_username,
+    verify_password, verify_token, AuthResponse, LoginRequest, RegisterRequest,
+    SyncWorkspaceRequest, SyncWorkspaceResponse, UserPublic,
 };
 use crate::db::{DbPool, User};
 
@@ -46,6 +47,10 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/login", post(login_handler))
         .layer(axum::middleware::from_fn(rate_limit_auth_middleware));
 
+    let sync_routes = Router::new()
+        .route("/sync", post(sync_save_handler).get(sync_load_handler))
+        .layer(axum::extract::DefaultBodyLimit::max(5 * 1024 * 1024)); // 5MB payload limit
+
     let proxy_routes = Router::new()
         .route("/yahoo", get(yahoo_handler))
         .route("/yahoo/*path", get(yahoo_handler))
@@ -60,7 +65,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/health", get(health_handler))
         .nest("/auth", auth_routes)
         .route("/auth/me", get(me_handler))
-        .route("/user/sync", post(sync_save_handler).get(sync_load_handler))
+        .nest("/user", sync_routes)
         .merge(proxy_routes)
 }
 
@@ -94,29 +99,17 @@ async fn register_handler(
     let email = req.email.trim().to_lowercase();
     let username = req.username.trim();
 
-    // 1. Validation
-    if email.is_empty() || !email.contains('@') || !email.contains('.') {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "A valid email address is required." })),
-        )
-            .into_response();
+    // 1. Strict Validation
+    if let Err(err) = validate_email(&email) {
+        return (StatusCode::BAD_REQUEST, Json(json!({ "error": err }))).into_response();
     }
 
-    if username.len() < 3 || username.len() > 32 {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Username must be between 3 and 32 characters." })),
-        )
-            .into_response();
+    if let Err(err) = validate_username(username) {
+        return (StatusCode::BAD_REQUEST, Json(json!({ "error": err }))).into_response();
     }
 
-    if req.password.len() < 6 {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Password must be at least 6 characters long." })),
-        )
-            .into_response();
+    if let Err(err) = validate_password(&req.password) {
+        return (StatusCode::BAD_REQUEST, Json(json!({ "error": err }))).into_response();
     }
 
     // 2. Check if user already exists
@@ -371,6 +364,26 @@ async fn sync_save_handler(
         }
     };
 
+    // Verify user account exists in database before allowing workspace persistence
+    match state.db.find_user_by_id(&claims.sub).await {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({ "error": "User account does not exist or has been deactivated." })),
+            )
+                .into_response();
+        }
+        Err(e) => {
+            tracing::error!("Database error checking user existence: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Internal database error." })),
+            )
+                .into_response();
+        }
+    }
+
     let data_str = payload.data.to_string();
     let now = chrono::Utc::now().timestamp();
 
@@ -421,6 +434,26 @@ async fn sync_load_handler(
         }
     };
 
+    // Verify user account exists in database before returning workspace data
+    match state.db.find_user_by_id(&claims.sub).await {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({ "error": "User account does not exist or has been deactivated." })),
+            )
+                .into_response();
+        }
+        Err(e) => {
+            tracing::error!("Database error checking user existence: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Internal database error." })),
+            )
+                .into_response();
+        }
+    }
+
     match state.db.load_workspace(&claims.sub).await {
         Ok(Some(data_str)) => {
             let data_json: serde_json::Value = serde_json::from_str(&data_str).unwrap_or(serde_json::Value::Null);
@@ -455,7 +488,12 @@ async fn sync_load_handler(
 }
 
 fn is_safe_subpath(path: &str) -> bool {
-    !path.contains("..") && !path.contains('\0') && !path.contains('\\')
+    !path.contains("..")
+        && !path.contains('\0')
+        && !path.contains('\\')
+        && !path.contains("://")
+        && !path.contains('@')
+        && !path.chars().any(|c| c.is_control())
 }
 
 async fn yahoo_handler(
@@ -646,6 +684,7 @@ async fn binance_handler(
 #[derive(Debug, Deserialize)]
 pub struct WireQuery {
     pub q: Option<String>,
+    #[allow(dead_code)]
     pub category: Option<String>,
 }
 

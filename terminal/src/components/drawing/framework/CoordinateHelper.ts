@@ -11,17 +11,25 @@ export class CoordinateHelper {
     public candles?: Candle[]
   ) {}
 
-  timeToX(time?: number, fallbackX: number = 0): number {
-    if (!this.chartApi || time === undefined) return fallbackX;
+  timeToX(time?: number, fallbackX: number = 0, logical?: number): number {
+    if (!this.chartApi) return fallbackX;
     try {
       const timeScale: any = this.chartApi.timeScale();
-      const coord = timeScale.timeToCoordinate(time as UTCTimestamp);
-      if (coord !== null && typeof coord === 'number' && !isNaN(coord)) {
-        return coord;
+      if (logical !== undefined && typeof timeScale.logicalToCoordinate === 'function') {
+        const coord = timeScale.logicalToCoordinate(logical);
+        if (coord !== null && typeof coord === 'number' && !isNaN(coord)) {
+          return coord;
+        }
+      }
+      if (time !== undefined) {
+        const coord = timeScale.timeToCoordinate(time as UTCTimestamp);
+        if (coord !== null && typeof coord === 'number' && !isNaN(coord)) {
+          return coord;
+        }
       }
 
       // Continuous fractional logical index conversion so drawings never jump or snap to X=0 when offscreen
-      if (this.candles && this.candles.length > 0) {
+      if (this.candles && this.candles.length > 0 && time !== undefined) {
         const cLen = this.candles.length;
         const firstTime = this.candles[0].time;
         const lastTime = this.candles[cLen - 1].time;
@@ -179,7 +187,26 @@ export class CoordinateHelper {
   }
 
   pointToXY(p: Point2D): { x: number; y: number } {
-    const x = this.timeToX(p.time, p.x);
+    let x: number;
+    if (this.chartApi && p.logical !== undefined) {
+      try {
+        const timeScale: any = this.chartApi.timeScale();
+        if (typeof timeScale.logicalToCoordinate === 'function') {
+          const coord = timeScale.logicalToCoordinate(p.logical);
+          if (coord !== null && typeof coord === 'number' && !isNaN(coord)) {
+            x = coord;
+          } else {
+            x = this.timeToX(p.time, p.x);
+          }
+        } else {
+          x = this.timeToX(p.time, p.x);
+        }
+      } catch {
+        x = this.timeToX(p.time, p.x);
+      }
+    } else {
+      x = this.timeToX(p.time, p.x);
+    }
     const y = this.priceToY(p.price, p.y);
     return { x, y };
   }

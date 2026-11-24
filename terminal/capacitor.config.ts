@@ -10,9 +10,8 @@ const config: CapacitorConfig = {
   server: {
     ...(serverUrl ? { url: serverUrl } : {}),
     androidScheme: 'https',
-    cleartext: true,
+    cleartext: false,
     allowNavigation: [
-      '*',
       'localhost',
       '127.0.0.1',
       '10.0.2.2',
@@ -22,7 +21,7 @@ const config: CapacitorConfig = {
     ]
   },
   android: {
-    allowMixedContent: true,
+    allowMixedContent: false,
     captureInput: true,
     webContentsDebuggingEnabled: false
   },

@@ -109,7 +109,9 @@ export default function XAlphaNewsPanel() {
 
   const handleConfirmProof = () => {
     audioHaptics.fill();
-    confirmTwitterVerification();
+    if (twitterAccount?.verificationNonce) {
+      confirmTwitterVerification(twitterAccount.verificationNonce);
+    }
   };
 
   const handleAddCustomFigureSubmit = (e: React.FormEvent) => {

@@ -75,28 +75,34 @@ impl RateLimiter {
 }
 
 pub fn extract_client_ip(headers: &HeaderMap) -> IpAddr {
-    // Railway / Cloudflare / Nginx headers: CF-Connecting-IP, X-Forwarded-For, X-Real-IP
+    // 1. High-confidence edge header from Cloudflare (sanitized and injected at edge)
     if let Some(cf_ip) = headers.get("cf-connecting-ip").and_then(|v| v.to_str().ok()) {
         if let Ok(ip) = cf_ip.trim().parse::<IpAddr>() {
             return ip;
         }
     }
 
-    if let Some(forwarded) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
-        if let Some(first_ip) = forwarded.split(',').next() {
-            if let Ok(ip) = first_ip.trim().parse::<IpAddr>() {
-                return ip;
-            }
-        }
-    }
-
+    // 2. Standard X-Real-IP from trusted reverse proxy
     if let Some(real_ip) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
         if let Ok(ip) = real_ip.trim().parse::<IpAddr>() {
             return ip;
         }
     }
 
-    // Default fallback to localhost if direct connection headers missing
+    // 3. X-Forwarded-For: parse defensively from right to left (upstream proxy appends trusted client IP)
+    if let Some(forwarded) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+        for part in forwarded.split(',').rev() {
+            let candidate = part.trim();
+            if let Ok(ip) = candidate.parse::<IpAddr>() {
+                // If it's a valid public IP, accept it
+                if !ip.is_loopback() && !ip.is_unspecified() {
+                    return ip;
+                }
+            }
+        }
+    }
+
+    // Default fallback to loopback
     "127.0.0.1".parse().unwrap()
 }
 

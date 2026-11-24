@@ -36,12 +36,13 @@ interface CloudStorageState {
   syncNow: () => Promise<{ success: boolean; message: string }>;
   restoreNow: () => Promise<{ success: boolean; message: string }>;
   testConnection: () => Promise<{ success: boolean; message: string }>;
+  clearCredentials: () => void;
 }
 
 export const useCloudStorageStore = create<CloudStorageState>((set, get) => ({
-  provider: (localStorage.getItem('terminalx_storage_provider') as StorageProviderType) || 'GITHUB_GIST',
-  githubToken: localStorage.getItem('terminalx_storage_gh_token') || '',
-  gistId: localStorage.getItem('terminalx_storage_gist_id') || '',
+  provider: (typeof window !== 'undefined' ? localStorage.getItem('terminalx_storage_provider') as StorageProviderType : null) || 'GITHUB_GIST',
+  githubToken: typeof window !== 'undefined' ? (sessionStorage.getItem('terminalx_storage_gh_token') || '') : '',
+  gistId: typeof window !== 'undefined' ? (localStorage.getItem('terminalx_storage_gist_id') || '') : '',
   lastSyncTime: null,
   isSyncing: false,
   syncStatus: null,
@@ -57,18 +58,35 @@ export const useCloudStorageStore = create<CloudStorageState>((set, get) => ({
   },
 
   setProvider: (provider) => {
-    localStorage.setItem('terminalx_storage_provider', provider);
+    try {
+      localStorage.setItem('terminalx_storage_provider', provider);
+    } catch {}
     set({ provider });
   },
 
   setGithubToken: (githubToken) => {
-    localStorage.setItem('terminalx_storage_gh_token', githubToken);
+    try {
+      sessionStorage.setItem('terminalx_storage_gh_token', githubToken);
+      // Immediately purge any legacy plaintext persistent tokens from localStorage
+      localStorage.removeItem('terminalx_storage_gh_token');
+    } catch {}
     set({ githubToken });
   },
 
   setGistId: (gistId) => {
-    localStorage.setItem('terminalx_storage_gist_id', gistId);
+    try {
+      localStorage.setItem('terminalx_storage_gist_id', gistId);
+    } catch {}
     set({ gistId });
+  },
+
+  clearCredentials: () => {
+    try {
+      sessionStorage.removeItem('terminalx_storage_gh_token');
+      localStorage.removeItem('terminalx_storage_gh_token');
+      localStorage.removeItem('terminalx_storage_gist_id');
+    } catch {}
+    set({ githubToken: '', gistId: '', syncStatus: 'Credentials cleared.' });
   },
 
   syncNow: async () => {

@@ -70,7 +70,9 @@ export default function AuthModal() {
   };
 
   const handleConfirmProof = () => {
-    confirmTwitterVerification();
+    if (twitterAccount?.verificationNonce) {
+      confirmTwitterVerification(twitterAccount.verificationNonce);
+    }
     setVerificationPending(null);
   };
 

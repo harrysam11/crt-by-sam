@@ -35,6 +35,7 @@ export interface Point2D {
   y: number;
   price: number;
   time?: number;
+  logical?: number;
 }
 
 export interface DrawingItem {

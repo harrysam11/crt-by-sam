@@ -742,7 +742,9 @@ export default function SettingsModal({
                               type="button"
                               onClick={() => {
                                 audioHaptics.fill();
-                                confirmTwitterVerification();
+                                if (twitterAccount?.verificationNonce) {
+                                  confirmTwitterVerification(twitterAccount.verificationNonce);
+                                }
                               }}
                               className="px-3 py-1.5 rounded bg-[#089981] text-white font-bold text-xs hover:bg-[#089981]/80 transition"
                             >
