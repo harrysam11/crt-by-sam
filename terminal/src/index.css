@@ -445,3 +445,12 @@ button, [role="button"], a {
     overscroll-behavior: contain;
   }
 }
+
+
+/* Chart settings surfaces stay readable in both themes. */
+html.theme-light .chart-settings-tabs {
+  background: #f1f5f9;
+}
+html.theme-light .bg-black\/30 {
+  background-color: rgba(15, 23, 42, 0.035) !important;
+}
