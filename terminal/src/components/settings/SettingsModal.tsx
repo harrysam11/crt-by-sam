@@ -8,6 +8,7 @@ import {
 import { audioHaptics } from '../../utils/notify';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useDrawingStore } from '../../store/useDrawingStore';
+import { useLayoutStore } from '../../store/useLayoutStore';
 import { McpProviderType } from '../../services/mcp/mcpClient';
 
 type SettingsTab =
@@ -88,10 +89,10 @@ export default function SettingsModal({
   const [handle, setHandle] = useState('PRO_ALPHA_TRADER');
   const [email, setEmail] = useState('trader@institutional.capital');
 
-  // Theme & Appearance State
-  const [themeMode, setThemeMode] = useState<'DARK' | 'LIGHT'>(() => {
-    return (localStorage.getItem('crt_theme_mode') as 'DARK' | 'LIGHT') || 'DARK';
-  });
+  // Theme state must come from the shared layout store so the settings UI,
+  // application shell, and persisted preference always stay in sync.
+  const themeMode = useLayoutStore((s) => s.themeMode);
+  const setThemeMode = useLayoutStore((s) => s.setThemeMode);
   const [highContrast, setHighContrast] = useState(false);
 
   // Language State
@@ -106,11 +107,9 @@ export default function SettingsModal({
 
   useEffect(() => {
     try {
-      localStorage.setItem('crt_theme_mode', themeMode);
       localStorage.setItem('crt_language', language);
-      window.dispatchEvent(new Event('crt-theme-change'));
     } catch {}
-  }, [themeMode, language]);
+  }, [language]);
 
   useEffect(() => {
     if (initialTab) setTab(initialTab);
