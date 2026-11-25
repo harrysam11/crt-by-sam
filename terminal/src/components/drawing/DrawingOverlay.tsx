@@ -779,6 +779,19 @@ export default function DrawingOverlay({
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
     const point = snapToCandle(rawX, rawY);
+    // Touch input needs a larger target than a mouse cursor. Keep the same
+    // geometric hit tests, but probe a small radius around the finger position.
+    const isTouchPointer = e.pointerType === 'touch';
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    const hitTestAtPointer = (tool: ReturnType<typeof ToolFactory.create>) => {
+      if (tool.hitTest(rawX, rawY, coordHelper)) return true;
+      if (!isTouchPointer) return false;
+      const offsets = [
+        [-16, 0], [16, 0], [0, -16], [0, 16],
+        [-11, -11], [11, -11], [-11, 11], [11, 11],
+      ];
+      return offsets.some(([dx, dy]) => tool.hitTest(rawX + dx, rawY + dy, coordHelper));
+    };
 
     // If previous measurement ruler is on screen, normal click dismisses it
     if (activeDrawing && activeDrawing.type === 'MEASURE_RULER') {
@@ -814,7 +827,7 @@ export default function DrawingOverlay({
     if (activeTool === 'CURSOR_ERASER' && e.button === 0) {
       for (let i = drawings.length - 1; i >= 0; i--) {
         const tool = ToolFactory.create(drawings[i]);
-        if (tool.hitTest(rawX, rawY, coordHelper)) {
+        if (hitTestAtPointer(tool)) {
           deleteDrawing(drawings[i].id);
           return;
         }
@@ -842,7 +855,7 @@ export default function DrawingOverlay({
         if (selected && !selected.locked && !isLockedAll) {
           const tool = ToolFactory.create(selected);
           const handles = tool.getHandles(coordHelper);
-          const hitHandle = handles.find((h) => Math.hypot(rawX - h.x, rawY - h.y) <= 8);
+          const hitHandle = handles.find((h) => Math.hypot(rawX - h.x, rawY - h.y) <= (isTouchPointer ? 20 : 8));
           if (hitHandle) {
             audioHaptics.tick();
             setDraggingHandle({ drawingId: selected.id, handleId: hitHandle.id });
@@ -856,7 +869,7 @@ export default function DrawingOverlay({
         const selected = drawings.find((d) => d.id === selId);
         if (selected && !selected.locked && !isLockedAll) {
           const tool = ToolFactory.create(selected);
-          if (tool.hitTest(rawX, rawY, coordHelper)) {
+          if (hitTestAtPointer(tool)) {
             audioHaptics.tick();
 
             // Ctrl + Drag: Instant Duplicate
@@ -912,7 +925,7 @@ export default function DrawingOverlay({
     if (!isDrawingTool) {
       for (let i = drawings.length - 1; i >= 0; i--) {
         const tool = ToolFactory.create(drawings[i]);
-        if (tool.hitTest(rawX, rawY, coordHelper)) {
+        if (hitTestAtPointer(tool)) {
           audioHaptics.tick();
           if (e.ctrlKey || e.metaKey) {
             toggleSelectDrawingId(drawings[i].id, true);
@@ -1735,6 +1748,7 @@ export default function DrawingOverlay({
               onPointerDown={(e) => {
                 if (isDrawingTool) return;
                 e.stopPropagation();
+                try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
                 handleDrawingPointerDown(e, item);
               }}
             >

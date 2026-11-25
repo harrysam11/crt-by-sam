@@ -499,3 +499,13 @@ html.theme-light .chart-context-menu {
   }
   .drawing-context-bar::-webkit-scrollbar { display: none; }
 }
+
+
+/* Finger-friendly drawing controls and chart object selection on touch devices. */
+@media (pointer: coarse) {
+  .drawing-toolbar button {
+    min-width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+}
