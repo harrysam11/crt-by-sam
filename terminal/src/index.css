@@ -454,3 +454,17 @@ html.theme-light .chart-settings-tabs {
 html.theme-light .bg-black\/30 {
   background-color: rgba(15, 23, 42, 0.035) !important;
 }
+
+
+/* Keep chart context menus opaque above the live canvas. */
+.chart-context-menu {
+  background-color: var(--color-panel) !important;
+  opacity: 1 !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  isolation: isolate;
+}
+html.theme-light .chart-context-menu {
+  background-color: #ffffff !important;
+  color: #0f172a;
+}

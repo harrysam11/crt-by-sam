@@ -111,8 +111,16 @@ export default function ChartContextMenu({
   return (
     <div
       ref={menuRef}
-      style={{ left: menuPosition?.left ?? -10000, top: menuPosition?.top ?? -10000, visibility: menuPosition ? 'visible' : 'hidden' }}
-      className="fixed z-50 w-64 max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-[8px] border border-grid bg-panel py-1.5 shadow-2xl select-none font-mono text-[12px] text-text"
+      style={{
+        left: menuPosition?.left ?? -10000,
+        top: menuPosition?.top ?? -10000,
+        visibility: menuPosition ? 'visible' : 'hidden',
+        backgroundColor: 'var(--color-panel)',
+        opacity: 1,
+        backdropFilter: 'none',
+        isolation: 'isolate',
+      }}
+      className="chart-context-menu fixed z-[1000] w-64 max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-[8px] border border-grid py-1.5 shadow-2xl select-none font-mono text-[12px] text-text"
     >
       {/* Price Header */}
       <div className="border-b border-grid/60 px-3 py-2 min-h-9 flex items-center justify-between text-muted text-[10px]">
@@ -198,7 +206,7 @@ export default function ChartContextMenu({
 
         {activeSubmenu === 'SCALE' && (
           <div
-            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-48 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid bg-panel py-1.5 shadow-2xl backdrop-blur-xl`}
+            className={`chart-context-menu absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-48 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid py-1.5 shadow-2xl`}
           >
             {(['NORMAL', 'LOGARITHMIC', 'PERCENTAGE'] as PriceScaleType[]).map((mode) => (
               <button
@@ -245,7 +253,7 @@ export default function ChartContextMenu({
 
         {activeSubmenu === 'STYLE' && (
           <div
-            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid bg-panel py-1.5 shadow-2xl backdrop-blur-xl`}
+            className={`chart-context-menu absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid py-1.5 shadow-2xl`}
           >
             {(
               [
@@ -302,7 +310,7 @@ export default function ChartContextMenu({
 
         {activeSubmenu === 'TZ' && (
           <div
-            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid bg-panel py-1.5 shadow-2xl backdrop-blur-xl`}
+            className={`chart-context-menu absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid py-1.5 shadow-2xl`}
           >
             {(
               [

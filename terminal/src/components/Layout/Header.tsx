@@ -494,7 +494,7 @@ export default function Header({
                   setTimeframe(t);
                   setPaneTimeframe(activePaneId, t);
                 }}
-                className={`px-1.5 py-0.5 text-xs rounded transition ${
+                className={`px-1.5 py-0.5 text-xs rounded transition ${(['4h', '1d'].includes(t) && timeframe !== t) ? 'hidden sm:inline-flex' : ''} ${
                   t === timeframe
                     ? 'bg-white/20 text-white font-bold shadow-xs'
                     : 'text-slate-400 hover:text-white hover:bg-white/5'
