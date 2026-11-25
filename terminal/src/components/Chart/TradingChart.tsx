@@ -3353,7 +3353,7 @@ export default function TradingChart({
             }}
             onPointerMove={(e) => {
               if (!longPressOrigin.current || !longPressTimer.current) return;
-              if (Math.hypot(e.clientX - longPressOrigin.current.x, e.clientY - longPressOrigin.current.y) > 12) {
+              if (Math.hypot(e.clientX - longPressOrigin.current.x, e.clientY - longPressOrigin.current.y) > 20) {
                 clearTimeout(longPressTimer.current);
                 longPressTimer.current = null;
                 longPressOrigin.current = null;
@@ -3368,8 +3368,8 @@ export default function TradingChart({
                 !wasLongPress &&
                 downAt !== null &&
                 tapOrigin !== null &&
-                Date.now() - downAt <= 280 &&
-                Math.hypot(e.clientX - tapOrigin.x, e.clientY - tapOrigin.y) <= 12;
+                Date.now() - downAt <= 400 &&
+                Math.hypot(e.clientX - tapOrigin.x, e.clientY - tapOrigin.y) <= 20;
 
               if (isQuickTouchTap && activeTool === 'CURSOR_ARROW') {
                 const target = e.target as HTMLElement | null;
@@ -3384,8 +3384,8 @@ export default function TradingChart({
                   const previousTap = lastTouchTapRef.current;
                   if (
                     previousTap &&
-                    now - previousTap.time <= 320 &&
-                    Math.hypot(e.clientX - previousTap.x, e.clientY - previousTap.y) <= 28
+                    now - previousTap.time <= 450 &&
+                    Math.hypot(e.clientX - previousTap.x, e.clientY - previousTap.y) <= 36
                   ) {
                     lastTouchTapRef.current = null;
                     audioHaptics.tick();
