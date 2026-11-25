@@ -131,6 +131,16 @@ export default function MultiChartGrid() {
     }
   };
 
+  // Keep the global header controls aligned with the pane that is active.
+  // This also covers restored sessions and saved-layout loads, not only manual taps.
+  useEffect(() => {
+    const activePane = panes[activePaneId];
+    if (!activePane) return;
+    const terminal = useTerminalStore.getState();
+    if (terminal.symbol !== activePane.symbol) terminal.setSymbol(activePane.symbol);
+    if (terminal.timeframe !== activePane.timeframe) terminal.setTimeframe(activePane.timeframe);
+  }, [activePaneId, panes]);
+
   // Drag handlers for resizable spaces with synchronized ratio
   const handleDragH = (deltaPx: number) => {
     if (!gridContainerRef.current) return;
