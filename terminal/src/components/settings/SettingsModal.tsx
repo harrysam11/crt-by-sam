@@ -337,8 +337,8 @@ export default function SettingsModal({
                       }}
                       className={`rounded-xl border p-3 text-left transition ${
                         themeMode === 'DARK'
-                          ? 'border-white bg-white/10 text-white'
-                          : 'border-grid bg-slate-900/40 text-muted hover:text-white'
+                          ? 'border-accent bg-surface text-primary'
+                          : 'border-grid bg-panel text-secondary hover:text-primary hover:bg-surface'
                       }`}
                     >
                       <div className="font-bold text-xs">Dark Terminal (Default)</div>
@@ -352,8 +352,8 @@ export default function SettingsModal({
                       }}
                       className={`rounded-xl border p-3 text-left transition ${
                         themeMode === 'LIGHT'
-                          ? 'border-white bg-white/10 text-white'
-                          : 'border-grid bg-slate-900/40 text-muted hover:text-white'
+                          ? 'border-accent bg-surface text-primary'
+                          : 'border-grid bg-panel text-secondary hover:text-primary hover:bg-surface'
                       }`}
                     >
                       <div className="font-bold text-xs">Light TradingView Canvas</div>
