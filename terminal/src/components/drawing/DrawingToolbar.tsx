@@ -48,7 +48,7 @@ export default function DrawingToolbar({
   const setFloatingToolbarPos = useDrawingStore((s) => s.setFloatingToolbarPos);
   const setDrawingContextBarPos = useDrawingStore((s) => s.setDrawingContextBarPos);
 
-  const toggleDrawer = (name: string, e: React.MouseEvent<HTMLButtonElement>) => {
+  const toggleDrawer = (name: string, e: React.PointerEvent<HTMLButtonElement>) => {
     if (openDrawer === name) {
       setOpenDrawer(null);
       setDrawerAnchor(null);
@@ -68,7 +68,7 @@ export default function DrawingToolbar({
   useEffect(() => {
     if (!openDrawer) return;
 
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent) => {
       const target = e.target as HTMLElement;
       if (
         toolbarRef.current &&
@@ -87,10 +87,10 @@ export default function DrawingToolbar({
       }
     };
 
-    window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('pointerdown', handleClickOutside);
     window.addEventListener('keydown', handleKeyDown);
     return () => {
-      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('pointerdown', handleClickOutside);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [openDrawer]);
@@ -105,7 +105,7 @@ export default function DrawingToolbar({
   const isCurrentInGroup = (tools: ToolType[]) => tools.includes(activeTool);
 
   const btnCls = (isActive: boolean) =>
-    `p-2 rounded-[6px] flex items-center justify-center transition relative group ${
+    `min-h-10 min-w-10 p-2.5 rounded-[6px] flex items-center justify-center touch-manipulation transition relative group ${
       isActive ? 'clay-btn-active' : 'clay-btn text-slate-300'
     }`;
 
@@ -122,7 +122,7 @@ export default function DrawingToolbar({
       >
         <button
           onClick={() => select(type)}
-          className="flex-1 text-left flex items-center justify-between gap-2"
+          className="min-h-10 flex-1 text-left flex items-center justify-between gap-2 touch-manipulation"
         >
           <span>{label}</span>
           {shortcut && (
@@ -139,7 +139,7 @@ export default function DrawingToolbar({
             audioHaptics.tick();
             toggleFavorite(type);
           }}
-          className={`p-0.5 transition ${
+          className={`min-h-10 min-w-10 p-2 flex items-center justify-center touch-manipulation transition ${
             isFav ? 'text-amber-400 hover:text-amber-300' : 'text-slate-600 hover:text-slate-400'
           }`}
           title={isFav ? 'Remove from Favorites' : 'Add to Favorites'}
@@ -155,7 +155,7 @@ export default function DrawingToolbar({
   return (
     <div
       ref={toolbarRef}
-      className="relative z-30 flex w-10 shrink-0 flex-col items-center gap-1 border-r border-grid bg-panel py-1.5 select-none font-mono text-xs overflow-y-auto overflow-x-hidden scrollbar-none max-h-full"
+      className="relative z-30 flex w-11 shrink-0 flex-col items-center gap-1 border-r border-grid bg-panel py-1.5 select-none font-mono text-xs overflow-y-auto overflow-x-hidden scrollbar-none max-h-full touch-pan-y"
     >
       {/* Drawer 1: Cursors */}
       <div>
@@ -173,7 +173,7 @@ export default function DrawingToolbar({
           <div
             style={{
               top: `${Math.max(50, Math.min(window.innerHeight - 200, drawerAnchor?.top ?? 60))}px`,
-              left: `${drawerAnchor?.left ?? 50}px`,
+              left: `${Math.max(8, Math.min(window.innerWidth - 220, drawerAnchor?.left ?? 50))}px`,
             }}
             className="fixed z-50 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[160px] max-h-[85vh] overflow-y-auto"
           >
@@ -211,7 +211,7 @@ export default function DrawingToolbar({
           <div
             style={{
               top: `${Math.max(50, Math.min(window.innerHeight - 280, drawerAnchor?.top ?? 90))}px`,
-              left: `${drawerAnchor?.left ?? 50}px`,
+              left: `${Math.max(8, Math.min(window.innerWidth - 220, drawerAnchor?.left ?? 50))}px`,
             }}
             className="fixed z-50 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[200px] max-h-[85vh] overflow-y-auto"
           >
@@ -342,7 +342,7 @@ export default function DrawingToolbar({
           audioHaptics.tick();
           toggleFavoritesBar();
         }}
-        className={`p-2 rounded-lg flex items-center justify-center transition ${
+        className={`min-h-10 min-w-10 p-2.5 rounded-lg flex items-center justify-center transition ${
           isFavoritesBarVisible && favorites.length > 0
             ? 'text-amber-400 bg-amber-500/20'
             : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
@@ -357,7 +357,7 @@ export default function DrawingToolbar({
       {/* Reset Floating Toolbars Positions */}
       <button
         onClick={handleResetFloatingBars}
-        className="p-2 rounded-lg flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:bg-slate-800/80 transition"
+        className="min-h-10 min-w-10 p-2.5 rounded-lg flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:bg-slate-800/80 transition"
         title="Reset Floating Toolbars Position (Favorites & Context Toolbar)"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -371,7 +371,7 @@ export default function DrawingToolbar({
           audioHaptics.tick();
           drawingEvents.undo();
         }}
-        className="p-2 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition"
+        className="min-h-10 min-w-10 p-2.5 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition"
         title="Undo (Ctrl+Z)"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
