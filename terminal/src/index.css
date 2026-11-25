@@ -498,6 +498,17 @@ html.theme-light .chart-context-menu {
     scrollbar-width: none;
   }
   .drawing-context-bar::-webkit-scrollbar { display: none; }
+  .drawing-context-bar button {
+    min-width: 40px;
+    min-height: 40px;
+    flex: 0 0 auto;
+    touch-action: manipulation;
+  }
+  .drawing-context-bar input[type="range"] {
+    min-width: 96px;
+    min-height: 32px;
+    touch-action: pan-x;
+  }
 }
 
 
