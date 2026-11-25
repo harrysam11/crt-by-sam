@@ -216,8 +216,7 @@ export default function OnChartNewsOverlay({
       group.xs.push(x);
       groups.set(dateKey, group);
     });
-    return Array.from(groups.entries()).map(([dateKey, group]) => ({
-      dateKey,
+    return Array.from(groups.values()).map((group) => ({
       items: group.items.sort((a, b) => a.timestamp - b.timestamp),
       x: group.xs.reduce((sum, value) => sum + value, 0) / group.xs.length,
     }));
@@ -249,7 +248,7 @@ export default function OnChartNewsOverlay({
       className="pointer-events-none absolute inset-0 z-20 overflow-hidden font-mono select-none"
     >
       {/* Markers rendered along bottom time-scale axis */}
-      {groupedMarkers.map(({ items, x, dateKey }) => {
+      {groupedMarkers.map(({ items, x }) => {
         const item = items[0];
         const isMacro = item.type === 'MACRO_EVENT';
         const isHigh = items.some((entry) => entry.impact === 'HIGH');
