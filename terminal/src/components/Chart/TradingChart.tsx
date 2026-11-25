@@ -3361,12 +3361,15 @@ export default function TradingChart({
             }}
             onPointerUp={(e) => {
               const downAt = pointerDownAtRef.current;
+              const tapOrigin = longPressOrigin.current;
               const wasLongPress = longPressFiredRef.current;
               const isQuickTouchTap =
                 e.pointerType === 'touch' &&
                 !wasLongPress &&
                 downAt !== null &&
-                Date.now() - downAt <= 280;
+                tapOrigin !== null &&
+                Date.now() - downAt <= 280 &&
+                Math.hypot(e.clientX - tapOrigin.x, e.clientY - tapOrigin.y) <= 12;
 
               if (isQuickTouchTap && activeTool === 'CURSOR_ARROW') {
                 const target = e.target as HTMLElement | null;
