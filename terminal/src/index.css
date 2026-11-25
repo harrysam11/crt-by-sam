@@ -20,9 +20,11 @@
   --color-accent: #38bdf8;
   --color-up: #22c55e;
   --color-down: #ef4444;
+  color-scheme: dark;
 }
 
 html.theme-light, body.theme-light, #root.theme-light {
+  color-scheme: light;
   --color-bg: #f8fafc;
   --color-panel: #ffffff;
   --color-surface: #f1f5f9;
@@ -308,6 +310,23 @@ html.theme-light kbd, html.theme-light .kbd {
   border-color: rgba(0, 0, 0, 0.12);
   color: #444444;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Theme-aware shadows and selection surfaces */
+html.theme-light .shadow-clay-card,
+html.theme-light .shadow-clay-pill,
+html.theme-light .shadow-clay-pill-active,
+html.theme-light .shadow-clay-btn {
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08) !important;
+}
+
+html.theme-light .shadow-clay-inset {
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+}
+
+html.theme-light ::selection {
+  background: rgba(2, 132, 199, 0.18);
+  color: #0f172a;
 }
 
 /* Light Theme Color Consistency Overrides */
