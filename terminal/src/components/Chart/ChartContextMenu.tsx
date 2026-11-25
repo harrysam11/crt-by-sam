@@ -111,7 +111,6 @@ export default function ChartContextMenu({
   return (
     <div
       ref={menuRef}
-      style={{ left: menuPosition?.left ?? -10000, top: menuPosition?.top ?? -10000, visibility: menuPosition ? 'visible' : 'hidden' }}
       className="fixed z-[10000] w-64 max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-[8px] border border-grid py-1.5 select-none font-mono text-[12px] text-text"
       style={{
         left: menuPosition?.left ?? -10000,
