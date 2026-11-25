@@ -454,3 +454,305 @@ html.theme-light .chart-settings-tabs {
 html.theme-light .bg-black\/30 {
   background-color: rgba(15, 23, 42, 0.035) !important;
 }
+
+
+/* Keep chart context menus opaque above the live canvas. */
+.chart-context-menu {
+  background-color: var(--color-panel) !important;
+  opacity: 1 !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  isolation: isolate;
+}
+html.theme-light .chart-context-menu {
+  background-color: #ffffff !important;
+  color: #0f172a;
+}
+
+
+/* Mobile chart workspace: focus one full-size pane at a time and switch with pane tabs. */
+@media (max-width: 767px) {
+  .mobile-chart-grid-row {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+  .mobile-chart-grid-half { display: contents !important; }
+  .mobile-chart-pane { display: none !important; }
+  .mobile-chart-pane[data-active="true"] {
+    display: block !important;
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    z-index: 1;
+  }
+  .mobile-chart-splitter { display: none !important; }
+  .drawing-context-bar {
+    max-width: calc(100vw - 16px);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .drawing-context-bar::-webkit-scrollbar { display: none; }
+  .drawing-context-bar button {
+    min-width: 40px;
+    min-height: 40px;
+    flex: 0 0 auto;
+    touch-action: manipulation;
+  }
+  .drawing-context-bar input[type="range"] {
+    min-width: 96px;
+    min-height: 32px;
+    touch-action: pan-x;
+  }
+}
+
+
+/* Finger-friendly drawing controls and chart object selection on touch devices. */
+@media (pointer: coarse) {
+  .drawing-toolbar button {
+    min-width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+  .chart-context-menu button {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+}
+
+
+/* Chart settings behaves like a native bottom sheet on compact screens. */
+@media (max-width: 767px) {
+  .chart-settings-dialog {
+    width: 100%;
+    height: min(88dvh, 760px);
+    max-height: calc(100dvh - env(safe-area-inset-top) - 4px);
+    margin-top: auto;
+    border-radius: 18px 18px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    overscroll-behavior: contain;
+  }
+  .chart-settings-header {
+    min-height: 56px;
+    padding-left: 16px;
+    padding-right: 12px;
+  }
+  .chart-settings-tabs {
+    min-height: 58px;
+    padding: 8px 10px;
+    scroll-padding-inline: 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .chart-settings-tab {
+    min-height: 44px;
+    padding-inline: 14px;
+    touch-action: pan-x;
+  }
+  .chart-settings-footer {
+    min-height: 58px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  }
+  .chart-settings-dialog input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+  }
+  .chart-settings-dialog input[type="range"] {
+    min-height: 32px;
+    touch-action: pan-x;
+  }
+}
+
+
+/* Chart settings text and native controls follow the active app theme. */
+html.theme-light .chart-settings-dialog {
+  color: #0f172a;
+}
+html.theme-light .chart-settings-dialog .text-white {
+  color: #0f172a !important;
+}
+html.theme-light .chart-settings-dialog .text-slate-300 {
+  color: #334155 !important;
+}
+html.theme-light .chart-settings-dialog .text-slate-400 {
+  color: #64748b !important;
+}
+html.theme-light .chart-settings-dialog .bg-slate-800 {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+html.theme-light .chart-settings-dialog .bg-panel\/50 {
+  background-color: #f8fafc !important;
+}
+html.theme-light .chart-settings-dialog .border-grid {
+  border-color: rgba(15, 23, 42, 0.14) !important;
+}
+html.theme-light .chart-settings-dialog input[type="color"] {
+  border-color: rgba(15, 23, 42, 0.2);
+}
+
+
+@media (max-width: 767px) {
+  .chart-settings-close,
+  .chart-settings-reset,
+  .chart-settings-done {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .chart-settings-close {
+    min-width: 44px;
+  }
+  .chart-settings-reset {
+    padding-inline: 8px;
+  }
+  .chart-settings-done {
+    min-width: 76px;
+    padding-inline: 18px;
+  }
+}
+
+
+/* Indicators library and symbol search become thumb-friendly mobile sheets. */
+@media (max-width: 767px) {
+  .indicator-modal-dialog {
+    width: 100%;
+    height: min(90dvh, 820px);
+    max-height: calc(100dvh - env(safe-area-inset-top) - 4px);
+    margin-top: auto;
+    border-radius: 18px 18px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .indicator-modal-header {
+    min-height: 58px;
+    padding: 10px 14px;
+  }
+  .indicator-modal-layout {
+    flex-direction: column;
+    min-height: 0;
+  }
+  .indicator-category-list {
+    width: 100%;
+    min-height: 54px;
+    max-height: 58px;
+    flex: 0 0 auto;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-grid);
+    -webkit-overflow-scrolling: touch;
+  }
+  .indicator-category-list button {
+    min-height: 40px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .indicator-modal-content {
+    min-height: 0;
+    padding: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .indicator-modal-footer {
+    min-height: 60px;
+    gap: 8px;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  }
+  .symbol-search-dialog {
+    width: 100%;
+    height: min(84dvh, 720px);
+    max-height: calc(100dvh - env(safe-area-inset-top) - 4px);
+    border-radius: 18px 18px 0 0;
+    margin-top: auto;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .symbol-search-header {
+    min-height: 58px;
+    padding: 8px 12px;
+  }
+  .symbol-search-header input {
+    min-width: 0;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .symbol-search-categories {
+    min-height: 52px;
+    padding-inline: 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .symbol-search-categories button {
+    min-height: 40px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .symbol-search-results {
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+  .symbol-search-footer {
+    min-height: 48px;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  }
+  .symbol-search-footer kbd,
+  .symbol-search-footer > div {
+    display: none;
+  }
+}
+
+
+/* Custom timeframe dialog: compact bottom sheet with full-width controls on phones. */
+@media (max-width: 767px) {
+  .custom-interval-dialog {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - env(safe-area-inset-top) - 4px);
+    overflow-y: auto;
+    margin-top: auto;
+    padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+    border-radius: 18px 18px 0 0;
+  }
+  .custom-interval-header {
+    min-height: 58px;
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+  }
+  .custom-interval-fields {
+    flex-wrap: wrap;
+  }
+  .custom-interval-fields input,
+  .custom-interval-fields select {
+    min-height: 48px;
+    font-size: 16px;
+  }
+  .custom-interval-actions {
+    position: sticky;
+    bottom: 0;
+    padding-top: 12px;
+    background: inherit;
+  }
+  .custom-interval-actions button {
+    min-height: 44px;
+    flex: 1;
+  }
+}
+html.theme-light .custom-interval-dialog {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+html.theme-light .custom-interval-dialog .text-white { color: #0f172a !important; }
+html.theme-light .custom-interval-dialog .text-slate-300 { color: #334155 !important; }
+html.theme-light .custom-interval-dialog .text-slate-400 { color: #64748b !important; }
+html.theme-light .custom-interval-dialog .bg-\[\#12121a\] {
+  background: #f8fafc !important;
+}
+html.theme-light .custom-interval-dialog .bg-\[\#181824\] {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}

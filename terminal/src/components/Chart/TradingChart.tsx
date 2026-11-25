@@ -1055,9 +1055,12 @@ export default function TradingChart({
     const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
     const isZen = zenMode.active && zenMode.softPastelCandles;
 
-    const chartBgColor = isCustomBg
-      ? 'rgba(0, 0, 0, 0)'
-      : (themeConfig.solidColor || (isLightMode ? '#ffffff' : '#141413'));
+    // #141413 is the legacy DARK default; it must not override LIGHT mode.
+    const storedSolidBg = themeConfig.solidColor;
+    const effectiveSolidBg = storedSolidBg && storedSolidBg.toLowerCase() !== '#141413'
+      ? storedSolidBg
+      : (isLightMode ? '#f4f4f6' : '#141413');
+    const chartBgColor = isCustomBg ? 'rgba(0, 0, 0, 0)' : effectiveSolidBg;
     const chartTextColor = isLightMode ? '#555555' : '#828290';
     const chartGridColor = isLightMode ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.03)';
     const chartBorderColor = isLightMode ? 'rgba(0, 0, 0, 0.1)' : '#1e1e26';
@@ -1345,10 +1348,16 @@ export default function TradingChart({
 
     const onThemeChange = () => {
       const isLight = document.documentElement.classList.contains('theme-light');
+      const currentTheme = usePsychologyStore.getState().themeConfig;
+      const hasCustomWallpaper = currentTheme.wallpaperType !== 'SOLID' && !!currentTheme.mediaUrl;
+      const savedSolid = currentTheme.solidColor;
+      const solidBackground = savedSolid && savedSolid.toLowerCase() !== '#141413'
+        ? savedSolid
+        : (isLight ? '#f4f4f6' : '#141413');
       chart.applyOptions({
         layout: {
-          background: { type: ColorType.Solid, color: isLight ? '#f4f4f6' : '#050508' },
-          textColor: isLight ? '#71717a' : '#828290',
+          background: { type: ColorType.Solid, color: hasCustomWallpaper ? 'rgba(0, 0, 0, 0)' : solidBackground },
+          textColor: isLight ? '#555555' : '#828290',
         },
         grid: {
           vertLines: { color: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)' },
@@ -1416,7 +1425,10 @@ export default function TradingChart({
   useEffect(() => {
     if (!api.current) return;
     const isCustomBg = themeConfig.wallpaperType !== 'SOLID' && !!themeConfig.mediaUrl;
-    const solidBg = themeConfig.solidColor || (themeMode === 'LIGHT' ? '#ffffff' : '#141413');
+    const savedSolid = themeConfig.solidColor;
+    const solidBg = savedSolid && savedSolid.toLowerCase() !== '#141413'
+      ? savedSolid
+      : (themeMode === 'LIGHT' ? '#f4f4f6' : '#141413');
     api.current.chart.applyOptions({
       layout: {
         background: {
@@ -1501,9 +1513,11 @@ export default function TradingChart({
     }
 
     const gridBase = isLight ? '0, 0, 0' : '255, 255, 255';
-    const chartBg = isCustomBg
-      ? 'rgba(0, 0, 0, 0)'
-      : (themeConfig.solidColor || (isLight ? '#ffffff' : '#141413'));
+    const savedSolid = themeConfig.solidColor;
+    const effectiveSolid = savedSolid && savedSolid.toLowerCase() !== '#141413'
+      ? savedSolid
+      : (isLight ? '#f4f4f6' : '#141413');
+    const chartBg = isCustomBg ? 'rgba(0, 0, 0, 0)' : effectiveSolid;
     const chartText = isLight ? '#555555' : '#828290';
     const chartBorder = isLight ? 'rgba(0, 0, 0, 0.1)' : '#1e1e26';
 
@@ -3325,6 +3339,9 @@ export default function TradingChart({
           <div
             ref={box}
             className="absolute inset-0 z-10"
+            // Prevent Android double-tap zoom from cancelling the second tap.
+            // Pan and pinch gestures remain available to the chart.
+            style={{ touchAction: 'manipulation' }}
             onPointerDown={(e) => {
               if (e.pointerType !== 'touch' || !seriesApi || !chartApi || !box.current) return;
               if (longPressTimer.current) clearTimeout(longPressTimer.current);
@@ -3371,7 +3388,8 @@ export default function TradingChart({
                 Date.now() - downAt <= 280 &&
                 Math.hypot(e.clientX - tapOrigin.x, e.clientY - tapOrigin.y) <= 12;
 
-              if (isQuickTouchTap && activeTool === 'CURSOR_ARROW') {
+              // Match TradingView: double-tap chart settings works with the default crosshair or arrow cursor.
+              if (isQuickTouchTap && (activeTool === 'CURSOR_ARROW' || activeTool === 'CURSOR_CROSSHAIR')) {
                 const target = e.target as HTMLElement | null;
                 const isInteractiveTarget = Boolean(
                   target?.closest(
@@ -3384,7 +3402,7 @@ export default function TradingChart({
                   const previousTap = lastTouchTapRef.current;
                   if (
                     previousTap &&
-                    now - previousTap.time <= 320 &&
+                    now - previousTap.time <= 380 &&
                     Math.hypot(e.clientX - previousTap.x, e.clientY - previousTap.y) <= 28
                   ) {
                     lastTouchTapRef.current = null;

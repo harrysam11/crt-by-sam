@@ -57,6 +57,7 @@ export default function DrawingContextBar({
     e.preventDefault();
     e.stopPropagation();
     isDraggingRef.current = true;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
     const startMouseX = e.clientX;
     const startMouseY = e.clientY;
     const startPosX = safeX;
@@ -71,14 +72,17 @@ export default function DrawingContextBar({
       setPos({ x: newX, y: newY });
     };
 
-    const handlePointerUp = () => {
+    const stopDrag = () => {
+      if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
       window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointerup', stopDrag);
+      window.removeEventListener('pointercancel', stopDrag);
     };
 
     window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointerup', stopDrag);
+    window.addEventListener('pointercancel', stopDrag);
   };
 
   const handleResetPos = () => {
@@ -135,12 +139,12 @@ export default function DrawingContextBar({
     <div
       ref={menuContainerRef}
       data-drawing-context-bar="true"
-      style={{ left: `${safeX}px`, top: `${safeY}px` }}
       onDoubleClick={handleResetPos}
       onPointerDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
-      className="fixed z-50 flex items-center gap-1 px-1.5 py-1 font-mono text-xs select-none shadow-2xl backdrop-blur-xl bg-[#1e222d] border border-[#2a2e39] text-[#d1d4dc] rounded-lg pointer-events-auto"
+      className="drawing-context-bar fixed z-50 flex max-w-[calc(100vw-16px)] items-center gap-1 overflow-x-auto overscroll-x-contain px-1.5 py-1 font-mono text-xs select-none shadow-2xl bg-[#1e222d] border border-[#2a2e39] text-[#d1d4dc] rounded-lg pointer-events-auto"
+      style={{ left: `${safeX}px`, top: `${safeY}px`, touchAction: 'pan-x' }}
       title="Drawing Context Toolbar (Drag grip to move, Double-click to reset)"
     >
       {/* 1. Movable Drag Grip Handle */}

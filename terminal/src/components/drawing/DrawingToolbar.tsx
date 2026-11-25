@@ -155,7 +155,7 @@ export default function DrawingToolbar({
   return (
     <div
       ref={toolbarRef}
-      className="relative z-30 flex w-11 shrink-0 flex-col items-center gap-1 border-r border-grid bg-panel py-1.5 select-none font-mono text-xs overflow-y-auto overflow-x-hidden scrollbar-none max-h-full touch-pan-y"
+      className="drawing-toolbar relative z-30 flex w-12 shrink-0 flex-col items-center gap-1 border-r border-grid bg-panel py-1.5 select-none font-mono text-xs overflow-y-auto overflow-x-hidden scrollbar-none max-h-full touch-pan-y"
     >
       {/* Drawer 1: Cursors */}
       <div>

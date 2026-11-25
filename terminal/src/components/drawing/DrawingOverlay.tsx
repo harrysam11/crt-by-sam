@@ -779,6 +779,19 @@ export default function DrawingOverlay({
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
     const point = snapToCandle(rawX, rawY);
+    // Touch input needs a larger target than a mouse cursor. Keep the same
+    // geometric hit tests, but probe a small radius around the finger position.
+    const isTouchPointer = e.pointerType === 'touch';
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    const hitTestAtPointer = (tool: ReturnType<typeof ToolFactory.create>) => {
+      if (tool.hitTest(rawX, rawY, coordHelper)) return true;
+      if (!isTouchPointer) return false;
+      const offsets = [
+        [-16, 0], [16, 0], [0, -16], [0, 16],
+        [-11, -11], [11, -11], [-11, 11], [11, 11],
+      ];
+      return offsets.some(([dx, dy]) => tool.hitTest(rawX + dx, rawY + dy, coordHelper));
+    };
 
     // If previous measurement ruler is on screen, normal click dismisses it
     if (activeDrawing && activeDrawing.type === 'MEASURE_RULER') {
@@ -814,7 +827,7 @@ export default function DrawingOverlay({
     if (activeTool === 'CURSOR_ERASER' && e.button === 0) {
       for (let i = drawings.length - 1; i >= 0; i--) {
         const tool = ToolFactory.create(drawings[i]);
-        if (tool.hitTest(rawX, rawY, coordHelper)) {
+        if (hitTestAtPointer(tool)) {
           deleteDrawing(drawings[i].id);
           return;
         }
@@ -842,7 +855,7 @@ export default function DrawingOverlay({
         if (selected && !selected.locked && !isLockedAll) {
           const tool = ToolFactory.create(selected);
           const handles = tool.getHandles(coordHelper);
-          const hitHandle = handles.find((h) => Math.hypot(rawX - h.x, rawY - h.y) <= 8);
+          const hitHandle = handles.find((h) => Math.hypot(rawX - h.x, rawY - h.y) <= (isTouchPointer ? 20 : 8));
           if (hitHandle) {
             audioHaptics.tick();
             setDraggingHandle({ drawingId: selected.id, handleId: hitHandle.id });
@@ -856,7 +869,7 @@ export default function DrawingOverlay({
         const selected = drawings.find((d) => d.id === selId);
         if (selected && !selected.locked && !isLockedAll) {
           const tool = ToolFactory.create(selected);
-          if (tool.hitTest(rawX, rawY, coordHelper)) {
+          if (hitTestAtPointer(tool)) {
             audioHaptics.tick();
 
             // Ctrl + Drag: Instant Duplicate
@@ -912,7 +925,7 @@ export default function DrawingOverlay({
     if (!isDrawingTool) {
       for (let i = drawings.length - 1; i >= 0; i--) {
         const tool = ToolFactory.create(drawings[i]);
-        if (tool.hitTest(rawX, rawY, coordHelper)) {
+        if (hitTestAtPointer(tool)) {
           audioHaptics.tick();
           if (e.ctrlKey || e.metaKey) {
             toggleSelectDrawingId(drawings[i].id, true);
@@ -1126,6 +1139,29 @@ export default function DrawingOverlay({
       } else if (creationStep === 2) {
         setActiveDrawing({ ...activeDrawing, p3: point });
       }
+    }
+  };
+
+  // Android/browser gesture arbitration can cancel an active pointer without
+  // dispatching pointerup. Clear transient state so drawing interactions do not
+  // remain stuck after an interrupted touch gesture.
+  const handlePointerCancel = () => {
+    if (draggingHandle || draggingBody) {
+      setDraggingHandle(null);
+      setDraggingBody(null);
+      pushState(drawings);
+      autoRevertToCrosshair();
+    }
+
+    setSelectionBox(null);
+    setDemonstrationDrawing(null);
+
+    // A completed ruler remains visible at creationStep 2. Discard only an
+    // unfinished ruler, or another drawing whose pointer sequence was canceled.
+    if (activeDrawing && (activeDrawing.type !== 'MEASURE_RULER' || creationStep === 1)) {
+      setActiveDrawing(null);
+      setCreationStep(0);
+      autoRevertToCrosshair();
     }
   };
 
@@ -1575,6 +1611,7 @@ export default function DrawingOverlay({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       onPointerLeave={() => setCursorPos(null)}
       style={
         paneBounds
@@ -1583,12 +1620,14 @@ export default function DrawingOverlay({
               top: `${paneBounds.top}px`,
               width: `${paneBounds.width}px`,
               height: `${paneBounds.height}px`,
+              touchAction: isDrawingTool ? 'none' : 'auto',
             }
           : {
               left: 0,
               top: 0,
               right: `${priceScaleWidth}px`,
               bottom: '28px',
+              touchAction: isDrawingTool ? 'none' : 'auto',
             }
       }
       className={`absolute z-20 ${
@@ -1735,6 +1774,7 @@ export default function DrawingOverlay({
               onPointerDown={(e) => {
                 if (isDrawingTool) return;
                 e.stopPropagation();
+                try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
                 handleDrawingPointerDown(e, item);
               }}
             >
@@ -1786,24 +1826,33 @@ export default function DrawingOverlay({
                 !item.locked &&
                 !isLockedAll &&
                 tool.getHandles(coordHelper).map((h) => (
-                  <circle
+                  <g
                     key={h.id}
                     data-drawing-element="true"
-                    cx={h.x}
-                    cy={h.y}
-                    r={5.5}
-                    fill="#ffffff"
-                    stroke="#181817"
-                    strokeWidth={1.5}
-                    className="cursor-move pointer-events-auto hover:scale-125 transition-transform"
-                    style={{ pointerEvents: 'all' }}
+                    className="cursor-move"
+                    style={{ pointerEvents: 'all', touchAction: 'none' }}
                     onPointerDown={(e) => {
                       e.stopPropagation();
+                      if (e.button !== 0) return;
+                      try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
                       audioHaptics.tick();
                       useLayoutStore.getState().setActivePaneId(paneId);
                       setDraggingHandle({ drawingId: item.id, handleId: h.id });
                     }}
-                  />
+                  >
+                    {/* Expanded invisible hit target keeps the visible handle precise
+                        while making it practical to grab with a fingertip. */}
+                    <circle cx={h.x} cy={h.y} r={14} fill="transparent" stroke="transparent" />
+                    <circle
+                      cx={h.x}
+                      cy={h.y}
+                      r={5.5}
+                      fill="#ffffff"
+                      stroke="#181817"
+                      strokeWidth={1.5}
+                      pointerEvents="none"
+                    />
+                  </g>
                 ))}
             </g>
           );
