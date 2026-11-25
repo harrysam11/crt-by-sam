@@ -119,24 +119,38 @@ export default function DrawingSettingsModal({
     const startMouseY = e.clientY;
     const startPosX = pos?.x ?? 280;
     const startPosY = pos?.y ?? 90;
+    let frame = 0;
+    let pending: { x: number; y: number } | null = null;
 
     const handlePointerMove = (moveEv: PointerEvent) => {
       if (!isDraggingRef.current) return;
       const dx = moveEv.clientX - startMouseX;
       const dy = moveEv.clientY - startMouseY;
-      const newX = Math.max(8, Math.min(window.innerWidth - 300, startPosX + dx));
-      const newY = Math.max(40, Math.min(window.innerHeight - 150, startPosY + dy));
-      setPos({ x: newX, y: newY });
+      pending = {
+        x: Math.max(8, Math.min(window.innerWidth - 300, startPosX + dx)),
+        y: Math.max(40, Math.min(window.innerHeight - 150, startPosY + dy)),
+      };
+      if (!frame) frame = requestAnimationFrame(() => {
+        frame = 0;
+        if (pending) setPos(pending);
+        pending = null;
+      });
     };
 
     const handlePointerUp = () => {
       isDraggingRef.current = false;
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+      if (pending) setPos(pending);
+      pending = null;
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
     };
 
-    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
     window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
   };
 
   useEffect(() => {
