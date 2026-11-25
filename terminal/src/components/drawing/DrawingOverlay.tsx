@@ -1826,24 +1826,33 @@ export default function DrawingOverlay({
                 !item.locked &&
                 !isLockedAll &&
                 tool.getHandles(coordHelper).map((h) => (
-                  <circle
+                  <g
                     key={h.id}
                     data-drawing-element="true"
-                    cx={h.x}
-                    cy={h.y}
-                    r={5.5}
-                    fill="#ffffff"
-                    stroke="#181817"
-                    strokeWidth={1.5}
-                    className="cursor-move pointer-events-auto hover:scale-125 transition-transform"
-                    style={{ pointerEvents: 'all' }}
+                    className="cursor-move"
+                    style={{ pointerEvents: 'all', touchAction: 'none' }}
                     onPointerDown={(e) => {
                       e.stopPropagation();
+                      if (e.button !== 0) return;
+                      try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
                       audioHaptics.tick();
                       useLayoutStore.getState().setActivePaneId(paneId);
                       setDraggingHandle({ drawingId: item.id, handleId: h.id });
                     }}
-                  />
+                  >
+                    {/* Expanded invisible hit target keeps the visible handle precise
+                        while making it practical to grab with a fingertip. */}
+                    <circle cx={h.x} cy={h.y} r={14} fill="transparent" stroke="transparent" />
+                    <circle
+                      cx={h.x}
+                      cy={h.y}
+                      r={5.5}
+                      fill="#ffffff"
+                      stroke="#181817"
+                      strokeWidth={1.5}
+                      pointerEvents="none"
+                    />
+                  </g>
                 ))}
             </g>
           );
