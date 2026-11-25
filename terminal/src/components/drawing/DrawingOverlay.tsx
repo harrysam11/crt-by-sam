@@ -141,6 +141,8 @@ export default function DrawingOverlay({
   const [activeDrawing, setActiveDrawing] = useState<DrawingItem | null>(null);
   const [creationStep, setCreationStep] = useState<number>(0);
   const [cursorPos, setCursorPos] = useState<Point2D | null>(null);
+  const [isTouchInput, setIsTouchInput] = useState(false);
+  const autoAngleSnap = useDrawingStore((s) => s.autoAngleSnap);
 
   // Modifier Key States
   const [isCtrlHeld, setIsCtrlHeld] = useState(false);
@@ -586,6 +588,18 @@ export default function DrawingOverlay({
     activeTool !== 'CURSOR_DOT' &&
     activeTool !== 'CURSOR_ERASER';
 
+  // On touch devices, show a chart-centred crosshair immediately after a drawing tool is selected.
+  useEffect(() => {
+    if (!isDrawingTool || !window.matchMedia('(pointer: coarse)').matches) return;
+    setIsTouchInput(true);
+    setCursorPos((current) => current ?? {
+      x: coordHelper.width / 2,
+      y: coordHelper.height / 2,
+      price: coordHelper.yToPrice(coordHelper.height / 2),
+      time: coordHelper.xToTime(coordHelper.width / 2),
+    });
+  }, [isDrawingTool, activeTool, coordHelper]);
+
   // Automatically free cursor and clear in-progress drawing states when cursor tool is selected
   useEffect(() => {
     if (!isDrawingTool) {
@@ -759,6 +773,19 @@ export default function DrawingOverlay({
     };
   }, [setSelectedDrawingIds, selectionBox]);
 
+  const snapPointToAngle = useCallback((point: Point2D, origin: Point2D): Point2D => {
+    const originXY = coordHelper.pointToXY(origin);
+    const dx = point.x - originXY.x;
+    const dy = point.y - originXY.y;
+    const angle = Math.atan2(dy, dx);
+    const step = Math.PI / 4;
+    const snapped = Math.round(angle / step) * step;
+    const distance = Math.hypot(dx, dy);
+    const x = originXY.x + distance * Math.cos(snapped);
+    const y = originXY.y + distance * Math.sin(snapped);
+    return { ...point, x, y, price: coordHelper.yToPrice(y), time: coordHelper.xToTime(x) };
+  }, [coordHelper]);
+
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement | SVGElement | null;
     if (
@@ -778,7 +805,12 @@ export default function DrawingOverlay({
     const rect = containerRef.current.getBoundingClientRect();
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
-    const point = snapToCandle(rawX, rawY);
+    let point = snapToCandle(rawX, rawY);
+    if (e.pointerType === 'touch') setIsTouchInput(true);
+    if (creationStep === 1 && activeDrawing && ((e.shiftKey || isShiftHeld) || (autoAngleSnap && ['TRENDLINE', 'RAY', 'ARROW', 'FIBONACCI', 'FIB_EXTENSION', 'PARALLEL_CHANNEL'].includes(activeTool)))) {
+      point = snapPointToAngle(point, activeDrawing.p1);
+    }
+    setCursorPos(point);
     // Touch input needs a larger target than a mouse cursor. Keep the same
     // geometric hit tests, but probe a small radius around the finger position.
     const isTouchPointer = e.pointerType === 'touch';
@@ -1090,6 +1122,7 @@ export default function DrawingOverlay({
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
     let point = snapToCandle(rawX, rawY);
+    if (e.pointerType === 'touch') setIsTouchInput(true);
     setCursorPos(point);
     useLayoutStore.getState().setActivePaneId(paneId);
 
@@ -1099,23 +1132,9 @@ export default function DrawingOverlay({
       return;
     }
 
-    // Shift Angle Lock (snap to nearest 45 degrees: horizontal, vertical, 45-deg diagonal)
-    if ((e.shiftKey || isShiftHeld) && activeDrawing && creationStep === 1) {
-      const p1XY = coordHelper.pointToXY(activeDrawing.p1);
-      const dx = rawX - p1XY.x;
-      const dy = rawY - p1XY.y;
-      const angle = Math.atan2(dy, dx);
-      const snapStep = Math.PI / 4;
-      const snappedAngle = Math.round(angle / snapStep) * snapStep;
-      const dist = Math.hypot(dx, dy);
-      const snapX = p1XY.x + dist * Math.cos(snappedAngle);
-      const snapY = p1XY.y + dist * Math.sin(snappedAngle);
-      point = {
-        x: snapX,
-        y: snapY,
-        price: coordHelper.yToPrice(snapY),
-        time: coordHelper.xToTime(snapX),
-      };
+    // Auto Angle Snap keeps line tools aligned to 0°, 45° or 90° without holding Shift.
+    if (((e.shiftKey || isShiftHeld) || (autoAngleSnap && ['TRENDLINE', 'RAY', 'ARROW', 'FIBONACCI', 'FIB_EXTENSION', 'PARALLEL_CHANNEL'].includes(activeTool))) && activeDrawing && creationStep === 1) {
+      point = snapPointToAngle(point, activeDrawing.p1);
     }
 
     // Marquee selection box dragging
@@ -1612,7 +1631,10 @@ export default function DrawingOverlay({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
-      onPointerLeave={() => setCursorPos(null)}
+      onPointerLeave={() => {
+        // Touch devices have no hover state; retain the last crosshair anchor between taps.
+        if (!window.matchMedia('(pointer: coarse)').matches) setCursorPos(null);
+      }}
       style={
         paneBounds
           ? {
@@ -1647,6 +1669,24 @@ export default function DrawingOverlay({
         className="h-full w-full pointer-events-none"
         style={{ overflow: 'visible' }}
       >
+        {/* Mobile drawing crosshair: follows the finger and remains at the last tap between anchors. */}
+        {(isDrawingTool || activeDrawing) && cursorPos && (
+          <g className="pointer-events-none select-none">
+            <line x1={cursorPos.x} y1={0} x2={cursorPos.x} y2={coordHelper.height} stroke="rgba(56,189,248,.72)" strokeWidth={1} strokeDasharray="3 4" />
+            <line x1={0} y1={cursorPos.y} x2={coordHelper.width} y2={cursorPos.y} stroke="rgba(56,189,248,.72)" strokeWidth={1} strokeDasharray="3 4" />
+            <circle cx={cursorPos.x} cy={cursorPos.y} r={7} fill="rgba(56,189,248,.12)" stroke="#38bdf8" strokeWidth={1.5} />
+            <circle cx={cursorPos.x} cy={cursorPos.y} r={2} fill="#ffffff" />
+          </g>
+        )}
+        {isTouchInput && isDrawingTool && (
+          <g className="pointer-events-none select-none">
+            <rect x={8} y={8} width={Math.min(250, coordHelper.width - 16)} height={24} rx={5} fill="rgba(12,16,24,.88)" stroke="rgba(56,189,248,.35)" />
+            <text x={18} y={24} fill="#dbeafe" fontSize={10} fontFamily="sans-serif">
+              {creationStep === 0 ? 'Tap chart to place first point' : creationStep === 1 ? 'Move crosshair · tap to finish' : 'Tap to place final point'}
+            </text>
+          </g>
+        )}
+
         {/* Magnet Snap Indicator & Axis Coordinates while Drawing */}
         {(isDrawingTool || activeDrawing) && cursorPos && (
           <g className="pointer-events-none select-none font-mono">

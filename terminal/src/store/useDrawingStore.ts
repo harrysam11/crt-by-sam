@@ -8,6 +8,8 @@ interface DrawingState {
 
   stayInDrawingMode: boolean;
   toggleStayInDrawingMode: () => void;
+  autoAngleSnap: boolean;
+  toggleAutoAngleSnap: () => void;
   setStayInDrawingMode: (v: boolean) => void;
 
   floatingToolbarPos: { x: number; y: number };
@@ -160,6 +162,8 @@ export const useDrawingStore = create<DrawingState>()(
 
       stayInDrawingMode: false,
       toggleStayInDrawingMode: () => set((s) => ({ stayInDrawingMode: !s.stayInDrawingMode })),
+      autoAngleSnap: false,
+      toggleAutoAngleSnap: () => set((s) => ({ autoAngleSnap: !s.autoAngleSnap })),
       setStayInDrawingMode: (v) => set({ stayInDrawingMode: v }),
 
       floatingToolbarPos: { x: 80, y: 120 },
@@ -274,6 +278,7 @@ export const useDrawingStore = create<DrawingState>()(
         floatingToolbarPos: state.floatingToolbarPos,
         drawingContextBarPos: state.drawingContextBarPos,
         stayInDrawingMode: state.stayInDrawingMode,
+        autoAngleSnap: state.autoAngleSnap,
         magnetConfig: state.magnetConfig,
         templates: state.templates,
         toolPreferences: state.toolPreferences,
