@@ -552,3 +552,31 @@ html.theme-light .chart-context-menu {
     touch-action: pan-x;
   }
 }
+
+
+/* Chart settings text and native controls follow the active app theme. */
+html.theme-light .chart-settings-dialog {
+  color: #0f172a;
+}
+html.theme-light .chart-settings-dialog .text-white {
+  color: #0f172a !important;
+}
+html.theme-light .chart-settings-dialog .text-slate-300 {
+  color: #334155 !important;
+}
+html.theme-light .chart-settings-dialog .text-slate-400 {
+  color: #64748b !important;
+}
+html.theme-light .chart-settings-dialog .bg-slate-800 {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+html.theme-light .chart-settings-dialog .bg-panel\/50 {
+  background-color: #f8fafc !important;
+}
+html.theme-light .chart-settings-dialog .border-grid {
+  border-color: rgba(15, 23, 42, 0.14) !important;
+}
+html.theme-light .chart-settings-dialog input[type="color"] {
+  border-color: rgba(15, 23, 42, 0.2);
+}
