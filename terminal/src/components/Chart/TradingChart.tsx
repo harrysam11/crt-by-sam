@@ -339,6 +339,8 @@ export default function TradingChart({
   const [isSymbolSearchOpen, setIsSymbolSearchOpen] = useState(false);
   const [externalLineTrigger, setExternalLineTrigger] = useState<{ price: number; type: 'LINE' | 'RAY' } | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<ChartContextMenuPos | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressOrigin = useRef<{ x: number; y: number } | null>(null);
   const [isCreateAlertOpen, setIsCreateAlertOpen] = useState(false);
   const [alertInitialPrice, setAlertInitialPrice] = useState<number | undefined>(undefined);
 
@@ -3320,6 +3322,46 @@ export default function TradingChart({
           <div
             ref={box}
             className="absolute inset-0 z-10"
+            onPointerDown={(e) => {
+              if (e.pointerType !== 'touch' || !seriesApi || !chartApi || !box.current) return;
+              if (longPressTimer.current) clearTimeout(longPressTimer.current);
+              longPressOrigin.current = { x: e.clientX, y: e.clientY };
+              const clientX = e.clientX;
+              const clientY = e.clientY;
+              longPressTimer.current = setTimeout(() => {
+                const rect = box.current?.getBoundingClientRect();
+                if (!rect || !seriesApi || !chartApi) return;
+                const x = clientX - rect.left;
+                const y = clientY - rect.top;
+                const price = seriesApi.coordinateToPrice(y) ?? currentPrice;
+                const time = chartApi.timeScale().coordinateToTime(x);
+                setContextMenuPos({
+                  x: clientX,
+                  y: clientY,
+                  price,
+                  time: typeof time === 'number' ? time : undefined,
+                });
+                longPressTimer.current = null;
+              }, 550);
+            }}
+            onPointerMove={(e) => {
+              if (!longPressOrigin.current || !longPressTimer.current) return;
+              if (Math.hypot(e.clientX - longPressOrigin.current.x, e.clientY - longPressOrigin.current.y) > 12) {
+                clearTimeout(longPressTimer.current);
+                longPressTimer.current = null;
+                longPressOrigin.current = null;
+              }
+            }}
+            onPointerUp={() => {
+              if (longPressTimer.current) clearTimeout(longPressTimer.current);
+              longPressTimer.current = null;
+              longPressOrigin.current = null;
+            }}
+            onPointerCancel={() => {
+              if (longPressTimer.current) clearTimeout(longPressTimer.current);
+              longPressTimer.current = null;
+              longPressOrigin.current = null;
+            }}
             onDoubleClick={(e) => {
               const target = e.target as HTMLElement | SVGElement | null;
               if (
