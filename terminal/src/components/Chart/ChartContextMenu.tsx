@@ -112,7 +112,19 @@ export default function ChartContextMenu({
     <div
       ref={menuRef}
       style={{ left: menuPosition?.left ?? -10000, top: menuPosition?.top ?? -10000, visibility: menuPosition ? 'visible' : 'hidden' }}
-      className="fixed z-50 w-64 max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-[8px] border border-grid bg-panel py-1.5 shadow-2xl select-none font-mono text-[12px] text-text"
+      className="fixed z-[10000] w-64 max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-[8px] border border-grid py-1.5 select-none font-mono text-[12px] text-text"
+      style={{
+        left: menuPosition?.left ?? -10000,
+        top: menuPosition?.top ?? -10000,
+        visibility: menuPosition ? 'visible' : 'hidden',
+        backgroundColor: 'var(--color-panel, #0e1017)',
+        color: 'var(--color-text, #f8fafc)',
+        borderColor: 'var(--color-grid, rgba(255,255,255,.12))',
+        opacity: 1,
+        backdropFilter: 'none',
+        boxShadow: '0 18px 48px rgba(0,0,0,.58)',
+        isolation: 'isolate',
+      }}
     >
       {/* Price Header */}
       <div className="border-b border-grid/60 px-3 py-2 min-h-9 flex items-center justify-between text-muted text-[10px]">
@@ -198,7 +210,8 @@ export default function ChartContextMenu({
 
         {activeSubmenu === 'SCALE' && (
           <div
-            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-48 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid bg-panel py-1.5 shadow-2xl backdrop-blur-xl`}
+            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-48 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid py-1.5 shadow-2xl`}
+            style={{ backgroundColor: 'var(--color-panel, #0e1017)', color: 'var(--color-text, #f8fafc)', borderColor: 'var(--color-grid, rgba(255,255,255,.12))', opacity: 1, backdropFilter: 'none' }}
           >
             {(['NORMAL', 'LOGARITHMIC', 'PERCENTAGE'] as PriceScaleType[]).map((mode) => (
               <button
@@ -245,7 +258,8 @@ export default function ChartContextMenu({
 
         {activeSubmenu === 'STYLE' && (
           <div
-            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid bg-panel py-1.5 shadow-2xl backdrop-blur-xl`}
+            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid py-1.5 shadow-2xl`}
+            style={{ backgroundColor: 'var(--color-panel, #0e1017)', color: 'var(--color-text, #f8fafc)', borderColor: 'var(--color-grid, rgba(255,255,255,.12))', opacity: 1, backdropFilter: 'none' }}
           >
             {(
               [
@@ -302,7 +316,8 @@ export default function ChartContextMenu({
 
         {activeSubmenu === 'TZ' && (
           <div
-            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid bg-panel py-1.5 shadow-2xl backdrop-blur-xl`}
+            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid py-1.5 shadow-2xl`}
+            style={{ backgroundColor: 'var(--color-panel, #0e1017)', color: 'var(--color-text, #f8fafc)', borderColor: 'var(--color-grid, rgba(255,255,255,.12))', opacity: 1, backdropFilter: 'none' }}
           >
             {(
               [
