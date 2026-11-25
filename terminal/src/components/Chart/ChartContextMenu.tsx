@@ -73,7 +73,7 @@ export default function ChartContextMenu({
   useEffect(() => {
     if (!pos) return;
 
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose();
       }
@@ -85,10 +85,10 @@ export default function ChartContextMenu({
       }
     };
 
-    window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('pointerdown', handleClickOutside);
     window.addEventListener('keydown', handleKeyDown);
     return () => {
-      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('pointerdown', handleClickOutside);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [pos, onClose]);
