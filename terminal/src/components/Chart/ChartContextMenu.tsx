@@ -5,7 +5,7 @@
  * ZERO EMOJI POLICY strictly enforced.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { fmtPrice } from '../../utils/formatters';
 import { audioHaptics } from '../../utils/notify';
 import type { ChartStyle, ChartTimezone, PriceScaleType } from '../../types/terminal';
@@ -65,6 +65,7 @@ export default function ChartContextMenu({
 }: ChartContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<'STYLE' | 'SCALE' | 'TZ' | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ left: number; top: number } | null>(null);
   const showPeriodSeparators = useTerminalStore((s) => s.showPeriodSeparators);
   const togglePeriodSeparators = useTerminalStore((s) => s.togglePeriodSeparators);
 
@@ -92,26 +93,30 @@ export default function ChartContextMenu({
     };
   }, [pos, onClose]);
 
+  useLayoutEffect(() => {
+    if (!pos || !menuRef.current) return;
+    const margin = 8;
+    const rect = menuRef.current.getBoundingClientRect();
+    setMenuPosition({
+      left: Math.max(margin, Math.min(pos.x, window.innerWidth - rect.width - margin)),
+      top: Math.max(margin, Math.min(pos.y, window.innerHeight - rect.height - margin)),
+    });
+  }, [pos, activeSubmenu]);
+
   if (!pos) return null;
 
-  // Ensure menu stays within window bounds
-  const menuWidth = 250;
-  const menuHeight = 440;
-  const clampedX = Math.min(pos.x, window.innerWidth - menuWidth - 10);
-  const clampedY = Math.min(pos.y, window.innerHeight - menuHeight - 10);
-  const submenuOnLeft = clampedX + menuWidth + 215 > window.innerWidth;
-
+  const submenuOnLeft = (menuPosition?.left ?? pos.x) + 256 + 215 > window.innerWidth;
   const formattedPrice = fmtPrice(pos.price, symbol);
 
   return (
     <div
       ref={menuRef}
-      style={{ left: clampedX, top: clampedY }}
-      className="fixed z-50 w-64 rounded-[8px] border border-grid bg-panel/95 py-1.5 shadow-2xl backdrop-blur-xl select-none font-mono text-[11px] text-white"
+      style={{ left: menuPosition?.left ?? -10000, top: menuPosition?.top ?? -10000, visibility: menuPosition ? 'visible' : 'hidden' }}
+      className="fixed z-50 w-64 max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-[8px] border border-grid bg-panel py-1.5 shadow-2xl select-none font-mono text-[12px] text-text"
     >
       {/* Price Header */}
-      <div className="border-b border-grid/60 px-3 py-1.5 flex items-center justify-between text-muted text-[10px]">
-        <span className="font-semibold text-white">{symbol}</span>
+      <div className="border-b border-grid/60 px-3 py-2 min-h-9 flex items-center justify-between text-muted text-[10px]">
+        <span className="font-semibold text-text">{symbol}</span>
         <span className="font-bold text-accent">{formattedPrice}</span>
       </div>
 
@@ -123,15 +128,15 @@ export default function ChartContextMenu({
             onResetScale();
             onClose();
           }}
-          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+          className="flex w-full items-center justify-between px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
         >
           <div className="flex items-center gap-2">
-            <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-3.5 w-3.5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
             <span>Reset price scale</span>
           </div>
-          <kbd className="text-[9px] text-slate-400 bg-black/60 px-1 py-0.5 rounded border border-white/10">Alt+R</kbd>
+          <kbd className="text-[9px] text-secondary bg-surface px-1 py-0.5 rounded border border-grid">Alt+R</kbd>
         </button>
 
         {/* Add Alert */}
@@ -141,7 +146,7 @@ export default function ChartContextMenu({
             onAddAlert(pos.price);
             onClose();
           }}
-          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+          className="flex w-full items-center justify-between px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
         >
           <div className="flex items-center gap-2">
             <svg className="h-3.5 w-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -149,7 +154,7 @@ export default function ChartContextMenu({
             </svg>
             <span>Add alert at {formattedPrice}</span>
           </div>
-          <kbd className="text-[9px] text-slate-400 bg-black/60 px-1 py-0.5 rounded border border-white/10">Alt+A</kbd>
+          <kbd className="text-[9px] text-secondary bg-surface px-1 py-0.5 rounded border border-grid">Alt+A</kbd>
         </button>
 
         {/* Create Limit Order */}
@@ -159,7 +164,7 @@ export default function ChartContextMenu({
             onCreateOrder(pos.price);
             onClose();
           }}
-          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+          className="flex w-full items-center justify-between px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
         >
           <div className="flex items-center gap-2">
             <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -176,21 +181,22 @@ export default function ChartContextMenu({
       <div className="relative">
         <button
           onMouseEnter={() => setActiveSubmenu('SCALE')}
-          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+          onClick={() => setActiveSubmenu((current) => current === 'SCALE' ? null : 'SCALE')}
+          aria-expanded={activeSubmenu === 'SCALE'}
+          className="flex w-full items-center justify-between px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
         >
           <div className="flex items-center gap-2">
-            <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-3.5 w-3.5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 18h12l3-18H3z" />
             </svg>
             <span>Scale: {scaleMode}</span>
           </div>
-          <span className="text-slate-400">{'>'}</span>
+          <span className="text-secondary">{'>'}</span>
         </button>
 
         {activeSubmenu === 'SCALE' && (
           <div
-            onMouseLeave={() => setActiveSubmenu(null)}
-            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-48 rounded-[8px] border border-white/[0.08] bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl`}
+            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-48 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid bg-panel py-1.5 shadow-2xl backdrop-blur-xl`}
           >
             {(['NORMAL', 'LOGARITHMIC', 'PERCENTAGE'] as PriceScaleType[]).map((mode) => (
               <button
@@ -200,13 +206,13 @@ export default function ChartContextMenu({
                   onSetScaleMode(mode);
                   onClose();
                 }}
-                className={`flex w-full items-center justify-between px-3 py-1.5 text-left transition ${
-                  scaleMode === mode ? 'font-bold text-white bg-white/10' : 'text-slate-300 hover:bg-white/5'
+                className={`flex w-full items-center justify-between px-3 py-2 min-h-9 text-left transition ${
+                  scaleMode === mode ? 'font-bold text-text bg-white/10' : 'text-secondary hover:bg-white/5'
                 }`}
               >
                 <span>{mode}</span>
                 {scaleMode === mode && (
-                  <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="h-3 w-3 text-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 )}
@@ -220,21 +226,22 @@ export default function ChartContextMenu({
       <div className="relative">
         <button
           onMouseEnter={() => setActiveSubmenu('STYLE')}
-          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+          onClick={() => setActiveSubmenu((current) => current === 'STYLE' ? null : 'STYLE')}
+          aria-expanded={activeSubmenu === 'STYLE'}
+          className="flex w-full items-center justify-between px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
         >
           <div className="flex items-center gap-2">
-            <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-3.5 w-3.5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
             <span>Style: {chartStyle}</span>
           </div>
-          <span className="text-slate-400">{'>'}</span>
+          <span className="text-secondary">{'>'}</span>
         </button>
 
         {activeSubmenu === 'STYLE' && (
           <div
-            onMouseLeave={() => setActiveSubmenu(null)}
-            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 rounded-[8px] border border-white/[0.08] bg-[#0a0a0f]/95 py-1.5 shadow-2xl backdrop-blur-xl`}
+            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid bg-panel py-1.5 shadow-2xl backdrop-blur-xl`}
           >
             {(
               [
@@ -254,13 +261,13 @@ export default function ChartContextMenu({
                   onSetChartStyle(item.id);
                   onClose();
                 }}
-                className={`flex w-full items-center justify-between px-3 py-1.5 text-left transition ${
-                  chartStyle === item.id ? 'font-bold text-white bg-white/10' : 'text-slate-300 hover:bg-white/5'
+                className={`flex w-full items-center justify-between px-3 py-2 min-h-9 text-left transition ${
+                  chartStyle === item.id ? 'font-bold text-text bg-white/10' : 'text-secondary hover:bg-white/5'
                 }`}
               >
                 <span>{item.label}</span>
                 {chartStyle === item.id && (
-                  <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="h-3 w-3 text-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 )}
@@ -274,21 +281,22 @@ export default function ChartContextMenu({
       <div className="relative">
         <button
           onMouseEnter={() => setActiveSubmenu('TZ')}
-          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+          onClick={() => setActiveSubmenu((current) => current === 'TZ' ? null : 'TZ')}
+          aria-expanded={activeSubmenu === 'TZ'}
+          className="flex w-full items-center justify-between px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
         >
           <div className="flex items-center gap-2">
-            <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-3.5 w-3.5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span className="truncate">TZ: {timezone.replace('America/', '').replace('Asia/', '').replace('Europe/', '')}</span>
           </div>
-          <span className="text-slate-400">{'>'}</span>
+          <span className="text-secondary">{'>'}</span>
         </button>
 
         {activeSubmenu === 'TZ' && (
           <div
-            onMouseLeave={() => setActiveSubmenu(null)}
-            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 rounded-[8px] border border-grid bg-panel py-1.5 shadow-2xl backdrop-blur-xl`}
+            className={`absolute ${submenuOnLeft ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-52 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-[8px] max-sm:static max-sm:mt-1 max-sm:w-full max-sm:shadow-none border border-grid bg-panel py-1.5 shadow-2xl backdrop-blur-xl`}
           >
             {(
               [
@@ -307,13 +315,13 @@ export default function ChartContextMenu({
                   onSetTimezone(tz.id);
                   onClose();
                 }}
-                className={`flex w-full items-center justify-between px-3 py-1.5 text-left transition ${
-                  timezone === tz.id ? 'font-bold text-white bg-white/10' : 'text-slate-300 hover:bg-white/5'
+                className={`flex w-full items-center justify-between px-3 py-2 min-h-9 text-left transition ${
+                  timezone === tz.id ? 'font-bold text-text bg-white/10' : 'text-secondary hover:bg-white/5'
                 }`}
               >
                 <span>{tz.label}</span>
                 {timezone === tz.id && (
-                  <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="h-3 w-3 text-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 )}
@@ -330,10 +338,10 @@ export default function ChartContextMenu({
           togglePeriodSeparators();
           onClose();
         }}
-        className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+        className="flex w-full items-center justify-between px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
       >
         <div className="flex items-center gap-2">
-          <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-3.5 w-3.5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
           <span>Period separators</span>
@@ -355,7 +363,7 @@ export default function ChartContextMenu({
             onAddHorizontalLine(pos.price);
             onClose();
           }}
-          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+          className="flex w-full items-center justify-between px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
         >
           <div className="flex items-center gap-2">
             <svg className="h-3.5 w-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -363,7 +371,7 @@ export default function ChartContextMenu({
             </svg>
             <span>Horizontal line at price</span>
           </div>
-          <kbd className="text-[9px] text-slate-400 bg-black/60 px-1 py-0.5 rounded border border-white/10">Alt+H</kbd>
+          <kbd className="text-[9px] text-secondary bg-surface px-1 py-0.5 rounded border border-grid">Alt+H</kbd>
         </button>
 
         <button
@@ -372,7 +380,7 @@ export default function ChartContextMenu({
             onAddHorizontalRay(pos.price);
             onClose();
           }}
-          className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+          className="flex w-full items-center gap-2 px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
         >
           <svg className="h-3.5 w-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h11M9 12a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -386,9 +394,9 @@ export default function ChartContextMenu({
             onOpenRuler();
             onClose();
           }}
-          className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+          className="flex w-full items-center gap-2 px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
         >
-          <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-3.5 w-3.5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
           <span>Measure tool</span>
@@ -401,7 +409,7 @@ export default function ChartContextMenu({
               onClearDrawings();
               onClose();
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-red-400 hover:bg-red-500/10 transition"
+            className="flex w-full items-center gap-2 px-3 py-2 min-h-9 text-left text-red-400 hover:bg-red-500/10 transition"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -422,7 +430,7 @@ export default function ChartContextMenu({
               onStartReplayAtTime(pos.time!);
               onClose();
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+            className="flex w-full items-center gap-2 px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
           >
             <svg className="h-3.5 w-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
@@ -437,7 +445,7 @@ export default function ChartContextMenu({
             onOpenIndicators();
             onClose();
           }}
-          className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+          className="flex w-full items-center gap-2 px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
         >
           <span className="font-bold text-accent text-[12px] w-3.5 text-center">fx</span>
           <span>Indicators & metrics...</span>
@@ -450,7 +458,7 @@ export default function ChartContextMenu({
               onOpenObjectTree();
               onClose();
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+            className="flex w-full items-center gap-2 px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
           >
             <svg className="h-3.5 w-3.5 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
@@ -467,9 +475,9 @@ export default function ChartContextMenu({
             }
             onClose();
           }}
-          className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+          className="flex w-full items-center gap-2 px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
         >
-          <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-3.5 w-3.5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
           <span>Chart skins & wallpapers...</span>
@@ -481,10 +489,10 @@ export default function ChartContextMenu({
             onOpenSettings();
             onClose();
           }}
-          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 hover:text-white transition"
+          className="flex w-full items-center justify-between px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
         >
           <div className="flex items-center gap-2">
-            <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-3.5 w-3.5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
