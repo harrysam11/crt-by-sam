@@ -48,7 +48,7 @@ export default function DrawingToolbar({
   const setFloatingToolbarPos = useDrawingStore((s) => s.setFloatingToolbarPos);
   const setDrawingContextBarPos = useDrawingStore((s) => s.setDrawingContextBarPos);
 
-  const toggleDrawer = (name: string, e: React.PointerEvent<HTMLButtonElement>) => {
+  const toggleDrawer = (name: string, e: React.MouseEvent<HTMLButtonElement>) => {
     if (openDrawer === name) {
       setOpenDrawer(null);
       setDrawerAnchor(null);
