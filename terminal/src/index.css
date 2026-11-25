@@ -519,6 +519,10 @@ html.theme-light .chart-context-menu {
     min-height: 44px;
     touch-action: manipulation;
   }
+  .chart-context-menu button {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
 }
 
 
