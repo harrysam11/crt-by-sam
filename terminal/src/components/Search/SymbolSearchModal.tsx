@@ -157,10 +157,10 @@ export default function SymbolSearchModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 bg-black/80 p-4 backdrop-blur-md font-mono select-none">
-      <div className="clay-modal w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh]">
+    <div className="symbol-search-overlay fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 max-sm:items-end max-sm:pt-0 bg-black/80 p-4 max-sm:p-0 backdrop-blur-md font-mono select-none">
+      <div className="symbol-search-dialog clay-modal w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh]">
         {/* Search Header */}
-        <div className="relative flex items-center border-b border-grid/50 px-4 py-3 bg-panel/90">
+        <div className="symbol-search-header relative flex items-center border-b border-grid/50 px-4 py-3 bg-panel/90">
           <svg className="h-5 w-5 text-muted mr-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
@@ -198,7 +198,7 @@ export default function SymbolSearchModal({
         </div>
 
         {/* Category Filters Bar */}
-        <div className="flex items-center gap-1.5 px-4 py-2 border-b border-grid/50 bg-[#09090d]/60 overflow-x-auto text-xs no-scrollbar">
+        <div className="symbol-search-categories flex items-center gap-1.5 px-4 py-2 border-b border-grid/50 bg-[#09090d]/60 overflow-x-auto text-xs no-scrollbar">
           {(['ALL', 'CRYPTO', 'IN_STOCK', 'FOREX', 'COMMODITY', 'US_STOCK', 'INDEX'] as const).map((cat) => (
             <button
               key={cat}
@@ -219,7 +219,7 @@ export default function SymbolSearchModal({
         </div>
 
         {/* Results List */}
-        <div ref={listRef} className="flex-1 overflow-y-auto divide-y divide-grid/30 p-2 space-y-1">
+        <div ref={listRef} className="symbol-search-results flex-1 overflow-y-auto divide-y divide-grid/30 p-2 space-y-1">
           {searchResults.length === 0 ? (
             <div className="py-12 text-center text-muted text-xs">
               {isLoading ? 'Searching live markets...' : `No matching instruments found for "${query}".`}
@@ -274,7 +274,7 @@ export default function SymbolSearchModal({
         </div>
 
         {/* Footer Navigation Info */}
-        <div className="flex items-center justify-between border-t border-grid/50 px-4 py-2.5 bg-panel/90 text-[10px] text-muted">
+        <div className="symbol-search-footer flex items-center justify-between border-t border-grid/50 px-4 py-2.5 bg-panel/90 text-[10px] text-muted">
           <div className="flex items-center gap-3">
             <span><kbd className="clay-badge px-1 py-0.5 text-white">^</kbd> <kbd className="clay-badge px-1 py-0.5 text-white">v</kbd> navigate</span>
             <span><kbd className="clay-badge px-1.5 py-0.5 text-white">ENTER</kbd> select</span>
