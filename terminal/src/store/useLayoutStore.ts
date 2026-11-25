@@ -157,7 +157,16 @@ export const useLayoutStore = create<LayoutState>()(
       setSplitRatioV: (splitRatioV) => set({ splitRatioV }),
       resetSplitRatios: () => set({ splitRatioH: 0.5, splitRatioV: 0.5 }),
 
-      setLayout: (layout) => set({ layout }),
+      setLayout: (layout) => set((state) => {
+        const visiblePaneCount = layout === '2x2' ? 4 : layout === '1x1' ? 1 : 2;
+        const activePaneIndex = Number(state.activePaneId.replace('pane-', ''));
+        return {
+          layout,
+          activePaneId: Number.isInteger(activePaneIndex) && activePaneIndex >= 1 && activePaneIndex <= visiblePaneCount
+            ? state.activePaneId
+            : 'pane-1',
+        };
+      }),
 
       setActivePaneId: (activePaneId) => set({ activePaneId }),
 
@@ -286,6 +295,9 @@ export const useLayoutStore = create<LayoutState>()(
 
           return {
             layout: found.layout,
+            // A loaded template starts from a visible pane, even if the previous
+            // workspace was focused on pane-3 or pane-4 and this template is smaller.
+            activePaneId: 'pane-1',
             syncSymbol: found.syncSymbol,
             syncTimeframe: found.syncTimeframe,
             syncCrosshair: found.syncCrosshair,

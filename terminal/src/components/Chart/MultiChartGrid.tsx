@@ -464,7 +464,7 @@ export default function MultiChartGrid() {
           {Array.from({ length: layout === '2x2' ? 4 : 2 }, (_, index) => `pane-${index + 1}`).map((paneId, index) => (
             <button key={paneId} type="button" aria-label={`Show chart pane ${index + 1}`} aria-pressed={activePaneId === paneId}
               onClick={() => handleSelectPane(paneId)}
-              className={`h-7 min-w-8 rounded px-2 text-[11px] font-bold touch-manipulation ${activePaneId === paneId ? 'bg-accent text-white' : 'text-secondary hover:bg-surface'}`}>
+              className={`h-11 min-w-11 rounded-md px-3 text-xs font-bold touch-manipulation ${activePaneId === paneId ? 'bg-accent text-white' : 'text-secondary hover:bg-surface'}`}>
               {index + 1}
             </button>
           ))}
