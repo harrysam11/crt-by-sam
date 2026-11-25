@@ -341,6 +341,9 @@ export default function TradingChart({
   const [contextMenuPos, setContextMenuPos] = useState<ChartContextMenuPos | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressOrigin = useRef<{ x: number; y: number } | null>(null);
+  const longPressFiredRef = useRef(false);
+  const pointerDownAtRef = useRef<number | null>(null);
+  const lastTouchTapRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const [isCreateAlertOpen, setIsCreateAlertOpen] = useState(false);
   const [alertInitialPrice, setAlertInitialPrice] = useState<number | undefined>(undefined);
 
@@ -3325,6 +3328,8 @@ export default function TradingChart({
             onPointerDown={(e) => {
               if (e.pointerType !== 'touch' || !seriesApi || !chartApi || !box.current) return;
               if (longPressTimer.current) clearTimeout(longPressTimer.current);
+              pointerDownAtRef.current = Date.now();
+              longPressFiredRef.current = false;
               longPressOrigin.current = { x: e.clientX, y: e.clientY };
               const clientX = e.clientX;
               const clientY = e.clientY;
@@ -3335,6 +3340,8 @@ export default function TradingChart({
                 const y = clientY - rect.top;
                 const price = seriesApi.coordinateToPrice(y) ?? currentPrice;
                 const time = chartApi.timeScale().coordinateToTime(x);
+                longPressFiredRef.current = true;
+                lastTouchTapRef.current = null;
                 setContextMenuPos({
                   x: clientX,
                   y: clientY,
@@ -3352,12 +3359,57 @@ export default function TradingChart({
                 longPressOrigin.current = null;
               }
             }}
-            onPointerUp={() => {
+            onPointerUp={(e) => {
+              const downAt = pointerDownAtRef.current;
+              const tapOrigin = longPressOrigin.current;
+              const wasLongPress = longPressFiredRef.current;
+              const isQuickTouchTap =
+                e.pointerType === 'touch' &&
+                !wasLongPress &&
+                downAt !== null &&
+                tapOrigin !== null &&
+                Date.now() - downAt <= 280 &&
+                Math.hypot(e.clientX - tapOrigin.x, e.clientY - tapOrigin.y) <= 12;
+
+              if (isQuickTouchTap && activeTool === 'CURSOR_ARROW') {
+                const target = e.target as HTMLElement | null;
+                const isInteractiveTarget = Boolean(
+                  target?.closest(
+                    '[data-drawing-element], [data-drawing-context-bar], [data-drawing-settings-modal], button, input, select, textarea'
+                  )
+                );
+
+                if (!isInteractiveTarget) {
+                  const now = Date.now();
+                  const previousTap = lastTouchTapRef.current;
+                  if (
+                    previousTap &&
+                    now - previousTap.time <= 320 &&
+                    Math.hypot(e.clientX - previousTap.x, e.clientY - previousTap.y) <= 28
+                  ) {
+                    lastTouchTapRef.current = null;
+                    audioHaptics.tick();
+                    setIsChartSettingsOpen(true);
+                  } else {
+                    lastTouchTapRef.current = { x: e.clientX, y: e.clientY, time: now };
+                  }
+                } else {
+                  lastTouchTapRef.current = null;
+                }
+              } else if (e.pointerType === 'touch') {
+                lastTouchTapRef.current = null;
+              }
+
+              pointerDownAtRef.current = null;
+              longPressFiredRef.current = false;
               if (longPressTimer.current) clearTimeout(longPressTimer.current);
               longPressTimer.current = null;
               longPressOrigin.current = null;
             }}
             onPointerCancel={() => {
+              pointerDownAtRef.current = null;
+              longPressFiredRef.current = false;
+              lastTouchTapRef.current = null;
               if (longPressTimer.current) clearTimeout(longPressTimer.current);
               longPressTimer.current = null;
               longPressOrigin.current = null;

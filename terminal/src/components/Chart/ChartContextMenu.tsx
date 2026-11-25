@@ -180,7 +180,9 @@ export default function ChartContextMenu({
       {/* Scale Mode Switcher */}
       <div className="relative">
         <button
-          onMouseEnter={() => setActiveSubmenu('SCALE')}
+          onPointerEnter={(e) => {
+            if (e.pointerType === 'mouse') setActiveSubmenu('SCALE');
+          }}
           onClick={() => setActiveSubmenu((current) => current === 'SCALE' ? null : 'SCALE')}
           aria-expanded={activeSubmenu === 'SCALE'}
           className="flex w-full items-center justify-between px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
@@ -225,7 +227,9 @@ export default function ChartContextMenu({
       {/* Chart Style Switcher */}
       <div className="relative">
         <button
-          onMouseEnter={() => setActiveSubmenu('STYLE')}
+          onPointerEnter={(e) => {
+            if (e.pointerType === 'mouse') setActiveSubmenu('STYLE');
+          }}
           onClick={() => setActiveSubmenu((current) => current === 'STYLE' ? null : 'STYLE')}
           aria-expanded={activeSubmenu === 'STYLE'}
           className="flex w-full items-center justify-between px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
@@ -280,7 +284,9 @@ export default function ChartContextMenu({
       {/* Timezone Switcher */}
       <div className="relative">
         <button
-          onMouseEnter={() => setActiveSubmenu('TZ')}
+          onPointerEnter={(e) => {
+            if (e.pointerType === 'mouse') setActiveSubmenu('TZ');
+          }}
           onClick={() => setActiveSubmenu((current) => current === 'TZ' ? null : 'TZ')}
           aria-expanded={activeSubmenu === 'TZ'}
           className="flex w-full items-center justify-between px-3 py-2 min-h-9 text-left hover:bg-white/10 hover:text-text transition"
