@@ -12,6 +12,7 @@ on:
       - main
       - 'fix/mobile-chart-context-menu-2026-11-25'
       - 'fix/mobile-chart-ux-theme'
+      - 'fix/mobile-drawing-crosshair-angle'
     paths:
       - 'terminal/**'
       - 'package.json'
