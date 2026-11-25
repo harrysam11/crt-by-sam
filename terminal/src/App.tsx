@@ -556,7 +556,7 @@ export default function App() {
             </div>
             <div
               style={{ width: typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : rightW }}
-              className="shrink-0 flex flex-col h-full overflow-hidden bg-panel border-l border-grid z-30 shadow-2xl fixed md:relative inset-y-0 right-0 md:inset-auto w-full md:w-auto"
+              className="shrink-0 flex flex-col overflow-hidden bg-panel border-t md:border-t-0 md:border-l border-grid z-30 shadow-2xl fixed inset-x-0 bottom-0 top-auto h-[78dvh] max-h-[640px] rounded-t-xl md:rounded-none md:relative md:inset-auto md:h-full md:max-h-none md:bottom-auto md:top-auto md:w-auto w-full"
             >
               {/* Mobile Drawer Close Header */}
               <div className="md:hidden flex items-center justify-between px-3 py-2 bg-base border-b border-grid">
@@ -781,6 +781,45 @@ export default function App() {
         )}
 
       </div>
+
+      {/* Mobile-first panel dock: persistent access to chart-adjacent tools without hiding the chart. */}
+      {!isChartMaximized && (
+        <nav aria-label="Terminal panels" className="md:hidden shrink-0 h-14 border-t border-grid bg-panel/95 backdrop-blur flex items-stretch overflow-x-auto overscroll-x-contain pb-[env(safe-area-inset-bottom)] z-40">
+          {([
+            ['WATCHLIST', 'Watch'],
+            ['TRADE', 'Trade'],
+            ['DOM', 'DOM'],
+            ['ANALYTICS', 'Stats'],
+            ['DATA_WINDOW', 'Data'],
+            ['OBJECT_TREE', 'Layers'],
+            ['NEWS_FEED', 'News'],
+            ['X_FEED', 'Social'],
+          ] as const).map(([panel, label]) => (
+            <button
+              key={panel}
+              type="button"
+              aria-pressed={activeRightDrawer === panel}
+              onClick={() => {
+                audioHaptics.tick();
+                setActiveRightDrawer((current) => current === panel ? null : panel);
+              }}
+              className={`min-w-[64px] flex-1 px-2 flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold touch-manipulation ${activeRightDrawer === panel ? 'text-accent bg-accent/10' : 'text-secondary'}`}
+            >
+              <span aria-hidden="true" className="text-sm leading-none">{panel === 'WATCHLIST' ? '≡' : panel === 'TRADE' ? '↗' : panel === 'DOM' ? '▥' : panel === 'ANALYTICS' ? '▤' : panel === 'DATA_WINDOW' ? '⌁' : panel === 'OBJECT_TREE' ? '▦' : panel === 'NEWS_FEED' ? '▤' : '𝕏'}</span>
+              <span>{label}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => { audioHaptics.tick(); setIsQuantAIOpen(true); }}
+            className="min-w-[64px] px-2 flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-accent touch-manipulation"
+            aria-label="Open Quant AI assistant"
+          >
+            <span aria-hidden="true" className="text-sm leading-none">✦</span>
+            <span>AI</span>
+          </button>
+        </nav>
+      )}
 
       {/* Institutional Quant & AI Assistant Modal */}
       <QuantAIAgentModal
