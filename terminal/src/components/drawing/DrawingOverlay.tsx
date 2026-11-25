@@ -1455,7 +1455,7 @@ export default function DrawingOverlay({
   useEffect(() => {
     if (!draggingHandle && !draggingBody) return;
 
-    const onGlobalPointerMove = (e: PointerEvent) => {
+    const applyGlobalPointerMove = (e: PointerEvent) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const rawX = e.clientX - rect.left;
@@ -1576,7 +1576,32 @@ export default function DrawingOverlay({
       }
     };
 
+    let dragFrame: number | null = null;
+    let latestDragEvent: PointerEvent | null = null;
+    const flushDragMove = () => {
+      if (dragFrame !== null) {
+        cancelAnimationFrame(dragFrame);
+        dragFrame = null;
+      }
+      if (latestDragEvent) {
+        const pending = latestDragEvent;
+        latestDragEvent = null;
+        applyGlobalPointerMove(pending);
+      }
+    };
+    const onGlobalPointerMove = (e: PointerEvent) => {
+      latestDragEvent = e;
+      if (dragFrame !== null) return;
+      dragFrame = requestAnimationFrame(() => {
+        dragFrame = null;
+        const pending = latestDragEvent;
+        latestDragEvent = null;
+        if (pending) applyGlobalPointerMove(pending);
+      });
+    };
+
     const onGlobalPointerUp = () => {
+      flushDragMove();
       if (draggingHandle) {
         setDraggingHandle(null);
         pushState(drawings);
@@ -1590,6 +1615,7 @@ export default function DrawingOverlay({
     window.addEventListener('pointermove', onGlobalPointerMove);
     window.addEventListener('pointerup', onGlobalPointerUp);
     return () => {
+      if (dragFrame !== null) cancelAnimationFrame(dragFrame);
       window.removeEventListener('pointermove', onGlobalPointerMove);
       window.removeEventListener('pointerup', onGlobalPointerUp);
     };
