@@ -1596,12 +1596,14 @@ export default function DrawingOverlay({
               top: `${paneBounds.top}px`,
               width: `${paneBounds.width}px`,
               height: `${paneBounds.height}px`,
+              touchAction: isDrawingTool ? 'none' : 'auto',
             }
           : {
               left: 0,
               top: 0,
               right: `${priceScaleWidth}px`,
               bottom: '28px',
+              touchAction: isDrawingTool ? 'none' : 'auto',
             }
       }
       className={`absolute z-20 ${
