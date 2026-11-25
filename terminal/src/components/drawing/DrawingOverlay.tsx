@@ -1142,6 +1142,29 @@ export default function DrawingOverlay({
     }
   };
 
+  // Android/browser gesture arbitration can cancel an active pointer without
+  // dispatching pointerup. Clear transient state so drawing interactions do not
+  // remain stuck after an interrupted touch gesture.
+  const handlePointerCancel = () => {
+    if (draggingHandle || draggingBody) {
+      setDraggingHandle(null);
+      setDraggingBody(null);
+      pushState(drawings);
+      autoRevertToCrosshair();
+    }
+
+    setSelectionBox(null);
+    setDemonstrationDrawing(null);
+
+    // A completed ruler remains visible at creationStep 2. Discard only an
+    // unfinished ruler, or another drawing whose pointer sequence was canceled.
+    if (activeDrawing && (activeDrawing.type !== 'MEASURE_RULER' || creationStep === 1)) {
+      setActiveDrawing(null);
+      setCreationStep(0);
+      autoRevertToCrosshair();
+    }
+  };
+
   const handlePointerUp = () => {
     // Clear demonstration drawing
     if (demonstrationDrawing) {
@@ -1588,6 +1611,7 @@ export default function DrawingOverlay({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       onPointerLeave={() => setCursorPos(null)}
       style={
         paneBounds
