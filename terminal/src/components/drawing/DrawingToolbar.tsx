@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { ToolType, MagnetConfig } from './types';
 import { audioHaptics } from '../../utils/notify';
 import { useDrawingStore } from '../../store/useDrawingStore';
@@ -171,7 +172,7 @@ export default function DrawingToolbar({
           </svg>
         </button>
 
-        {openDrawer === 'CURSOR' && (
+        {openDrawer === 'CURSOR' && createPortal(
           <div
             style={{
               top: `${Math.max(50, Math.min(window.innerHeight - 200, drawerAnchor?.top ?? 60))}px`,
@@ -183,8 +184,7 @@ export default function DrawingToolbar({
             {renderToolRow('CURSOR_ARROW', 'Arrow Cursor')}
             {renderToolRow('CURSOR_DOT', 'Dot Cursor')}
             {renderToolRow('CURSOR_ERASER', 'Eraser')}
-          </div>
-        )}
+          </div>, document.body)}
       </div>
 
       {/* Drawer 2: Lines & Channels */}
@@ -209,7 +209,7 @@ export default function DrawingToolbar({
           </svg>
         </button>
 
-        {openDrawer === 'LINES' && (
+        {openDrawer === 'LINES' && createPortal(
           <div
             style={{
               top: `${Math.max(50, Math.min(window.innerHeight - 280, drawerAnchor?.top ?? 90))}px`,
@@ -224,8 +224,7 @@ export default function DrawingToolbar({
             {renderToolRow('VERTICAL_LINE', 'Vertical Line', 'Alt+V')}
             {renderToolRow('PARALLEL_CHANNEL', 'Parallel Channel')}
             {renderToolRow('ARROW', 'Arrow Vector')}
-          </div>
-        )}
+          </div>, document.body)}
       </div>
 
       {/* Drawer 3: Fibonacci */}
@@ -240,7 +239,7 @@ export default function DrawingToolbar({
           </svg>
         </button>
 
-        {openDrawer === 'FIB' && (
+        {openDrawer === 'FIB' && createPortal(
           <div
             style={{
               top: `${Math.max(50, Math.min(window.innerHeight - 150, drawerAnchor?.top ?? 130))}px`,
@@ -250,8 +249,7 @@ export default function DrawingToolbar({
           >
             {renderToolRow('FIBONACCI', 'Fib Retracement', 'Alt+F')}
             {renderToolRow('FIB_EXTENSION', 'Trend-Based Fib Extension')}
-          </div>
-        )}
+          </div>, document.body)}
       </div>
 
       {/* Drawer 4: Geometric Shapes */}
@@ -266,7 +264,7 @@ export default function DrawingToolbar({
           </svg>
         </button>
 
-        {openDrawer === 'SHAPES' && (
+        {openDrawer === 'SHAPES' && createPortal(
           <div
             style={{
               top: `${Math.max(50, Math.min(window.innerHeight - 180, drawerAnchor?.top ?? 170))}px`,
@@ -277,8 +275,7 @@ export default function DrawingToolbar({
             {renderToolRow('RECTANGLE', 'Rectangle Box')}
             {renderToolRow('CIRCLE', 'Circle / Ellipse')}
             {renderToolRow('BRUSH', 'Brush / Pen')}
-          </div>
-        )}
+          </div>, document.body)}
       </div>
 
       {/* Drawer 5: Annotations */}
@@ -293,7 +290,7 @@ export default function DrawingToolbar({
           </svg>
         </button>
 
-        {openDrawer === 'TEXT' && (
+        {openDrawer === 'TEXT' && createPortal(
           <div
             style={{
               top: `${Math.max(50, Math.min(window.innerHeight - 180, drawerAnchor?.top ?? 210))}px`,
@@ -304,8 +301,7 @@ export default function DrawingToolbar({
             {renderToolRow('TEXT', 'Text Note')}
             {renderToolRow('CALLOUT', 'Callout Balloon')}
             {renderToolRow('PRICE_LABEL', 'Price Tag Label')}
-          </div>
-        )}
+          </div>, document.body)}
       </div>
 
       {/* Drawer 6: Position & Forecasting */}
@@ -320,7 +316,7 @@ export default function DrawingToolbar({
           </svg>
         </button>
 
-        {openDrawer === 'POSITION' && (
+        {openDrawer === 'POSITION' && createPortal(
           <div
             style={{
               top: `${Math.max(50, Math.min(window.innerHeight - 180, drawerAnchor?.top ?? 250))}px`,
@@ -332,8 +328,7 @@ export default function DrawingToolbar({
             {renderToolRow('POSITION_SHORT', 'Short Position (R:R)')}
             {renderToolRow('ANCHORED_VOLUME_PROFILE', 'Anchored Volume Profile (AVP)')}
             {renderToolRow('MEASURE_RULER', 'Measure Ruler')}
-          </div>
-        )}
+          </div>, document.body)}
       </div>
 
       <div className="h-px bg-grid my-0.5 w-6" />
