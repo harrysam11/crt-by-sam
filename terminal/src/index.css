@@ -689,3 +689,55 @@ html.theme-light .chart-settings-dialog input[type="color"] {
     display: none;
   }
 }
+
+
+/* Custom timeframe dialog: compact bottom sheet with full-width controls on phones. */
+@media (max-width: 767px) {
+  .custom-interval-dialog {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - env(safe-area-inset-top) - 4px);
+    overflow-y: auto;
+    margin-top: auto;
+    padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+    border-radius: 18px 18px 0 0;
+  }
+  .custom-interval-header {
+    min-height: 58px;
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+  }
+  .custom-interval-fields {
+    flex-wrap: wrap;
+  }
+  .custom-interval-fields input,
+  .custom-interval-fields select {
+    min-height: 48px;
+    font-size: 16px;
+  }
+  .custom-interval-actions {
+    position: sticky;
+    bottom: 0;
+    padding-top: 12px;
+    background: inherit;
+  }
+  .custom-interval-actions button {
+    min-height: 44px;
+    flex: 1;
+  }
+}
+html.theme-light .custom-interval-dialog {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+html.theme-light .custom-interval-dialog .text-white { color: #0f172a !important; }
+html.theme-light .custom-interval-dialog .text-slate-300 { color: #334155 !important; }
+html.theme-light .custom-interval-dialog .text-slate-400 { color: #64748b !important; }
+html.theme-light .custom-interval-dialog .bg-\[\#12121a\] {
+  background: #f8fafc !important;
+}
+html.theme-light .custom-interval-dialog .bg-\[\#181824\] {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}

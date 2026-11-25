@@ -87,13 +87,13 @@ export default function CustomIntervalModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-[2px]"
+      className="custom-interval-overlay fixed inset-0 z-50 flex items-center justify-center max-sm:items-end bg-black/75 p-4 max-sm:p-0 backdrop-blur-[2px]"
       onKeyDown={handleKeyDown}
     >
-      <div className="relative w-full max-w-xl rounded-2xl bg-[#0e0e14] border border-[#272736] p-6 shadow-2xl shadow-black font-mono">
+      <div className="custom-interval-dialog relative w-full max-w-xl rounded-2xl bg-[#0e0e14] border border-[#272736] p-6 shadow-2xl shadow-black font-mono">
         {/* Header with Primary Icon */}
-        <div className="flex items-start justify-between border-b border-[#20202e] pb-4 mb-5">
-          <div className="flex items-center gap-3">
+        <div className="custom-interval-header flex items-start justify-between border-b border-[#20202e] pb-4 mb-5">
+          <div className="custom-interval-fields flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#171722] border border-[#2c2c3e] text-[#38bdf8]">
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <circle cx="12" cy="12" r="10" />
@@ -222,7 +222,7 @@ export default function CustomIntervalModal({
         </div>
 
         {/* Modal Actions */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#20202e]">
+        <div className="custom-interval-actions flex items-center justify-end gap-3 pt-4 border-t border-[#20202e]">
           <button
             type="button"
             onClick={onClose}
