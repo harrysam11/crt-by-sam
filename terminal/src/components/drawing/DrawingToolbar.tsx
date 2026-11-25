@@ -242,7 +242,7 @@ export default function DrawingToolbar({
           <div
             style={{
               top: `${Math.max(50, Math.min(window.innerHeight - 150, drawerAnchor?.top ?? 130))}px`,
-              left: `${drawerAnchor?.left ?? 50}px`,
+              left: `${Math.max(8, Math.min(window.innerWidth - 220, drawerAnchor?.left ?? 50))}px`,
             }}
             className="fixed z-50 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[200px] max-h-[85vh] overflow-y-auto"
           >
@@ -268,7 +268,7 @@ export default function DrawingToolbar({
           <div
             style={{
               top: `${Math.max(50, Math.min(window.innerHeight - 180, drawerAnchor?.top ?? 170))}px`,
-              left: `${drawerAnchor?.left ?? 50}px`,
+              left: `${Math.max(8, Math.min(window.innerWidth - 220, drawerAnchor?.left ?? 50))}px`,
             }}
             className="fixed z-50 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[170px] max-h-[85vh] overflow-y-auto"
           >
@@ -295,7 +295,7 @@ export default function DrawingToolbar({
           <div
             style={{
               top: `${Math.max(50, Math.min(window.innerHeight - 180, drawerAnchor?.top ?? 210))}px`,
-              left: `${drawerAnchor?.left ?? 50}px`,
+              left: `${Math.max(8, Math.min(window.innerWidth - 220, drawerAnchor?.left ?? 50))}px`,
             }}
             className="fixed z-50 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[170px] max-h-[85vh] overflow-y-auto"
           >
@@ -322,7 +322,7 @@ export default function DrawingToolbar({
           <div
             style={{
               top: `${Math.max(50, Math.min(window.innerHeight - 180, drawerAnchor?.top ?? 250))}px`,
-              left: `${drawerAnchor?.left ?? 50}px`,
+              left: `${Math.max(8, Math.min(window.innerWidth - 220, drawerAnchor?.left ?? 50))}px`,
             }}
             className="fixed z-50 flex flex-col gap-1.5 clay-popover p-2 shadow-2xl min-w-[210px] max-h-[85vh] overflow-y-auto"
           >
