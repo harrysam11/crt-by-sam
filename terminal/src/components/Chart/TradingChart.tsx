@@ -3388,7 +3388,8 @@ export default function TradingChart({
                 Date.now() - downAt <= 280 &&
                 Math.hypot(e.clientX - tapOrigin.x, e.clientY - tapOrigin.y) <= 12;
 
-              if (isQuickTouchTap && activeTool === 'CURSOR_ARROW') {
+              // Match TradingView: double-tap chart settings works with the default crosshair or arrow cursor.
+              if (isQuickTouchTap && (activeTool === 'CURSOR_ARROW' || activeTool === 'CURSOR_CROSSHAIR')) {
                 const target = e.target as HTMLElement | null;
                 const isInteractiveTarget = Boolean(
                   target?.closest(

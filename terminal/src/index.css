@@ -468,3 +468,34 @@ html.theme-light .chart-context-menu {
   background-color: #ffffff !important;
   color: #0f172a;
 }
+
+
+/* Mobile chart workspace: focus one full-size pane at a time and switch with pane tabs. */
+@media (max-width: 767px) {
+  .mobile-chart-grid-row {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+  .mobile-chart-grid-half { display: contents !important; }
+  .mobile-chart-pane { display: none !important; }
+  .mobile-chart-pane[data-active="true"] {
+    display: block !important;
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    z-index: 1;
+  }
+  .mobile-chart-splitter { display: none !important; }
+  .drawing-context-bar {
+    max-width: calc(100vw - 16px);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .drawing-context-bar::-webkit-scrollbar { display: none; }
+}

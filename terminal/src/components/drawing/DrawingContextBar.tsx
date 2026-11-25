@@ -140,7 +140,7 @@ export default function DrawingContextBar({
       onPointerDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
-      className="fixed z-50 flex items-center gap-1 px-1.5 py-1 font-mono text-xs select-none shadow-2xl backdrop-blur-xl bg-[#1e222d] border border-[#2a2e39] text-[#d1d4dc] rounded-lg pointer-events-auto"
+      className="drawing-context-bar fixed z-50 flex items-center gap-1 px-1.5 py-1 font-mono text-xs select-none shadow-2xl bg-[#1e222d] border border-[#2a2e39] text-[#d1d4dc] rounded-lg pointer-events-auto"
       title="Drawing Context Toolbar (Drag grip to move, Double-click to reset)"
     >
       {/* 1. Movable Drag Grip Handle */}

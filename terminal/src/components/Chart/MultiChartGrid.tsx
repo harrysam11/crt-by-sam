@@ -459,6 +459,18 @@ export default function MultiChartGrid() {
         </div>
       )}
 
+      {layout !== '1x1' && (
+        <div className="md:hidden absolute left-2 top-1 z-40 flex items-center gap-1 rounded-lg border border-grid bg-panel/95 p-1 shadow-xl" aria-label="Choose active chart pane">
+          {Array.from({ length: layout === '2x2' ? 4 : 2 }, (_, index) => `pane-${index + 1}`).map((paneId, index) => (
+            <button key={paneId} type="button" aria-label={`Show chart pane ${index + 1}`} aria-pressed={activePaneId === paneId}
+              onClick={() => handleSelectPane(paneId)}
+              className={`h-7 min-w-8 rounded px-2 text-[11px] font-bold touch-manipulation ${activePaneId === paneId ? 'bg-accent text-white' : 'text-secondary hover:bg-surface'}`}>
+              {index + 1}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Grid Container with Active Pane Focus Rings & Resizable Splitters */}
       <div ref={gridContainerRef} className="flex-1 min-h-0 w-full h-full relative">
         {layout === '1x1' && (
@@ -468,10 +480,11 @@ export default function MultiChartGrid() {
         )}
 
         {layout === '1x2' && (
-          <div className="flex h-full w-full overflow-hidden">
+          <div className="mobile-chart-grid-row flex h-full w-full overflow-hidden">
             <div
               style={{ width: `calc(${splitRatioH * 100}% - 3px)` }}
-              className={`h-full min-h-0 relative ${activePaneId === 'pane-1' ? 'ring-1 ring-white/40 z-10' : ''}`}
+              data-active={activePaneId === 'pane-1'}
+              className={`mobile-chart-pane h-full min-h-0 relative ${activePaneId === 'pane-1' ? 'ring-1 ring-white/40 z-10' : ''}`}
               onClick={() => handleSelectPane('pane-1')}
             >
               <TradingChart
@@ -480,10 +493,11 @@ export default function MultiChartGrid() {
                 timeframeOverride={p1.timeframe}
               />
             </div>
-            <Splitter dir="v" onDrag={handleDragH} />
+            <div className="mobile-chart-splitter"><Splitter dir="v" onDrag={handleDragH} /></div>
             <div
               style={{ width: `calc(${(1 - splitRatioH) * 100}% - 3px)` }}
-              className={`h-full min-h-0 relative ${activePaneId === 'pane-2' ? 'ring-1 ring-white/40 z-10' : ''}`}
+              data-active={activePaneId === 'pane-2'}
+              className={`mobile-chart-pane h-full min-h-0 relative ${activePaneId === 'pane-2' ? 'ring-1 ring-white/40 z-10' : ''}`}
               onClick={() => handleSelectPane('pane-2')}
             >
               <TradingChart
@@ -496,10 +510,11 @@ export default function MultiChartGrid() {
         )}
 
         {layout === '2x1' && (
-          <div className="flex flex-col h-full w-full overflow-hidden">
+          <div className="mobile-chart-grid-row flex flex-col h-full w-full overflow-hidden">
             <div
               style={{ height: `calc(${splitRatioV * 100}% - 3px)` }}
-              className={`w-full min-h-0 relative ${activePaneId === 'pane-1' ? 'ring-1 ring-white/40 z-10' : ''}`}
+              data-active={activePaneId === 'pane-1'}
+              className={`mobile-chart-pane w-full min-h-0 relative ${activePaneId === 'pane-1' ? 'ring-1 ring-white/40 z-10' : ''}`}
               onClick={() => handleSelectPane('pane-1')}
             >
               <TradingChart
@@ -508,10 +523,11 @@ export default function MultiChartGrid() {
                 timeframeOverride={p1.timeframe}
               />
             </div>
-            <Splitter dir="h" onDrag={handleDragV} />
+            <div className="mobile-chart-splitter"><Splitter dir="h" onDrag={handleDragV} /></div>
             <div
               style={{ height: `calc(${(1 - splitRatioV) * 100}% - 3px)` }}
-              className={`w-full min-h-0 relative ${activePaneId === 'pane-2' ? 'ring-1 ring-white/40 z-10' : ''}`}
+              data-active={activePaneId === 'pane-2'}
+              className={`mobile-chart-pane w-full min-h-0 relative ${activePaneId === 'pane-2' ? 'ring-1 ring-white/40 z-10' : ''}`}
               onClick={() => handleSelectPane('pane-2')}
             >
               <TradingChart
@@ -524,12 +540,13 @@ export default function MultiChartGrid() {
         )}
 
         {layout === '2x2' && (
-          <div className="flex flex-col h-full w-full overflow-hidden">
+          <div className="mobile-chart-grid-row flex flex-col h-full w-full overflow-hidden">
             {/* Top Row */}
-            <div style={{ height: `calc(${splitRatioV * 100}% - 3px)` }} className="flex w-full min-h-0 overflow-hidden">
+            <div style={{ height: `calc(${splitRatioV * 100}% - 3px)` }} className="mobile-chart-grid-half flex w-full min-h-0 overflow-hidden">
               <div
                 style={{ width: `calc(${splitRatioH * 100}% - 3px)` }}
-                className={`h-full min-h-0 relative ${activePaneId === 'pane-1' ? 'ring-1 ring-white/40 z-10' : ''}`}
+                data-active={activePaneId === 'pane-1'}
+              className={`mobile-chart-pane h-full min-h-0 relative ${activePaneId === 'pane-1' ? 'ring-1 ring-white/40 z-10' : ''}`}
                 onClick={() => handleSelectPane('pane-1')}
               >
                 <TradingChart
@@ -538,10 +555,11 @@ export default function MultiChartGrid() {
                   timeframeOverride={p1.timeframe}
                 />
               </div>
-              <Splitter dir="v" onDrag={handleDragH} />
+              <div className="mobile-chart-splitter"><Splitter dir="v" onDrag={handleDragH} /></div>
               <div
                 style={{ width: `calc(${(1 - splitRatioH) * 100}% - 3px)` }}
-                className={`h-full min-h-0 relative ${activePaneId === 'pane-2' ? 'ring-1 ring-white/40 z-10' : ''}`}
+                data-active={activePaneId === 'pane-2'}
+              className={`mobile-chart-pane h-full min-h-0 relative ${activePaneId === 'pane-2' ? 'ring-1 ring-white/40 z-10' : ''}`}
                 onClick={() => handleSelectPane('pane-2')}
               >
                 <TradingChart
@@ -553,13 +571,14 @@ export default function MultiChartGrid() {
             </div>
 
             {/* Horizontal Splitter */}
-            <Splitter dir="h" onDrag={handleDragV} />
+            <div className="mobile-chart-splitter"><Splitter dir="h" onDrag={handleDragV} /></div>
 
             {/* Bottom Row */}
-            <div style={{ height: `calc(${(1 - splitRatioV) * 100}% - 3px)` }} className="flex w-full min-h-0 overflow-hidden">
+            <div style={{ height: `calc(${(1 - splitRatioV) * 100}% - 3px)` }} className="mobile-chart-grid-half flex w-full min-h-0 overflow-hidden">
               <div
                 style={{ width: `calc(${splitRatioH * 100}% - 3px)` }}
-                className={`h-full min-h-0 relative ${activePaneId === 'pane-3' ? 'ring-1 ring-white/40 z-10' : ''}`}
+                data-active={activePaneId === 'pane-3'}
+              className={`mobile-chart-pane h-full min-h-0 relative ${activePaneId === 'pane-3' ? 'ring-1 ring-white/40 z-10' : ''}`}
                 onClick={() => handleSelectPane('pane-3')}
               >
                 <TradingChart
@@ -568,10 +587,11 @@ export default function MultiChartGrid() {
                   timeframeOverride={p3.timeframe}
                 />
               </div>
-              <Splitter dir="v" onDrag={handleDragH} />
+              <div className="mobile-chart-splitter"><Splitter dir="v" onDrag={handleDragH} /></div>
               <div
                 style={{ width: `calc(${(1 - splitRatioH) * 100}% - 3px)` }}
-                className={`h-full min-h-0 relative ${activePaneId === 'pane-4' ? 'ring-1 ring-white/40 z-10' : ''}`}
+                data-active={activePaneId === 'pane-4'}
+              className={`mobile-chart-pane h-full min-h-0 relative ${activePaneId === 'pane-4' ? 'ring-1 ring-white/40 z-10' : ''}`}
                 onClick={() => handleSelectPane('pane-4')}
               >
                 <TradingChart
