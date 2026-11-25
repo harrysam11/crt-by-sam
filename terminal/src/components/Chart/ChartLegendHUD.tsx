@@ -46,7 +46,9 @@ export default function ChartLegendHUD({
   countdownText,
   onClearAllIndicators,
 }: ChartLegendHUDProps) {
-  const [isIndicatorsCollapsed, setIsIndicatorsCollapsed] = useState(false);
+  const [isIndicatorsCollapsed, setIsIndicatorsCollapsed] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  );
   const isLegendHudVisible = useDrawingStore((s) => s.isLegendHudVisible);
   const toggleLegendHud = useDrawingStore((s) => s.toggleLegendHud);
 
@@ -79,7 +81,7 @@ export default function ChartLegendHUD({
   }
 
   return (
-    <div className="pointer-events-auto absolute left-3 top-2.5 z-20 flex flex-col gap-1 select-none font-mono text-[11px] leading-tight max-w-[85%]">
+    <div className="pointer-events-auto absolute left-3 top-2.5 z-20 flex flex-col gap-1 select-none font-mono text-[11px] leading-tight max-w-[85%] max-sm:left-2 max-sm:top-2 max-sm:max-w-[calc(100%-1rem)] max-sm:max-h-[35%] max-sm:overflow-y-auto max-sm:rounded-lg max-sm:border max-sm:border-grid/70 max-sm:bg-panel/90 max-sm:px-2 max-sm:py-1.5 max-sm:shadow-lg max-sm:backdrop-blur-md">
       {/* Symbol & Market Status Header */}
       <div className="flex flex-wrap items-center gap-1.5 py-0.5 select-none w-fit text-[11px]">
         {/* Toggle hide/unhide legend button */}

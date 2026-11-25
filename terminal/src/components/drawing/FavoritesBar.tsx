@@ -252,24 +252,38 @@ export default function FavoritesBar() {
     const startMouseY = e.clientY;
     const startPosX = safeX;
     const startPosY = safeY;
+    let frame = 0;
+    let pending: { x: number; y: number } | null = null;
 
     const handlePointerMove = (moveEv: PointerEvent) => {
       if (!isDraggingRef.current) return;
       const dx = moveEv.clientX - startMouseX;
       const dy = moveEv.clientY - startMouseY;
-      const newX = Math.max(16, Math.min(window.innerWidth - 320, startPosX + dx));
-      const newY = Math.max(64, Math.min(window.innerHeight - 70, startPosY + dy));
-      setPos({ x: newX, y: newY });
+      pending = {
+        x: Math.max(16, Math.min(window.innerWidth - 320, startPosX + dx)),
+        y: Math.max(64, Math.min(window.innerHeight - 70, startPosY + dy)),
+      };
+      if (!frame) frame = requestAnimationFrame(() => {
+        frame = 0;
+        if (pending) setPos(pending);
+        pending = null;
+      });
     };
 
     const handlePointerUp = () => {
       isDraggingRef.current = false;
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+      if (pending) setPos(pending);
+      pending = null;
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
     };
 
-    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
     window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
   };
 
   const handleResetPos = () => {
