@@ -134,7 +134,7 @@ export default function ChartSettingsModal({
           </div>
           <button
             onClick={onClose}
-            className="clay-btn h-7 w-7 text-muted hover:text-white"
+            className="chart-settings-close clay-btn h-7 w-7 text-muted hover:text-white"
             title="Close (Esc)"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -575,13 +575,13 @@ export default function ChartSettingsModal({
               audioHaptics.tick();
               onResetDefaults();
             }}
-            className="text-muted hover:text-white transition underline"
+            className="chart-settings-reset text-muted hover:text-white transition underline"
           >
             Reset Defaults
           </button>
           <button
             onClick={onClose}
-            className="clay-pill-active px-5 py-1.5 font-bold"
+            className="chart-settings-done clay-pill-active px-5 py-1.5 font-bold"
           >
             Done
           </button>

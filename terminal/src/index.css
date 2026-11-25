@@ -580,3 +580,25 @@ html.theme-light .chart-settings-dialog .border-grid {
 html.theme-light .chart-settings-dialog input[type="color"] {
   border-color: rgba(15, 23, 42, 0.2);
 }
+
+
+@media (max-width: 767px) {
+  .chart-settings-close,
+  .chart-settings-reset,
+  .chart-settings-done {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .chart-settings-close {
+    min-width: 44px;
+  }
+  .chart-settings-reset {
+    padding-inline: 8px;
+  }
+  .chart-settings-done {
+    min-width: 76px;
+    padding-inline: 18px;
+  }
+}
