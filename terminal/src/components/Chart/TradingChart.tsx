@@ -2421,6 +2421,22 @@ export default function TradingChart({
                   </svg>
                   <span>Advanced Interval Dialog...</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    audioHaptics.tick();
+                    closeAllMenus();
+                    if (isReplayActive) exitReplay();
+                    else startReplay();
+                  }}
+                  className="flex w-full items-center gap-2 px-2.5 py-2 mt-1 rounded-lg text-accent hover:bg-accent/10 transition text-left font-semibold"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M5 5v14l12-7-12-7z" />
+                  </svg>
+                  <span>{isReplayActive ? 'Exit Bar Replay' : 'Start Bar Replay'}</span>
+                </button>
               </div>
             )}
           </div>
@@ -2685,6 +2701,22 @@ export default function TradingChart({
                       </div>
                     </div>
 
+                    <div className="flex items-center justify-between bg-black/40 px-2.5 py-1.5 rounded-lg border border-white/5">
+                      <span className="text-slate-300">Up Candle Border</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase">{chartSettings.borderUpColor || chartSettings.candleUpColor}</span>
+                        <input type="color" value={chartSettings.borderUpColor || chartSettings.candleUpColor} onChange={(e) => updateChartSettings({ borderUpColor: e.target.value })} className="h-7 w-8 rounded cursor-pointer border-0 bg-transparent p-0" title="Pick Up Candle Border Color" aria-label="Up candle border color" />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-black/40 px-2.5 py-1.5 rounded-lg border border-white/5">
+                      <span className="text-slate-300">Down Candle Border</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase">{chartSettings.borderDownColor || '#71717a'}</span>
+                        <input type="color" value={chartSettings.borderDownColor || '#71717a'} onChange={(e) => updateChartSettings({ borderDownColor: e.target.value })} className="h-7 w-8 rounded cursor-pointer border-0 bg-transparent p-0" title="Pick Down Candle Border Color" aria-label="Down candle border color" />
+                      </div>
+                    </div>
+
                     {/* Canvas Custom Solid Background Color */}
                     <div className="flex items-center justify-between bg-black/40 px-2.5 py-1.5 rounded-lg border border-white/5">
                       <span className="text-slate-300 flex items-center gap-1.5">
@@ -2843,6 +2875,7 @@ export default function TradingChart({
                 : 'text-secondary hover:text-primary hover:bg-surface/50'
             }`}
             title="Bar Replay Historical Time Machine (Space: Play/Pause, Shift+Right: Step)"
+            aria-label={isReplayActive ? 'Exit Bar Replay' : 'Start Bar Replay'}
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
