@@ -34,42 +34,39 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
 
-  // Never intercept APIs or socket traffic.
   if (url.origin !== self.location.origin ||
       url.pathname.startsWith('/api') ||
       url.protocol === 'ws:' ||
       url.protocol === 'wss:') return;
 
-  // Always ask the deployed server for the app shell first. This prevents
-  // users from being pinned to an old index.html and old hashed bundles.
+  // Fetch the app shell from production first; cache only as offline fallback.
   if (event.request.mode === 'navigate' || url.pathname === '/index.html') {
     event.respondWith(
-      fetch(event.request, { cache: 'no-store' })
-        .then((response) => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', copy)));
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match('/index.html');
-          return cached || Response.error();
-        })
+      fetch(event.request, { cache: 'no-store' }).then(async (response) => {
+        if (response && response.ok) {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put('/index.html', response.clone());
+        }
+        return response;
+      }).catch(async () => {
+        return (await caches.match('/index.html')) || Response.error();
+      })
     );
     return;
   }
 
-  // Vite's content-hashed assets are safe to cache by their immutable URL.
+  // Vite content-hashed assets can be safely cached by immutable URL.
   if (/\.(?:js|css|woff2|svg|png|webp|jpg|jpeg)$/.test(url.pathname)) {
     event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
+      caches.match(event.request).then(async (cached) => {
+        if (cached) return cached;
+        const response = await fetch(event.request);
         if (response && response.ok) {
-          const copy = response.clone();
-          event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)));
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(event.request, response.clone());
         }
         return response;
-      }))
+      })
     );
   }
 });
