@@ -68,7 +68,7 @@ export default function BarReplayController({
   return (
     <div
       ref={containerRef}
-      className="clay-popover absolute top-2 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3 py-1.5 font-mono text-xs select-none"
+      className="clay-popover absolute top-2 left-2 right-2 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-40 flex items-center gap-2 px-3 py-1.5 font-mono text-xs select-none max-w-[calc(100vw-1rem)] overflow-x-auto overscroll-x-contain touch-pan-x whitespace-nowrap [&>*]:shrink-0"
     >
       {/* Replay Mode Badge */}
       <div className="flex items-center gap-1.5 pr-2 border-r border-grid/50">
