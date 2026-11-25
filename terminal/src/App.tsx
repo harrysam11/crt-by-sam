@@ -556,7 +556,7 @@ export default function App() {
             </div>
             <div
               style={{ width: typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : rightW }}
-              className="shrink-0 flex flex-col overflow-hidden bg-panel border-t md:border-t-0 md:border-l border-grid z-30 shadow-2xl fixed inset-x-0 bottom-0 top-auto bottom-14 h-[72dvh] max-h-[640px] rounded-t-xl md:rounded-none md:relative md:inset-auto md:h-full md:max-h-none md:bottom-auto md:top-auto md:w-auto w-full"
+              className="shrink-0 flex flex-col overflow-hidden bg-panel border-t md:border-t-0 md:border-l border-grid z-30 shadow-2xl fixed inset-x-0 bottom-14 top-auto h-[72dvh] max-h-[640px] rounded-t-xl md:rounded-none md:relative md:inset-auto md:h-full md:max-h-none md:bottom-auto md:top-auto md:w-auto w-full"
             >
               {/* Mobile Drawer Close Header */}
               <div className="md:hidden flex items-center justify-between px-3 py-2 bg-base border-b border-grid">
