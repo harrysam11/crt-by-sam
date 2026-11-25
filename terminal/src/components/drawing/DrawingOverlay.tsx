@@ -104,14 +104,26 @@ export default function DrawingOverlay({
     };
 
     updateBounds();
-    const ro = new ResizeObserver(updateBounds);
-    if (containerRef.current?.parentElement) {
-      ro.observe(containerRef.current.parentElement);
+    let frame = 0;
+    const scheduleUpdate = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        updateBounds();
+      });
+    };
+    const parent = containerRef.current?.parentElement;
+    const ro = new ResizeObserver(scheduleUpdate);
+    if (parent) {
+      ro.observe(parent);
+      const canvas = parent.querySelector('.tv-lightweight-charts canvas');
+      if (canvas) ro.observe(canvas);
     }
-    const interval = setInterval(updateBounds, 350);
+    window.addEventListener('resize', scheduleUpdate, { passive: true });
     return () => {
       ro.disconnect();
-      clearInterval(interval);
+      window.removeEventListener('resize', scheduleUpdate);
+      if (frame) cancelAnimationFrame(frame);
     };
   }, [chartApi]);
 

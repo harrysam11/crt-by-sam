@@ -44,6 +44,7 @@ export default function OnChartNewsOverlay({
 }: OnChartNewsOverlayProps) {
   const [newsItems, setNewsItems] = useState<UnifiedChartNewsItem[]>([]);
   const [activeItem, setActiveItem] = useState<UnifiedChartNewsItem | null>(null);
+  const [activeDayItems, setActiveDayItems] = useState<UnifiedChartNewsItem[] | null>(null);
   const [hoveredItem, setHoveredItem] = useState<{ item: UnifiedChartNewsItem; x: number; y: number } | null>(null);
   const [chartWidth, setChartWidth] = useState(800);
   const [chartHeight, setChartHeight] = useState(500);
@@ -56,13 +57,12 @@ export default function OnChartNewsOverlay({
     const loadNews = async () => {
       const consolidated: UnifiedChartNewsItem[] = [];
 
-      // 1. Static high-impact macro calendar events
-      const nowSec = Math.floor(Date.now() / 1000);
-      MACRO_ECONOMIC_CALENDAR.forEach((ev, idx) => {
-        // synthesize timestamps spread over recent days and future
-        const dayOffset = (idx - 3) * 86400;
-        const [hh, mm] = ev.timeUtc.split(':').map(Number);
-        const eventSec = nowSec + dayOffset + (hh * 3600 + mm * 60);
+      // 1. Static calendar fixtures use their declared UTC date/time.
+      // Never shift old events relative to "now": that makes the chart date lie.
+      MACRO_ECONOMIC_CALENDAR.forEach((ev) => {
+        const eventDate = new Date(`${ev.dateStr}T${ev.timeUtc}:00Z`);
+        const eventSec = Math.floor(eventDate.getTime() / 1000);
+        if (!Number.isFinite(eventSec)) return;
 
         consolidated.push({
           id: `macro-${ev.id}`,
@@ -205,6 +205,23 @@ export default function OnChartNewsOverlay({
     return markers;
   }, [chartApi, visible, newsItems, chartWidth, timeRange]);
 
+  // Collapse same-day events into one date marker. Tapping it opens a list
+  // so several releases/news stories on one date remain individually accessible.
+  const groupedMarkers = useMemo(() => {
+    const groups = new Map<string, { items: UnifiedChartNewsItem[]; xs: number[] }>();
+    visibleMarkers.forEach(({ item, x }) => {
+      const dateKey = new Date(item.timestamp * 1000).toLocaleDateString();
+      const group = groups.get(dateKey) ?? { items: [], xs: [] };
+      group.items.push(item);
+      group.xs.push(x);
+      groups.set(dateKey, group);
+    });
+    return Array.from(groups.values()).map((group) => ({
+      items: group.items.sort((a, b) => a.timestamp - b.timestamp),
+      x: group.xs.reduce((sum, value) => sum + value, 0) / group.xs.length,
+    }));
+  }, [visibleMarkers]);
+
   const upcomingEvent = useMemo(() => {
     const nowSec = Math.floor(Date.now() / 1000);
     const future = newsItems
@@ -231,10 +248,11 @@ export default function OnChartNewsOverlay({
       className="pointer-events-none absolute inset-0 z-20 overflow-hidden font-mono select-none"
     >
       {/* Markers rendered along bottom time-scale axis */}
-      {visibleMarkers.map(({ item, x }) => {
+      {groupedMarkers.map(({ items, x }) => {
+        const item = items[0];
         const isMacro = item.type === 'MACRO_EVENT';
-        const isHigh = item.impact === 'HIGH';
-        const isMed = item.impact === 'MED';
+        const isHigh = items.some((entry) => entry.impact === 'HIGH');
+        const isMed = !isHigh && items.some((entry) => entry.impact === 'MED');
 
         const badgeColor = isHigh
           ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500 hover:text-white'
@@ -255,7 +273,8 @@ export default function OnChartNewsOverlay({
             className="pointer-events-auto absolute -translate-x-1/2 flex flex-col items-center group cursor-pointer transition-transform hover:scale-110"
             onClick={() => {
               audioHaptics.tick();
-              setActiveItem(item);
+              if (items.length === 1) setActiveItem(item);
+              else setActiveDayItems(items);
             }}
             onMouseEnter={() => setHoveredItem({ item, x, y: chartHeight - bottomPos })}
             onMouseLeave={() => setHoveredItem(null)}
@@ -271,10 +290,48 @@ export default function OnChartNewsOverlay({
               {isMed && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}
               {!isHigh && !isMed && <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />}
               <span>{labelText}</span>
+              {items.length > 1 && <span className="ml-0.5 rounded bg-black/30 px-1">{items.length}</span>}
             </div>
           </div>
         );
       })}
+
+      {activeDayItems && (
+        <div
+          className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3"
+          onClick={() => setActiveDayItems(null)}
+        >
+          <div className="clay-popover w-full max-w-sm max-h-[70vh] overflow-y-auto p-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-between border-b border-grid pb-2">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted">News & events</div>
+                <div className="text-sm font-bold text-white">{new Date(activeDayItems[0].timestamp * 1000).toLocaleDateString()}</div>
+              </div>
+              <button type="button" onClick={() => setActiveDayItems(null)} className="rounded px-2 py-1 text-xs text-secondary hover:bg-surface">Close</button>
+            </div>
+            <div className="space-y-1">
+              {activeDayItems.map((entry) => (
+                <button
+                  key={entry.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveDayItems(null);
+                    setActiveItem(entry);
+                  }}
+                  className="flex w-full items-start gap-3 rounded-md border border-grid/60 p-2 text-left hover:bg-surface"
+                >
+                  <span className="shrink-0 text-[10px] text-muted">{new Date(entry.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[10px] font-bold text-accent">{entry.type === 'MACRO_EVENT' ? entry.currency || 'MACRO' : entry.source}</span>
+                    <span className="block text-xs text-primary">{entry.title}</span>
+                  </span>
+                  <span className="shrink-0 text-[9px] text-muted">{entry.impact}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hover Tooltip Card */}
       {hoveredItem && !activeItem && (

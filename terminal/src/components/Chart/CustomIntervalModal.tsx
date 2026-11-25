@@ -83,12 +83,27 @@ export default function CustomIntervalModal({
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleWindowKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleWindowKeyDown);
+    return () => window.removeEventListener('keydown', handleWindowKeyDown);
+  }, [isOpen, onClose]);
+
   return (
     <div
       role="dialog"
       aria-modal="true"
       className="custom-interval-overlay fixed inset-0 z-50 flex items-center justify-center max-sm:items-end bg-black/75 p-4 max-sm:p-0 backdrop-blur-[2px]"
       onKeyDown={handleKeyDown}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="custom-interval-dialog relative w-full max-w-xl rounded-2xl bg-[#0e0e14] border border-[#272736] p-6 shadow-2xl shadow-black font-mono">
         {/* Header with Primary Icon */}

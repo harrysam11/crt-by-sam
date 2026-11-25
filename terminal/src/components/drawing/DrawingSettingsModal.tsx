@@ -76,6 +76,7 @@ export default function DrawingSettingsModal({
   // Movable Dialog Window position state
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Initialize position to comfortable center-right view on first open so chart stays visible
   useEffect(() => {
@@ -96,6 +97,17 @@ export default function DrawingSettingsModal({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // Close the floating settings panel when the user taps outside it.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleOutsidePointerDown = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (target && dialogRef.current && !dialogRef.current.contains(target)) onClose();
+    };
+    window.addEventListener('pointerdown', handleOutsidePointerDown, true);
+    return () => window.removeEventListener('pointerdown', handleOutsidePointerDown, true);
   }, [isOpen, onClose]);
 
   const startDrag = (e: React.PointerEvent) => {
@@ -211,6 +223,7 @@ export default function DrawingSettingsModal({
 
   return (
     <div
+      ref={dialogRef}
       data-drawing-settings-modal="true"
       onPointerDown={(e) => e.stopPropagation()}
       style={{
@@ -418,6 +431,18 @@ export default function DrawingSettingsModal({
                             }`}
                           />
                         ))}
+                        <input
+                          type="color"
+                          value={fillColor}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setFillColor(next);
+                            applyLiveChange({ fillColor: next });
+                          }}
+                          className="h-8 w-8 shrink-0 rounded cursor-pointer bg-transparent border-0 p-0"
+                          title="Custom Fill Color"
+                          aria-label="Custom fill color"
+                        />
                       </div>
                       <div className="flex items-center gap-2 flex-1">
                         <span className="text-slate-400 text-[10px]">Opacity:</span>
