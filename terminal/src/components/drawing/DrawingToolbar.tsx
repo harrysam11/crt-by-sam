@@ -47,6 +47,8 @@ export default function DrawingToolbar({
   const toggleFavoritesBar = useDrawingStore((s) => s.toggleFavoritesBar);
   const setFloatingToolbarPos = useDrawingStore((s) => s.setFloatingToolbarPos);
   const setDrawingContextBarPos = useDrawingStore((s) => s.setDrawingContextBarPos);
+  const autoAngleSnap = useDrawingStore((s) => s.autoAngleSnap);
+  const toggleAutoAngleSnap = useDrawingStore((s) => s.toggleAutoAngleSnap);
 
   const toggleDrawer = (name: string, e: React.MouseEvent<HTMLButtonElement>) => {
     if (openDrawer === name) {
@@ -410,6 +412,18 @@ export default function DrawingToolbar({
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
+        </svg>
+      </button>
+
+      {/* Automatic line-angle snapping: 0°, 45°, and 90° */}
+      <button
+        onClick={() => { audioHaptics.tick(); toggleAutoAngleSnap(); }}
+        aria-pressed={autoAngleSnap}
+        className={`min-h-10 min-w-10 p-2.5 rounded-lg flex items-center justify-center transition ${autoAngleSnap ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/80'}`}
+        title={autoAngleSnap ? 'Auto Angle Snap ON (0°, 45°, 90°)' : 'Enable Auto Angle Snap (0°, 45°, 90°)'}
+      >
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 19V5m0 14h16M4 19l11-11m0 0h-5m5 0v5" />
         </svg>
       </button>
 
