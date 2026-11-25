@@ -62,25 +62,37 @@ export default function DrawingContextBar({
     const startMouseY = e.clientY;
     const startPosX = safeX;
     const startPosY = safeY;
+    let frame = 0;
+    let pending: { x: number; y: number } | null = null;
 
     const handlePointerMove = (moveEv: PointerEvent) => {
       if (!isDraggingRef.current) return;
       const dx = moveEv.clientX - startMouseX;
       const dy = moveEv.clientY - startMouseY;
-      const newX = Math.max(8, Math.min(window.innerWidth - 220, startPosX + dx));
-      const newY = Math.max(42, Math.min(window.innerHeight - 45, startPosY + dy));
-      setPos({ x: newX, y: newY });
+      pending = {
+        x: Math.max(8, Math.min(window.innerWidth - 220, startPosX + dx)),
+        y: Math.max(42, Math.min(window.innerHeight - 45, startPosY + dy)),
+      };
+      if (!frame) frame = requestAnimationFrame(() => {
+        frame = 0;
+        if (pending) setPos(pending);
+        pending = null;
+      });
     };
 
     const stopDrag = () => {
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+      if (pending) setPos(pending);
+      pending = null;
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', stopDrag);
       window.removeEventListener('pointercancel', stopDrag);
     };
 
-    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
     window.addEventListener('pointerup', stopDrag);
     window.addEventListener('pointercancel', stopDrag);
   };
