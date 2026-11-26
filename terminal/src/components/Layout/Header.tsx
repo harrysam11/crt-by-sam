@@ -198,12 +198,28 @@ export default function Header({
     try {
       const raw = localStorage.getItem('crt_chart_settings');
       const prev = raw ? JSON.parse(raw) : {};
-      const next = { ...prev, candleUpColor: up, candleDownColor: down };
+      // Palette presets update the complete candle appearance, not only the body fill.
+      const next = {
+        ...prev,
+        candleUpColor: up,
+        candleDownColor: down,
+        borderUpColor: up,
+        borderDownColor: down,
+        wickUpColor: up,
+        wickDownColor: down,
+      };
       localStorage.setItem('crt_chart_settings', JSON.stringify(next));
       window.dispatchEvent(new CustomEvent('crt-chart-settings-changed', { detail: next }));
     } catch {}
     if ((window as any).__updateChartSettings) {
-      (window as any).__updateChartSettings({ candleUpColor: up, candleDownColor: down });
+      (window as any).__updateChartSettings({
+        candleUpColor: up,
+        candleDownColor: down,
+        borderUpColor: up,
+        borderDownColor: down,
+        wickUpColor: up,
+        wickDownColor: down,
+      });
     }
   };
 
@@ -225,7 +241,7 @@ export default function Header({
   };
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent) => {
       const target = e.target as Node;
       if (instToolsRef.current && !instToolsRef.current.contains(target)) {
         setIsInstToolsOpen(false);
@@ -273,11 +289,11 @@ export default function Header({
       }
     };
     if (isInstToolsOpen || isLayoutOpen || isAccountOpen || isOverflowOpen || isTfMenuOpen || isStyleMenuOpen || isCandleColorOpen || isLayersMenuOpen || isSnapshotOpen || isUserMenuOpen) {
-      window.addEventListener('mousedown', handleClickOutside);
+      window.addEventListener('pointerdown', handleClickOutside, true);
       window.addEventListener('keydown', handleKeyDown);
     }
     return () => {
-      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('pointerdown', handleClickOutside, true);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isInstToolsOpen, isLayoutOpen, isAccountOpen, isOverflowOpen, isTfMenuOpen, isStyleMenuOpen, isCandleColorOpen, isLayersMenuOpen, isSnapshotOpen, isUserMenuOpen]);
@@ -417,7 +433,7 @@ export default function Header({
   const displayPnl = hideDollar ? (open >= 0 ? '+Target Track' : '-Risk Zone') : fmtPnl(open);
 
   return (
-    <header className="relative flex h-[38px] shrink-0 items-center justify-between gap-1.5 border-b border-grid bg-panel px-2 sm:px-2.5 select-none font-mono text-xs z-30">
+    <header className="terminal-main-header relative flex h-[38px] shrink-0 items-center justify-between gap-1.5 border-b border-grid bg-panel px-2 sm:px-2.5 select-none font-mono text-xs z-30">
       {/* Daily Drawdown Progress Bar along top border */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-grid/30 overflow-hidden">
         <div

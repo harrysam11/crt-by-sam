@@ -445,7 +445,7 @@ export default function TradingChart({
   }, [activeMenu, closeAllMenus]);
 
   useEffect(() => {
-    const handleOutside = (e: MouseEvent) => {
+    const handleOutside = (e: PointerEvent) => {
       const target = e.target as HTMLElement;
       if (
         (tfMenuRef.current && tfMenuRef.current.contains(target)) ||
@@ -453,7 +453,7 @@ export default function TradingChart({
         (layersMenuRef.current && layersMenuRef.current.contains(target)) ||
         (colorMenuRef.current && colorMenuRef.current.contains(target)) ||
         (screenshotMenuRef.current && screenshotMenuRef.current.contains(target)) ||
-        target.closest('.clay-popover')
+        target.closest('[data-chart-toolbar-menu]')
       ) {
         return;
       }
@@ -465,11 +465,11 @@ export default function TradingChart({
       }
     };
     if (activeMenu || isScreenshotMenuOpen) {
-      window.addEventListener('mousedown', handleOutside);
+      window.addEventListener('pointerdown', handleOutside, true);
       window.addEventListener('keydown', handleEscape);
     }
     return () => {
-      window.removeEventListener('mousedown', handleOutside);
+      window.removeEventListener('pointerdown', handleOutside, true);
       window.removeEventListener('keydown', handleEscape);
     };
   }, [activeMenu, isScreenshotMenuOpen, closeAllMenus]);
@@ -1970,54 +1970,46 @@ export default function TradingChart({
     else if (chartStyle === 'BASELINE') setSeriesApi(a.baselineSeries);
     else setSeriesApi(a.candles);
 
-    const isDark = chartSettings.candleDownColor === '#101015' || chartSettings.candleDownColor === '#050508';
-    const borderDown = isDark ? '#71717a' : chartSettings.candleDownColor;
+    const isLight = themeMode === 'LIGHT';
+    const defaultUp = isLight ? '#16a34a' : '#ffffff';
+    const defaultDown = isLight ? '#dc2626' : '#101015';
+    // Match the theme-aware defaults used by the live settings effect above.
+    const upCol = chartSettings.candleUpColor && chartSettings.candleUpColor !== '#ffffff'
+      ? chartSettings.candleUpColor
+      : defaultUp;
+    const downCol = chartSettings.candleDownColor && chartSettings.candleDownColor !== '#101015'
+      ? chartSettings.candleDownColor
+      : defaultDown;
+    const borderUp = chartSettings.borderUpColor || upCol;
+    const isDarkDown = downCol === '#101015' || downCol === '#050508';
+    const borderDown = chartSettings.borderDownColor || (isLight ? downCol : (isDarkDown ? '#71717a' : downCol));
+    const wickUp = chartSettings.wickUpColor || borderUp;
+    const wickDown = chartSettings.wickDownColor || borderDown;
 
     if (chartStyle === 'FOOTPRINT') {
       a.candles.applyOptions({
         upColor: 'transparent',
         downColor: 'transparent',
         borderVisible: false,
+        wickVisible: true,
         wickUpColor: 'rgba(255, 255, 255, 0.25)',
         wickDownColor: 'rgba(255, 255, 255, 0.25)',
       });
-    } else if (chartStyle === 'HOLLOW_CANDLE') {
-      const isLight = themeMode === 'LIGHT';
-      const defaultUp = isLight ? '#089981' : '#ffffff';
-      const defaultDown = isLight ? '#f23645' : '#101015';
-      const upCol = chartSettings.candleUpColor && chartSettings.candleUpColor !== '#ffffff' ? chartSettings.candleUpColor : defaultUp;
-      const downCol = chartSettings.candleDownColor && chartSettings.candleDownColor !== '#101015' ? chartSettings.candleDownColor : defaultDown;
-
-      a.candles.applyOptions({
-        upColor: 'transparent',
-        downColor: downCol,
-        borderVisible: true,
-        borderUpColor: upCol,
-        borderDownColor: borderDown,
-        wickVisible: true,
-        wickUpColor: upCol,
-        wickDownColor: borderDown,
-      });
     } else {
-      const isLight = themeMode === 'LIGHT';
-      const defaultUp = isLight ? '#089981' : '#ffffff';
-      const defaultDown = isLight ? '#f23645' : '#101015';
-      const upCol = chartSettings.candleUpColor && chartSettings.candleUpColor !== '#ffffff' ? chartSettings.candleUpColor : defaultUp;
-      const downCol = chartSettings.candleDownColor && chartSettings.candleDownColor !== '#101015' ? chartSettings.candleDownColor : defaultDown;
-
+      const isHollow = chartStyle === 'HOLLOW_CANDLE';
       a.candles.applyOptions({
-        upColor: upCol,
-        downColor: downCol,
-        borderVisible: true,
-        borderUpColor: upCol,
+        upColor: isHollow || chartSettings.candleBodyVisible === false ? 'transparent' : upCol,
+        downColor: chartSettings.candleBodyVisible === false ? 'transparent' : downCol,
+        borderVisible: chartSettings.candleBorderVisible !== false,
+        borderUpColor: borderUp,
         borderDownColor: borderDown,
-        wickVisible: true,
-        wickUpColor: upCol,
-        wickDownColor: borderDown,
+        wickVisible: chartSettings.candleWickVisible !== false,
+        wickUpColor: wickUp,
+        wickDownColor: wickDown,
       });
       a.barSeries.applyOptions({
         upColor: upCol,
-        downColor: borderDown,
+        downColor: downCol,
       });
       a.lineSeries.applyOptions({
         color: upCol,
@@ -2149,7 +2141,7 @@ export default function TradingChart({
       {shouldShowTopToolbar && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="relative z-30 flex items-center justify-between border-b border-grid bg-panel px-2.5 py-1 select-none text-xs gap-2 overflow-visible"
+          className="chart-top-toolbar relative z-30 flex items-center justify-between border-b border-grid bg-panel px-2.5 py-1 select-none text-xs gap-2 overflow-visible"
         >
         {/* Left Section: Symbol, Timeframes, Candle Style, Indicators, Replay, Alert, Undo/Redo, Layers */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none min-w-0 flex-1 py-0.5">
@@ -2254,7 +2246,7 @@ export default function TradingChart({
                   top: `${menuAnchor?.top ?? 45}px`,
                   left: `${menuAnchor?.left ?? 10}px`,
                 }}
-                className="fixed z-50 w-72 max-w-[calc(100vw-16px)] clay-popover p-2.5 shadow-2xl font-mono text-xs max-h-[80vh] overflow-y-auto"
+                data-chart-toolbar-menu className="fixed z-50 w-72 max-w-[calc(100vw-16px)] clay-popover p-2.5 shadow-2xl font-mono text-xs max-h-[80vh] overflow-y-auto"
               >
                 {/* Direct User Input Form for Custom Interval */}
                 <div className="p-2 border border-[#2d2d3e] bg-black/60 rounded-xl mb-2.5">
@@ -2532,7 +2524,7 @@ export default function TradingChart({
                   top: `${menuAnchor?.top ?? 45}px`,
                   left: `${menuAnchor?.left ?? 10}px`,
                 }}
-                className="fixed z-50 w-60 clay-popover p-2 shadow-2xl font-mono text-xs max-h-80 overflow-y-auto"
+                data-chart-toolbar-menu className="fixed z-50 w-60 clay-popover p-2 shadow-2xl font-mono text-xs max-h-80 overflow-y-auto"
               >
                 <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1">
                   Chart Style
@@ -2609,7 +2601,7 @@ export default function TradingChart({
                   top: `${menuAnchor?.top ?? 45}px`,
                   left: `${menuAnchor?.left ?? 10}px`,
                 }}
-                className="fixed z-50 w-64 clay-popover p-3 shadow-2xl font-mono text-xs select-none max-h-[80vh] overflow-y-auto"
+                data-chart-toolbar-menu className="fixed z-50 w-64 clay-popover p-3 shadow-2xl font-mono text-xs select-none max-h-[80vh] overflow-y-auto"
               >
                 <div className="px-1 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-2 flex items-center justify-between">
                   <span>Candle Palette</span>
@@ -2641,7 +2633,14 @@ export default function TradingChart({
                         key={preset.name}
                         onClick={() => {
                           audioHaptics.tick();
-                          updateChartSettings({ candleUpColor: preset.up, candleDownColor: preset.down });
+                          updateChartSettings({
+                            candleUpColor: preset.up,
+                            candleDownColor: preset.down,
+                            borderUpColor: preset.up,
+                            borderDownColor: preset.down,
+                            wickUpColor: preset.up,
+                            wickDownColor: preset.down,
+                          });
                         }}
                         className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition ${
                           isSelected ? 'clay-btn-active font-bold' : 'text-slate-300 hover:bg-white/10 hover:text-white'
@@ -2976,7 +2975,7 @@ export default function TradingChart({
                   top: `${menuAnchor?.top ?? 45}px`,
                   left: `${menuAnchor?.left ?? 10}px`,
                 }}
-                className="fixed z-50 w-72 clay-popover p-2.5 shadow-2xl font-mono text-xs select-none max-h-[80vh] overflow-y-auto"
+                data-chart-toolbar-menu className="fixed z-50 w-72 clay-popover p-2.5 shadow-2xl font-mono text-xs select-none max-h-[80vh] overflow-y-auto"
               >
                 <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-grid/60 mb-1.5">
                   Chart Overlays & Tools
@@ -3111,7 +3110,7 @@ export default function TradingChart({
         </div>
 
         {/* Right Section: Snapshot, Theme, Settings, Fullscreen */}
-        <div className="flex items-center gap-1 shrink-0 ml-auto">
+        <div className="chart-top-toolbar-right flex items-center gap-1 shrink-0 ml-auto">
           {/* Chart Snapshot Dropdown Popover (TradingView-style, NO eye-mask) */}
           <div className="relative hidden sm:block" ref={screenshotMenuRef}>
             <button
@@ -3131,7 +3130,7 @@ export default function TradingChart({
             </button>
 
             {isScreenshotMenuOpen && (
-              <div className="absolute right-0 top-full mt-1.5 z-50 w-52 clay-popover p-1.5 rounded-xl shadow-2xl select-none font-mono text-xs border border-white/10 backdrop-blur-md">
+              <div data-chart-toolbar-menu className="absolute right-0 top-full mt-1.5 z-50 w-52 clay-popover p-1.5 rounded-xl shadow-2xl select-none font-mono text-xs border border-white/10 backdrop-blur-md">
                 <button
                   onClick={handleDownloadScreenshot}
                   className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 text-slate-200 hover:text-white transition text-left"
