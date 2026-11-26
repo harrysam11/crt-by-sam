@@ -756,3 +756,47 @@ html.theme-light .custom-interval-dialog .bg-\[\#181824\] {
   background: #f1f5f9 !important;
   color: #0f172a !important;
 }
+
+
+/* Mobile terminal toolbars: wrap into deliberate rows instead of compressing controls over each other. */
+@media (max-width: 767px) {
+  .terminal-main-header {
+    height: auto !important;
+    min-height: 38px;
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+    align-content: flex-start;
+    align-items: center;
+    row-gap: 3px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  .terminal-main-header > div.flex:not(.absolute) {
+    flex: 1 1 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .chart-top-toolbar {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 4px;
+  }
+  .chart-top-toolbar > div:first-child {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+  .chart-top-toolbar-right {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    margin-left: 0 !important;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .chart-top-toolbar-right::-webkit-scrollbar { display: none; }
+}
