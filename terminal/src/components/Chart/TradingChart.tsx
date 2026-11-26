@@ -1973,8 +1973,13 @@ export default function TradingChart({
     const isLight = themeMode === 'LIGHT';
     const defaultUp = isLight ? '#16a34a' : '#ffffff';
     const defaultDown = isLight ? '#dc2626' : '#101015';
-    const upCol = chartSettings.candleUpColor || defaultUp;
-    const downCol = chartSettings.candleDownColor || defaultDown;
+    // Match the theme-aware defaults used by the live settings effect above.
+    const upCol = chartSettings.candleUpColor && chartSettings.candleUpColor !== '#ffffff'
+      ? chartSettings.candleUpColor
+      : defaultUp;
+    const downCol = chartSettings.candleDownColor && chartSettings.candleDownColor !== '#101015'
+      ? chartSettings.candleDownColor
+      : defaultDown;
     const borderUp = chartSettings.borderUpColor || upCol;
     const isDarkDown = downCol === '#101015' || downCol === '#050508';
     const borderDown = chartSettings.borderDownColor || (isLight ? downCol : (isDarkDown ? '#71717a' : downCol));
